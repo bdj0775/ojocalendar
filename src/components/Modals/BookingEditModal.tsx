@@ -157,7 +157,7 @@ const BookingEditModal = () => {
         checkIn, checkOut,
         guests: guestCount,
         nationality, channel: channel as 'Airbnb' | 'Booking.com' | 'Naver' | 'Direct',
-        amount, commission,
+        amount, commission: commRate,
       });
       showToast('예약이 수정되었습니다.', 'success');
       closeBookingModal();

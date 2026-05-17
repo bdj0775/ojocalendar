@@ -162,7 +162,7 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
         guests: guestCount,
         infants: 0,
         nationality, channel,
-        amount, commission,
+        amount, commission: commRate,
         bookingDate: today,
       });
       showToast('예약이 저장되었습니다.', 'success');
