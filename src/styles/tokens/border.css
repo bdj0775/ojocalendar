@@ -1,0 +1,29 @@
+/* ============================================================
+   Border Radius Tokens — 픽셀 고정 반경 시스템
+   Tailwind 기본 rounded-*(rem 기반)으로 표현 불가한 값.
+   chip  → 뱃지, 소형 태그
+   inner → 카드 내부 버튼/요소
+   card  → 아이콘 컨테이너
+   sheet → 카드, 바텀시트 상단 모서리
+   pill  → 최대 pill 버튼, FAB
+   ============================================================ */
+
+@theme {
+  --radius-chip:  6px;
+  --radius-inner: 10px;
+  --radius-card:  14px;
+  --radius-sheet: 20px;
+  --radius-pill:  30px;
+}
+
+@layer utilities {
+  .rounded-chip  { border-radius: var(--radius-chip); }
+  .rounded-inner { border-radius: var(--radius-inner); }
+  .rounded-card  { border-radius: var(--radius-card); }
+  .rounded-sheet { border-radius: var(--radius-sheet); }
+  .rounded-pill  { border-radius: var(--radius-pill); }
+  .rounded-t-sheet {
+    border-top-left-radius:  var(--radius-sheet);
+    border-top-right-radius: var(--radius-sheet);
+  }
+}

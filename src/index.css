@@ -1,0 +1,149 @@
+/* Pretendard Variable — dynamic subset (한글 최적화) */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+@import "tailwindcss";
+
+/* ── Design Tokens ──────────────────────────────────────────
+   로딩 순서: color → typography → elevation → border → spacing → layout
+   (spacing은 layout의 --nav-clearance를 참조하므로 layout이 먼저)
+   ──────────────────────────────────────────────────────── */
+@import "./styles/tokens/color.css";
+@import "./styles/tokens/typography.css";
+@import "./styles/tokens/elevation.css";
+@import "./styles/tokens/border.css";
+@import "./styles/tokens/layout.css";
+@import "./styles/tokens/spacing.css";
+
+/* ── Global Reset ─────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    padding-bottom: 70px;
+  }
+
+  a      { text-decoration: none; color: inherit; }
+  button { cursor: pointer; border: none; background: none; font-family: inherit; }
+}
+
+/* ── Container Layout (MainLayout) ───────────────────────── */
+@layer components {
+  .container {
+    max-width: var(--container-max-w);
+    margin: 0 auto;
+    min-height: 100vh;
+    position: relative;
+    background-color: var(--background);
+    box-shadow: var(--shadow-container);
+  }
+
+  @media (min-width: 1024px) {
+    body { padding-bottom: 0; }
+    .container {
+      max-width: 100%;
+      width: 100%;
+      margin: 0;
+      display: flex;
+      box-shadow: none;
+    }
+    main {
+      flex: 1;
+      min-width: 0;
+      height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+  }
+}
+
+/* ── Animations & App-level utilities ────────────────────── */
+@layer utilities {
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in    { animation: fadeIn    0.2s ease; }
+  .animate-slide-up   { animation: slideUp   0.25s ease; }
+  .animate-fade-in-up { animation: fadeInUp  0.4s ease both; }
+
+  /* DesktopDashboard scrollbar */
+  .dashboard-scroll::-webkit-scrollbar             { width: 6px; }
+  .dashboard-scroll::-webkit-scrollbar-track       { background: transparent; }
+  .dashboard-scroll::-webkit-scrollbar-thumb       { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  .dashboard-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+  .dashboard-scroll.light-mode::-webkit-scrollbar-thumb       { background: rgba(0,0,0,0.12); }
+  .dashboard-scroll::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+  /* Calendar / App scrollbar (thin, light gray, hides when not hovered on desktop) */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+    background-color: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+  }
+  .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(203, 213, 225, 0.8); /* slate-300 */
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(148, 163, 184, 0.8); /* slate-400 */
+  }
+
+  /* DesktopDashboard card entrance delays */
+  .dash-card:nth-child(1) { animation-delay: 0.00s; }
+  .dash-card:nth-child(2) { animation-delay: 0.05s; }
+  .dash-card:nth-child(3) { animation-delay: 0.10s; }
+  .dash-card:nth-child(4) { animation-delay: 0.15s; }
+  .dash-card:nth-child(5) { animation-delay: 0.20s; }
+  .dash-card:nth-child(6) { animation-delay: 0.25s; }
+  .dash-card:nth-child(7) { animation-delay: 0.30s; }
+
+  /* Analytics table sticky header */
+  .analytics-table thead th { position: sticky; top: 0; z-index: 1; }
+
+  /* Gradient text */
+  .gradient-text-dark,
+  .gradient-text-light {
+    background: linear-gradient(135deg, var(--foreground) 0%, var(--primary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Full-screen modal overlay */
+  .modal-overlay-full {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: var(--z-overlay);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 24px 16px;
+  }
+}

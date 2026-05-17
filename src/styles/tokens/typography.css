@@ -1,0 +1,102 @@
+/* ============================================================
+   Typography Scale — single source of truth
+   브랜드 폰트나 크기를 바꿀 때 이 파일만 수정하면 됩니다.
+   ============================================================ */
+
+@theme {
+  /* ── Font family ─────────────────────────────────────────── */
+  --font-sans: 'Pretendard Variable', 'Pretendard', -apple-system,
+    BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
+
+  /* ── Size + line-height pairs ─────────────────────────────
+     Tailwind utilities (text-display, text-page-title …) 자동 생성.
+     line-height 포함 — text-display 클래스 하나가 둘 다 세팅.     ──────────────────────────────────────────────────────── */
+  --text-display:       32px / 1.2;
+  --text-page-title:    24px / 1.3;
+  --text-section-title: 18px / 1.4;
+  --text-card-title:    15px / 1.5;
+  --text-body:          14px / 1.6;
+  --text-body-strong:   14px / 1.6;
+  --text-label:         12px / 1.4;
+  --text-caption:       11px / 1.4;
+  /* 확장 토큰 */
+  --text-micro:         10px / 1.4;  /* 높이 제약 바(bar) 메타, 극소형 레이블 */
+  --text-numeric:       26px / 1.1;  /* 대시보드 KPI/기간 숫자 헤딩 */
+}
+
+/* ============================================================
+   Compound utilities — size + weight + tracking 한 번에 적용.
+   JSX / Typography 컴포넌트의 1차 API.
+   색상(text-*)은 포함하지 않아 composable하게 유지.
+   ============================================================ */
+@layer utilities {
+  .type-display {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .type-page-title {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+  }
+
+  .type-section-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+  }
+
+  .type-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.5;
+  }
+
+  .type-body {
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.6;
+  }
+
+  .type-body-strong {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.6;
+  }
+
+  .type-label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    line-height: 1.4;
+  }
+
+  .type-caption {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+  }
+
+  .type-micro {
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+  }
+
+  .type-numeric {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+}

@@ -1,0 +1,18 @@
+/* ============================================================
+   Spacing Tokens — Tailwind 4px 스케일 외의 미세 간격
+   bracket 표기(gap-[3px], py-[18px]) 대신 이 클래스를 사용합니다.
+   ============================================================ */
+
+@layer utilities {
+  /* 3px — 분포 바 아이템 간격, 뱃지 내부 */
+  .gap-micro { gap:            3px; }
+  .py-micro  { padding-top:    3px; padding-bottom: 3px; }
+  .px-micro  { padding-left:   3px; padding-right:  3px; }
+
+  /* 18px — CTA 버튼 수직 패딩 (4px 배수 사이 중간값) */
+  .py-btn { padding-top: 18px; padding-bottom: 18px; }
+
+  /* BottomNav 기준 여백 — var(--nav-clearance) 참조 */
+  .pb-nav-clear     { padding-bottom: var(--nav-clearance); }
+  .bottom-nav-clear { bottom:         var(--nav-clearance); }
+}
