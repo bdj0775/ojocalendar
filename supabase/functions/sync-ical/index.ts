@@ -103,15 +103,25 @@ serve(async (req) => {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
-  // CRON_SECRET 검증 — Supabase Dashboard 스케줄러 또는 서버에서만 호출 가능
-  // 설정 방법: Supabase Dashboard > Edge Functions > sync-ical > Secrets > CRON_SECRET
-  // 스케줄러 Authorization 헤더: Bearer {CRON_SECRET}
-  const cronSecret = Deno.env.get('CRON_SECRET');
-  if (cronSecret) {
-    const authHeader = req.headers.get('Authorization') ?? '';
-    if (authHeader !== `Bearer ${cronSecret}`) {
+  const cronSecret  = Deno.env.get('CRON_SECRET');
+  const authHeader  = req.headers.get('Authorization') ?? '';
+  let filterHostId: string | null = null; // null = 전체 호스트 동기화 (cron 모드)
+
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+    // ── cron 스케줄러: 전체 동기화 ──────────────────────────
+    filterHostId = null;
+  } else {
+    // ── 클라이언트 JWT: 해당 유저 채널만 동기화 ─────────────
+    const anonClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user }, error: authErr } = await anonClient.auth.getUser();
+    if (authErr || !user) {
       return new Response('Unauthorized', { status: 401 });
     }
+    filterHostId = user.id;
   }
 
   const supabase = createClient(
@@ -119,10 +129,9 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
   );
 
-  const { data: channels, error } = await supabase
-    .from('sync_channels')
-    .select('*')
-    .eq('is_active', true);
+  let query = supabase.from('sync_channels').select('*').eq('is_active', true);
+  if (filterHostId) query = query.eq('host_id', filterHostId);
+  const { data: channels, error } = await query;
 
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   if (!channels?.length) return new Response(JSON.stringify({ message: 'no active channels' }));

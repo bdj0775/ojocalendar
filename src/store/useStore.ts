@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../services/supabaseClient';
 import { DUMMY_BOOKINGS, DUMMY_MAINTENANCE } from '../utils/dummyData';
-import { syncAllChannels } from '../services/icalSync/syncService';
 import { validateICalUrl } from '../services/icalSync/icalFetcher';
 import type {
   StoreState, Property, BookingStatus, Settings, SyncNotification,
@@ -406,19 +405,24 @@ export const useStore = create<StoreState>()(
       },
 
       triggerSync: async () => {
-        const user = get().userProfile;
-        if (!user) return;
+        if (!get().userProfile) return;
         set({ syncLoading: true, lastSyncResults: [] });
         try {
-          const results = await syncAllChannels(user.id);
+          // 서버사이드 Edge Function 직접 호출 → CORS 프록시 불필요
+          // JWT가 자동으로 전달되어 Edge Function이 해당 유저 채널만 동기화함
+          const { data, error } = await supabase.functions.invoke('sync-ical');
+          if (error) throw error;
+
+          type SyncRow = { channel: string; added: number; updated: number; error: string | null };
+          const rows: SyncRow[] = (data as { results?: SyncRow[] })?.results ?? [];
+
           set({
-            lastSyncResults: results.map(r => ({
-              channel: r.channel, added: r.added, updated: r.updated, error: r.error,
+            lastSyncResults: rows.map(r => ({
+              channel: r.channel, added: r.added, updated: r.updated, error: r.error ?? undefined,
             })),
           });
-          // 신규/변경 예약이 있으면 데이터 + 알림 모두 갱신
-          if (results.some(r => r.added > 0 || r.updated > 0)) {
-            await get().fetchData(); // fetchData 내부에서 fetchNotifications 호출됨
+          if (rows.some(r => r.added > 0 || r.updated > 0)) {
+            await get().fetchData();
           }
           await get().fetchSyncChannels();
         } finally {
