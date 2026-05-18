@@ -49,9 +49,9 @@ interface GridCell {
 }
 
 // JS 상수 — CSS 토큰 (layout.css) 과 동기화 유지
-const CELL_HEIGHT  = 120; // --calendar-cell-h
+const CELL_HEIGHT  = 100; // --calendar-cell-h
 const HEADER_H     =   0; // --calendar-header-h removed
-const BAR_OFFSET_Y =  38; // --calendar-bar-offset (날짜 숫자 영역 아래 시작점)
+const BAR_OFFSET_Y =  26; // --calendar-bar-offset (날짜 숫자 영역 아래 시작점)
 
 export function useBookingBars(
   bookings: Booking[],
@@ -130,7 +130,7 @@ export function useBookingBars(
           channelClass,
           left:    `${(col  / 7) * 100}%`,
           width:   `${(span / 7) * 100}%`,
-          top:     `${HEADER_H + row * CELL_HEIGHT + BAR_OFFSET_Y + (row === 0 ? 16 : 0)}px`,
+          top:     `${HEADER_H + row * CELL_HEIGHT + BAR_OFFSET_Y + (row === 0 ? 14 : 0)}px`,
           isFirst: cur === startIdx,
           isLast:  segEnd === endIdx,
           isPast:  endDate < today,

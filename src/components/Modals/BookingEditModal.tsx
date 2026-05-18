@@ -220,11 +220,11 @@ const BookingEditModal = () => {
       onClick={closeBookingModal}
     >
       <div
-        className="bg-card rounded-[28px] shadow-modal w-full max-w-[420px] relative animate-[fadeIn_0.15s_ease] overflow-hidden flex flex-col"
+        className="bg-card rounded-[28px] shadow-modal w-full max-w-[420px] max-h-[90vh] relative animate-[fadeIn_0.15s_ease] overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="px-7 pt-7 pb-5">
+        <div className="px-7 pt-7 pb-5 shrink-0">
           <button
             onClick={closeBookingModal}
             className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
@@ -270,7 +270,7 @@ const BookingEditModal = () => {
         </div>
 
         {/* ── Body ── */}
-        <div className="px-7 pb-7 space-y-6">
+        <div className="px-7 pb-7 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
           {/* Dates */}
           <div className="flex items-center bg-muted/20 p-4 rounded-2xl relative">
             <div className="flex-1 flex flex-col relative z-10 cursor-pointer" onClick={() => setPickerType('checkIn')}>
@@ -402,16 +402,19 @@ const BookingEditModal = () => {
             
             <div className="flex items-center gap-2">
               <button
-                onClick={handleDelete}
-                className={`p-3 rounded-2xl transition-all shadow-sm ${
+                type="button"
+                onClick={(e) => { e.preventDefault(); handleDelete(); }}
+                className={`flex items-center gap-2 p-3 rounded-2xl transition-all shadow-sm ${
                   confirmDel
-                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4'
                     : 'bg-muted/50 text-destructive hover:bg-destructive/10'
                 }`}
               >
                 <Trash2 size={16} />
+                {confirmDel && <span className="text-sm font-bold whitespace-nowrap">삭제 확인</span>}
               </button>
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={isSaving}
                 className="px-6 py-3 rounded-2xl bg-primary text-primary-foreground text-[15px] font-bold hover:bg-primary-hover active:scale-[0.98] transition-all disabled:opacity-50 shadow-sm shadow-primary/20"

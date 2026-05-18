@@ -18,10 +18,10 @@
     --sidebar-max-w:     800px;
 
     /* Calendar */
-    --calendar-cell-h:      120px;
+    --calendar-cell-h:       100px;
     --calendar-header-h:     40px;
-    --calendar-bar-h:        48px;  /* 예약 바 높이 (셀 높이의 40%) */
-    --calendar-bar-offset:   38px;  /* 셀 상단에서 바까지 거리 (날짜 숫자 영역) */
+    --calendar-bar-h:        48px;  /* 예약 바 높이 두배 확대 */
+    --calendar-bar-offset:   26px;  /* 셀 상단에서 바까지 거리 */
 
     /* Chart */
     --chart-h-sm: 160px;  /* 모바일 대시보드 */

@@ -133,7 +133,7 @@ export const PaceTooltip = ({ active, payload, label, isDark, ko, paceMode, sym 
       <div className={labelCls}>D-{label} {ko ? '누적 페이스' : 'Cumulative Pace'}</div>
       {pickupItem && pickupItem.value > 0 && (
         <div className="mb-2 bg-primary/10 rounded px-2 py-1 flex items-center justify-between text-xs text-primary font-bold">
-          <span>{ko ? '오늘 픽업' : 'Daily Pickup'}</span>
+          <span>{ko ? '당일 픽업' : 'Daily Pickup'}</span>
           <span>{paceMode === 'occ' ? `${pickupItem.value}박` : `${sym}${pickupItem.value.toLocaleString()}`}</span>
         </div>
       )}

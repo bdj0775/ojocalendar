@@ -24,7 +24,7 @@ const BAR_CHANNEL_CLS: Record<string, string> = {
 };
 
 // JS 상수 — CSS 토큰 (layout.css) 과 동기화 유지
-const CELL_HEIGHT = 120; // --calendar-cell-h
+const CELL_HEIGHT = 100; // --calendar-cell-h
 
 const getBarCls = (ch: string, isFirst: boolean, isLast: boolean, isPast: boolean) =>
   [
@@ -32,10 +32,10 @@ const getBarCls = (ch: string, isFirst: boolean, isLast: boolean, isPast: boolea
     'z-raise cursor-pointer overflow-hidden shadow-sm',
     'rounded-tl-none rounded-bl-none transition-all',
     'hover:brightness-95 hover:-translate-y-px hover:z-fab',
-    'h-[var(--calendar-bar-h)] py-1.5 px-2.5',
+    'h-[var(--calendar-bar-h)] py-[2px] px-1.5',
     BAR_CHANNEL_CLS[ch] ?? BAR_CHANNEL_CLS.airbnb,
     isLast  ? 'rounded-tr-2xl rounded-br-2xl' : 'rounded-tr-none rounded-br-none',
-    !isFirst ? '!border-l-0 pl-2.5'           : '',
+    !isFirst ? '!border-l-0 pl-1.5'           : '',
     isPast ? 'opacity-50' : '',
   ].join(' ');
 
@@ -84,9 +84,9 @@ const CalendarGrid = ({
         const isBlue   = dow === 6 && !holiName;
 
         const numCls = isToday
-          ? 'bg-primary text-primary-foreground font-bold w-[26px] h-[26px] inline-flex items-center justify-center rounded-full -mt-[3px] -ml-[4px]'
+          ? 'bg-primary text-primary-foreground font-bold w-5 h-5 text-[11px] inline-flex items-center justify-center rounded-full -mt-0.5 -ml-1'
           : [
-              'type-body font-medium inline-block',
+              'text-[11px] font-medium inline-block',
               isRed  ? 'text-calendar-sun' : isBlue ? 'text-calendar-sat' : 'text-muted-foreground',
               !cell.isCurrentMonth ? 'opacity-40' : '',
             ].join(' ');
@@ -95,7 +95,7 @@ const CalendarGrid = ({
           <div
             key={index}
             className={[
-              'h-[var(--calendar-cell-h)] p-2.5 box-border relative',
+              'h-[var(--calendar-cell-h)] p-1.5 box-border relative',
               dow < 6 ? 'border-r' : '',
               'border-b border-border/60',
               'cursor-pointer transition-colors hover:bg-accent/20',
@@ -104,14 +104,14 @@ const CalendarGrid = ({
             onClick={() => onDateClick(cell)}
           >
             {index < 7 && (
-              <div className={`absolute top-1.5 left-0 right-0 text-center text-[10px] uppercase font-semibold ${isRed ? 'text-calendar-sun/80' : isBlue ? 'text-calendar-sat/80' : 'text-muted-foreground/60'}`}>
+              <div className={`absolute top-1 left-0 right-0 text-center text-[9px] uppercase font-semibold ${isRed ? 'text-calendar-sun/80' : isBlue ? 'text-calendar-sat/80' : 'text-muted-foreground/60'}`}>
                 {dowLabels[dow]}
               </div>
             )}
-            <div className={`flex items-center gap-1.5 ${index < 7 ? 'mt-4' : ''}`}>
+            <div className={`flex items-center gap-1 ${index < 7 ? 'mt-3.5' : ''}`}>
               <span className={numCls}>{cell.day}</span>
               {holiName && cell.isCurrentMonth && (
-                <span className="type-caption font-semibold text-calendar-sun opacity-85 whitespace-nowrap overflow-hidden text-ellipsis">
+                <span className="text-[9px] leading-none font-semibold text-calendar-sun opacity-85 whitespace-nowrap overflow-hidden text-ellipsis">
                   {holiName}
                 </span>
               )}
@@ -128,27 +128,13 @@ const CalendarGrid = ({
           style={{ top: bar.top, left: bar.left, width: bar.width }}
           onClick={e => onBarClick(e, bar)}
         >
-          <div className="flex flex-col gap-0.5 w-full">
-            <strong className="type-caption font-bold whitespace-nowrap overflow-hidden text-ellipsis">
+          <div className="flex flex-col justify-center w-full overflow-hidden">
+            <strong className="text-[10px] font-bold whitespace-nowrap overflow-hidden text-ellipsis leading-tight">
               {bar.guestName}
             </strong>
-            <div className="flex flex-wrap gap-1.5 items-center type-micro opacity-85 h-3.5 overflow-hidden">
-              {bar.guests > 0 && (
-                <span className="whitespace-nowrap flex items-center">
-                  <User size={10} className="mr-0.5 inline-block" />
-                  {bar.guests} {bar.guests > 1 ? t('calendar.guests') : t('calendar.guest')}
-                </span>
-              )}
-              {bar.nights > 0 && (
-                <span className="whitespace-nowrap">
-                  {bar.nights} {bar.nights > 1 ? t('calendar.nights') : t('calendar.night')}
-                </span>
-              )}
-              {bar.channel && (
-                <span className="whitespace-nowrap">
-                  {bar.channel} {FLAG_MAP[bar.nationality || ''] || ''}
-                </span>
-              )}
+            <div className="flex items-center gap-1 text-[9px] opacity-90 mt-0.5 leading-none overflow-hidden whitespace-nowrap">
+              {bar.guests > 0 && <span className="shrink-0">{bar.guests}{language === 'ko' ? '인' : 'p'}</span>}
+              {bar.channel && <span className="shrink-0 truncate opacity-80">{bar.channel}</span>}
             </div>
           </div>
         </div>
