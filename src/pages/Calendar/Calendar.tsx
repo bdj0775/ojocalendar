@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Plus, User, ChevronLeft, ChevronRight, Menu, ChevronDown } from 'lucide-react';
+import { useSidebar } from '../../context/SidebarContext';
 import { ICON_SIZES } from '../../lib/iconSizes';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
@@ -76,8 +77,9 @@ const CalendarPage = () => {
     nextMonth, prevMonth, goToday, setMonth, openBookingModal, openEditMaintModal,
   } = useStore();
 
+  const { open: openSidebar } = useSidebar();
+
   const [quickBookingDate, setQuickBookingDate] = useState<string | null>(null);
-  const [sidebarOpen,   setSidebarOpen]   = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const today    = new Date();
@@ -135,35 +137,13 @@ const CalendarPage = () => {
   return (
     <div className="pt-2 relative">
 
-      {/* ── Sidebar — 항상 마운트, CSS transition으로 슬라이드 인/아웃 ── */}
-      <div
-        className={`fixed inset-0 z-[100] flex transition-opacity duration-300 ${
-          sidebarOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-      >
-        {/* 딤 배경 */}
-        <div
-          className="absolute inset-0 bg-black/40"
-          onClick={() => setSidebarOpen(false)}
-        />
-        {/* 드로어 패널 */}
-        <div
-          className={`relative w-64 bg-card text-card-foreground h-full shadow-xl flex flex-col p-5 transition-transform duration-300 ease-out ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-        >
-          <h2 className="text-xl font-bold mb-4 text-foreground">Menu</h2>
-          <p className="text-sm text-muted-foreground">사이드바 세부구성은 추후 지시 예정.</p>
-        </div>
-      </div>
-
       {/* ── Header ── */}
       <div className="px-3 mb-2">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
             <button
               className="p-1 -ml-1 text-foreground"
-              onClick={() => setSidebarOpen(true)}
+              onClick={openSidebar}
             >
               <Menu size={24} />
             </button>

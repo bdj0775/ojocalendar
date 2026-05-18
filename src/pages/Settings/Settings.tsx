@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, Edit, Bed, Bell, Globe, CircleDollarSign, LogOut, Plus, Link, Percent, RefreshCw, CheckCircle, XCircle, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Menu, ChevronRight, Edit, Bed, Bell, Globe, CircleDollarSign, LogOut, Plus, Link, Percent, RefreshCw, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { useSidebar } from '../../context/SidebarContext';
 import { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -57,7 +57,7 @@ function ExportIcalSection({ hostId, propertyId }: { hostId: string; propertyId:
 }
 
 const SettingsPage = () => {
-  const navigate = useNavigate();
+  const { open: openSidebar } = useSidebar();
   const { t, language } = useTranslation();
   const {
     settings, properties, updateSettings, updateProperty,
@@ -167,12 +167,14 @@ const SettingsPage = () => {
   return (
     <div className="bg-background min-h-screen pb-24">
       {/* Header */}
-      <header className="flex justify-between items-center px-5 py-4">
-        <button className="flex items-center" onClick={() => navigate(-1)}>
-          <ChevronLeft size={22} color="var(--foreground)" />
-        </button>
-        <h1 className="type-section-title">{t('settings.title') || 'Settings'}</h1>
-        <div style={{ width: 22 }} />
+      <header className="flex justify-between items-center px-3 py-3">
+        <div className="flex items-center gap-2">
+          <button className="p-1 -ml-1 text-foreground" onClick={openSidebar}>
+            <Menu size={24} />
+          </button>
+          <h1 className="type-section-title text-foreground">{t('settings.title') || 'Settings'}</h1>
+        </div>
+        <div style={{ width: 32 }} />
       </header>
 
       {/* Profile Section */}

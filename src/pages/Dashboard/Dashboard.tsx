@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import {
   Bell, User, ChevronLeft, ChevronRight, TrendingUp,
-  ArrowUpRight, ArrowDownRight, Database,
+  ArrowUpRight, ArrowDownRight, Database, Menu,
 } from 'lucide-react';
+import { useSidebar } from '../../context/SidebarContext';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -22,6 +23,7 @@ import PaceChart from '../DesktopDashboard/PaceChart';
 
 const DashboardPage = () => {
   const { t, language } = useTranslation();
+  const { open: openSidebar } = useSidebar();
   const { bookings, nextMonth, prevMonth, userProfile, properties, fetchData, showToast, currentYear, currentMonth } = useStore();
 
   const [tableChannelFilter, setTableChannelFilter] = useState('All');
@@ -75,6 +77,9 @@ const DashboardPage = () => {
     <div className={wrapCls}>
       {/* Header */}
       <header className="flex items-center px-5 py-6 gap-3">
+        <button className="p-1 -ml-1 text-foreground lg:hidden shrink-0" onClick={openSidebar}>
+          <Menu size={24} />
+        </button>
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
           <TrendingUp color="var(--primary)" size={20} />
         </div>
