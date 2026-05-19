@@ -133,7 +133,7 @@ export function useBookingBars(
           top:     `${HEADER_H + row * CELL_HEIGHT + BAR_OFFSET_Y + (row === 0 ? 14 : 0)}px`,
           isFirst: cur === startIdx,
           isLast:  segEnd === endIdx,
-          isPast:  endDate < today,
+          isPast:  endDate <= today,  // iCal DTEND는 exclusive end(체크아웃+1일)이므로 <=
         });
         cur = segEnd + 1;
       }
