@@ -129,6 +129,7 @@ const CalendarGrid = ({
             {bar.guests > 0 && (
               <span className="text-[8px] opacity-80 leading-none shrink-0 ml-1.5">
                 {bar.guests}{ko ? '인' : 'p'}
+                {bar.span >= 2 && <> {bar.nights}{ko ? '박' : 'n'}</>}
               </span>
             )}
             {bar.span >= 3 && bar.channel && (
