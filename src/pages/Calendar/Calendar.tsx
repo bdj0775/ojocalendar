@@ -54,15 +54,14 @@ function buildCalendarGrid(year: number, month: number): GridCell[] {
       dateStr: `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
     });
   }
-  const remaining = 7 - (cells.length % 7);
-  if (remaining < 7) {
-    for (let i = 1; i <= remaining; i++) {
-      cells.push({
-        day: i,
-        isCurrentMonth: false,
-        dateStr: `${ny}-${String(nm + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
-      });
-    }
+  // 항상 42셀(6행×7열) 고정 — 부족하면 다음 달 날짜로 채움
+  // 5행 달과 6행 달의 높이를 통일해 스와이프 중 레이아웃 점프 방지
+  for (let i = 1; cells.length < 42; i++) {
+    cells.push({
+      day: i,
+      isCurrentMonth: false,
+      dateStr: `${ny}-${String(nm + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
+    });
   }
   return cells;
 }

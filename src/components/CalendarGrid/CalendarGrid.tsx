@@ -71,7 +71,7 @@ const CalendarGrid = ({
       className="grid grid-cols-7 relative border-t border-border bg-card"
       style={{
         gridTemplateRows: `repeat(${totalRows}, ${CELL_HEIGHT}px)`,
-        minHeight: `${totalRows * CELL_HEIGHT + 10}px`,
+        height: `${totalRows * CELL_HEIGHT}px`,
       }}
     >
 
