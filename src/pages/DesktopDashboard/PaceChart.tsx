@@ -13,9 +13,10 @@ interface PaceChartProps {
   ko: boolean;
   sym: string;
   fmtShort: (v: number) => string;
+  compact?: boolean;
 }
 
-const PaceChart = ({ pace, isDark, ko, sym, fmtShort }: PaceChartProps) => {
+const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false }: PaceChartProps) => {
   const [paceMode, setPaceMode] = useState<'occ' | 'rev'>('occ');
   const [isPaceModalOpen, setIsPaceModalOpen] = useState(false);
 
@@ -30,12 +31,18 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort }: PaceChartProps) => {
   const legendItemCls = 'flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground';
   const baseColors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#d946ef', '#f43f5e'];
 
+  const chartHeight = compact ? 200 : 320;
+
   return (
     <>
-      <div className={`mt-6 ${cardCls}`} style={{ padding: '20px' }}>
-        <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <span className="whitespace-nowrap font-bold text-[15px] text-foreground">{ko ? '예약 속도 추이 (Booking Pace)' : 'Booking Pace'}</span>
+      <div className={`${compact ? '' : 'mt-6'} ${cardCls}`} style={{ padding: '20px' }}>
+
+        {/* Header — compact: stacked column / default: side-by-side */}
+        <div className={`flex gap-3 mb-4 ${compact ? 'flex-col' : 'items-center justify-between flex-wrap gap-4'}`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="whitespace-nowrap font-bold text-[15px] text-foreground">
+              {ko ? '예약 속도 추이' : 'Booking Pace'}
+            </span>
             <div className={toggleGroupCls}>
               <button className={`${toggleBtnCls} ${paceMode === 'occ' ? toggleBtnActiveCls : ''}`} onClick={() => setPaceMode('occ')}>{ko ? '점유율' : 'Occupancy'}</button>
               <button className={`${toggleBtnCls} ${paceMode === 'rev' ? toggleBtnActiveCls : ''}`} onClick={() => setPaceMode('rev')}>{ko ? '매출' : 'Revenue'}</button>
@@ -47,22 +54,27 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort }: PaceChartProps) => {
               {ko ? '자세히 보기 >' : 'View Details >'}
             </button>
           </div>
-          <div className="flex flex-wrap justify-end gap-2.5 flex-1">
-            {pace.targets.map(t => {
-              const idx = t.offset < 0 ? t.offset + 5 : t.offset + 4;
-              const color = t.isCurrent ? 'var(--primary)' : baseColors[idx % baseColors.length];
-              return (
-                <div key={t.key} className={legendItemCls} style={{ opacity: t.isCurrent ? 1 : 0.8 }}>
-                  <span className="w-2 h-2 rounded-full" style={{ background: color }} />
-                  <span style={{ fontWeight: t.isCurrent ? 700 : 400, color: t.isCurrent ? (isDark ? '#fff' : '#000') : (isDark ? '#cbd5e1' : '#475569') }}>{t.label}</span>
-                </div>
-              );
-            })}
+
+          {/* Legend — full on desktop, current-month-only on compact */}
+          <div className={`flex flex-wrap gap-2.5 ${compact ? '' : 'justify-end flex-1'}`}>
+            {pace.targets
+              .filter(t => compact ? t.isCurrent : true)
+              .map(t => {
+                const idx = t.offset < 0 ? t.offset + 5 : t.offset + 4;
+                const color = t.isCurrent ? 'var(--primary)' : baseColors[idx % baseColors.length];
+                return (
+                  <div key={t.key} className={legendItemCls} style={{ opacity: t.isCurrent ? 1 : 0.8 }}>
+                    <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+                    <span style={{ fontWeight: t.isCurrent ? 700 : 400, color: t.isCurrent ? (isDark ? '#fff' : '#000') : (isDark ? '#cbd5e1' : '#475569') }}>{t.label}</span>
+                  </div>
+                );
+              })}
           </div>
         </div>
-        <div style={{ width: '100%', height: 320 }}>
+
+        <div style={{ width: '100%', height: chartHeight }}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={pace.paceData} margin={{ top: 30, right: 30, left: paceMode === 'rev' ? 10 : -20, bottom: 20 }}>
+            <ComposedChart data={pace.paceData} margin={{ top: 30, right: 16, left: paceMode === 'rev' ? 10 : -20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
               <XAxis dataKey="leadDay" type="category" tick={{ fontSize: 11, fill: tickColor, fontWeight: 600 }} tickFormatter={val => val % 15 === 0 ? `D-${val}` : ''} axisLine={false} tickLine={false} />
               <YAxis yAxisId="pace" type="number" domain={paceMode === 'occ' ? [0, 100] : ['auto', 'auto']} tick={{ fontSize: 11, fill: tickColorAlt }} tickFormatter={val => paceMode === 'occ' ? `${val}%` : fmtShort(val)} axisLine={false} tickLine={false} />
@@ -75,11 +87,11 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort }: PaceChartProps) => {
                 const idx = t.offset < 0 ? t.offset + 5 : t.offset + 4;
                 const color = baseColors[idx % baseColors.length];
                 const key = paceMode === 'occ' ? t.key : `${t.key}_rev`;
-                return <Line yAxisId="pace" key={key} type="monotone" name={t.label} dataKey={key} stroke={color} strokeWidth={2} dot={false} connectNulls={false} strokeOpacity={isDark ? 0.4 : 0.5} activeDot={{ r: 4, fill: color, strokeWidth: 0 }} />;
+                return <Line yAxisId="pace" key={key} type="monotone" name={t.label} dataKey={key} stroke={color} strokeWidth={compact ? 1.5 : 2} dot={false} connectNulls={false} strokeOpacity={isDark ? 0.35 : 0.4} activeDot={{ r: 4, fill: color, strokeWidth: 0 }} />;
               })}
               {pace.targets.filter(t => t.isCurrent).map(t => {
                 const key = paceMode === 'occ' ? t.key : `${t.key}_rev`;
-                return <Line yAxisId="pace" key={key} type="monotone" name={t.label} dataKey={key} stroke="var(--primary)" strokeWidth={4} dot={false} connectNulls={false} activeDot={{ r: 6, fill: 'var(--primary)', stroke: isDark ? '#0f172a' : '#ffffff', strokeWidth: 2 }} />;
+                return <Line yAxisId="pace" key={key} type="monotone" name={t.label} dataKey={key} stroke="var(--primary)" strokeWidth={compact ? 3 : 4} dot={false} connectNulls={false} activeDot={{ r: 6, fill: 'var(--primary)', stroke: isDark ? '#0f172a' : '#ffffff', strokeWidth: 2 }} />;
               })}
 
               {pace.todayLeadDay != null && (
