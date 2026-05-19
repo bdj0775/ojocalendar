@@ -8,11 +8,6 @@ const DOW_LABELS: Record<string, string[]> = {
   ko: ['일', '월', '화', '수', '목', '금', '토'],
 };
 
-const FLAG_MAP: Record<string, string> = {
-  USA: '🇺🇸', UK: '🇬🇧', India: '🇮🇳', France: '🇫🇷', Japan: '🇯🇵',
-  Korea: '🇰🇷', Taiwan: '🇹🇼', Singapore: '🇸🇬', China: '🇨🇳', Others: '🏳️',
-};
-
 // OTA·정비 채널별 이벤트 바 색상 — color.css 토큰 사용
 const BAR_CHANNEL_CLS: Record<string, string> = {
   airbnb:      'bg-channel-airbnb   text-white',
@@ -119,39 +114,31 @@ const CalendarGrid = ({
       })}
 
       {/* ── 예약 바 ── */}
-      {bookingBars.map((bar, i) => {
-        const flag = bar.nationality ? FLAG_MAP[bar.nationality] : undefined;
-        return (
-          <div
-            key={`${bar.id}-${i}`}
-            className={getBarCls(bar.channelClass, bar.isPast)}
-            style={{ top: bar.top, left: bar.left, width: bar.width }}
-            onClick={e => onBarClick(e, bar)}
-          >
-            {/* 좌측: 이름 + 인원 */}
-            <span className="text-[9px] font-semibold truncate leading-none min-w-0 shrink">
+      {bookingBars.map((bar, i) => (
+        <div
+          key={`${bar.id}-${i}`}
+          className={getBarCls(bar.channelClass, bar.isPast)}
+          style={{ top: bar.top, left: bar.left, width: bar.width }}
+          onClick={e => onBarClick(e, bar)}
+        >
+          {/* items-baseline 으로 서로 다른 폰트 크기의 베이스라인 통일 */}
+          <div className="flex items-baseline w-full overflow-hidden min-w-0">
+            <span className="text-[9px] font-medium truncate leading-none min-w-0 shrink">
               {bar.guestName}
             </span>
             {bar.guests > 0 && (
-              <span className="text-[8px] opacity-90 leading-none shrink-0 ml-0.5">
+              <span className="text-[8px] opacity-80 leading-none shrink-0 ml-1.5">
                 {bar.guests}{ko ? '인' : 'p'}
               </span>
             )}
-
-            {/* 우측: 국가(span 2+), 채널(span 3+) */}
-            {bar.span >= 2 && (flag || (bar.span >= 3 && bar.channel)) && (
-              <div className="ml-auto pl-1 flex items-center gap-0.5 shrink-0">
-                {flag && (
-                  <span className="text-[9px] leading-none">{flag}</span>
-                )}
-                {bar.span >= 3 && bar.channel && (
-                  <span className="text-[8px] opacity-75 leading-none">{bar.channel}</span>
-                )}
-              </div>
+            {bar.span >= 3 && bar.channel && (
+              <span className="text-[8px] opacity-70 leading-none shrink-0 ml-auto">
+                {bar.channel}
+              </span>
             )}
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 };
