@@ -169,7 +169,7 @@ const SettingsPage = () => {
       {/* Header */}
       <header className="flex justify-between items-center px-3 py-3">
         <div className="flex items-center gap-2">
-          <button className="p-1 -ml-1 text-foreground" onClick={openSidebar}>
+          <button className="p-1 -ml-1 text-foreground lg:hidden" onClick={openSidebar}>
             <Menu size={24} />
           </button>
           <h1 className="type-section-title text-foreground">{t('settings.title') || 'Settings'}</h1>

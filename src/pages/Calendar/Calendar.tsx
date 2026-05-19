@@ -141,7 +141,7 @@ const CalendarPage = () => {
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
             <button
-              className="p-1 -ml-1 text-foreground"
+              className="p-1 -ml-1 text-foreground lg:hidden"
               onClick={openSidebar}
             >
               <Menu size={24} />
@@ -239,7 +239,7 @@ const CalendarPage = () => {
 
         {/* FAB — 작게 조정 */}
         <button
-          className="fixed right-5 bottom-nav-clear w-11 h-11 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/35 z-fab active:scale-[0.90] transition-transform lg:absolute lg:right-8 lg:bottom-8"
+          className="fixed right-5 bottom-nav-clear w-11 h-11 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/35 z-fab active:scale-[0.90] transition-transform lg:hidden"
           onClick={() => navigate('/new-booking')}
         >
           <Plus size={ICON_SIZES.md} color="white" />
