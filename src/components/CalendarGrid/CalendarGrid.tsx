@@ -8,6 +8,11 @@ const DOW_LABELS: Record<string, string[]> = {
   ko: ['일', '월', '화', '수', '목', '금', '토'],
 };
 
+const FLAG_MAP: Record<string, string> = {
+  USA: '🇺🇸', UK: '🇬🇧', India: '🇮🇳', France: '🇫🇷', Japan: '🇯🇵',
+  Korea: '🇰🇷', Taiwan: '🇹🇼', Singapore: '🇸🇬', China: '🇨🇳', Others: '🏳️',
+};
+
 // OTA·정비 채널별 이벤트 바 색상 — color.css 토큰 사용
 const BAR_CHANNEL_CLS: Record<string, string> = {
   airbnb:      'bg-channel-airbnb   text-white',
@@ -20,16 +25,15 @@ const BAR_CHANNEL_CLS: Record<string, string> = {
 // JS 상수 — CSS 토큰 (layout.css) 과 동기화 유지
 const CELL_HEIGHT = 100; // --calendar-cell-h
 
-const getBarCls = (ch: string, isFirst: boolean, isLast: boolean, isPast: boolean) =>
+// 좌우 동일한 4px 라운딩 — 모든 세그먼트에 균일 적용
+const getBarCls = (ch: string, isPast: boolean) =>
   [
-    'absolute flex items-center overflow-hidden',
+    'absolute flex items-center overflow-hidden rounded-[4px]',
     'z-raise cursor-pointer shadow-sm',
     'transition-all hover:brightness-95 hover:-translate-y-px hover:z-fab',
     'h-[var(--calendar-bar-h)] px-1',
     BAR_CHANNEL_CLS[ch] ?? BAR_CHANNEL_CLS.airbnb,
-    isFirst ? 'rounded-l-full' : 'rounded-l-none',
-    isLast  ? 'rounded-r-[6px]' : 'rounded-r-none',
-    isPast  ? 'opacity-50' : '',
+    isPast ? 'opacity-50' : '',
   ].join(' ');
 
 // ── Props ─────────────────────────────────────────────────────
@@ -55,7 +59,7 @@ const CalendarGrid = ({
   onDateClick,
   onBarClick,
 }: CalendarGridProps) => {
-  const { t, language } = useTranslation();
+  const { language } = useTranslation();
   const dowLabels = DOW_LABELS[language] ?? DOW_LABELS.en;
   const totalRows = Math.ceil(calendarGrid.length / 7);
   const ko = language === 'ko';
@@ -115,38 +119,39 @@ const CalendarGrid = ({
       })}
 
       {/* ── 예약 바 ── */}
-      {bookingBars.map((bar, i) => (
-        <div
-          key={`${bar.id}-${i}`}
-          className={getBarCls(bar.channelClass, bar.isFirst, bar.isLast, bar.isPast)}
-          style={{ top: bar.top, left: bar.left, width: bar.width }}
-          onClick={e => onBarClick(e, bar)}
-        >
-          {/* 이름 — 항상 표시, 공간 부족 시 truncate */}
-          <span className="text-[9px] font-bold truncate leading-none min-w-0 shrink">
-            {bar.guestName}
-          </span>
+      {bookingBars.map((bar, i) => {
+        const flag = bar.nationality ? FLAG_MAP[bar.nationality] : undefined;
+        return (
+          <div
+            key={`${bar.id}-${i}`}
+            className={getBarCls(bar.channelClass, bar.isPast)}
+            style={{ top: bar.top, left: bar.left, width: bar.width }}
+            onClick={e => onBarClick(e, bar)}
+          >
+            {/* 좌측: 이름 + 인원 */}
+            <span className="text-[9px] font-semibold truncate leading-none min-w-0 shrink">
+              {bar.guestName}
+            </span>
+            {bar.guests > 0 && (
+              <span className="text-[8px] opacity-90 leading-none shrink-0 ml-0.5">
+                {bar.guests}{ko ? '인' : 'p'}
+              </span>
+            )}
 
-          {/* 2칸 이상: 인원 */}
-          {bar.span >= 2 && bar.guests > 0 && (
-            <span className="text-[8px] opacity-90 leading-none shrink-0 ml-0.5">
-              {bar.guests}{ko ? '인' : 'p'}
-            </span>
-          )}
-
-          {/* 3칸 이상: 박수 + 채널 */}
-          {bar.span >= 3 && (
-            <span className="text-[8px] opacity-80 leading-none shrink-0 ml-0.5">
-              {bar.nights}{ko ? '박' : 'n'}
-            </span>
-          )}
-          {bar.span >= 3 && bar.channel && (
-            <span className="text-[8px] opacity-70 leading-none shrink-0 ml-0.5">
-              {bar.channel}
-            </span>
-          )}
-        </div>
-      ))}
+            {/* 우측: 국가(span 2+), 채널(span 3+) */}
+            {bar.span >= 2 && (flag || (bar.span >= 3 && bar.channel)) && (
+              <div className="ml-auto pl-1 flex items-center gap-0.5 shrink-0">
+                {flag && (
+                  <span className="text-[9px] leading-none">{flag}</span>
+                )}
+                {bar.span >= 3 && bar.channel && (
+                  <span className="text-[8px] opacity-75 leading-none">{bar.channel}</span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
