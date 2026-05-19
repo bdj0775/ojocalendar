@@ -9,6 +9,7 @@ export interface BookingBar {
   nationality?: string;
   guests: number;
   nights: number;
+  span: number;
   channelClass: string;
   left: string;
   width: string;
@@ -127,9 +128,10 @@ export function useBookingBars(
           nationality:  item.nationality,
           guests:       item.guests || 0,
           nights,
+          span,
           channelClass,
-          left:    `${(col  / 7) * 100}%`,
-          width:   `${(span / 7) * 100}%`,
+          left:    `calc(${(col  / 7) * 100}% + 1px)`,
+          width:   `calc(${(span / 7) * 100}% - 2px)`,
           top:     `${HEADER_H + row * CELL_HEIGHT + BAR_OFFSET_Y + (row === 0 ? 14 : 0)}px`,
           isFirst: cur === startIdx,
           isLast:  segEnd === endIdx,

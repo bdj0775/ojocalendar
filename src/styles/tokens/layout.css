@@ -20,7 +20,7 @@
     /* Calendar */
     --calendar-cell-h:       100px;
     --calendar-header-h:     40px;
-    --calendar-bar-h:        48px;  /* 예약 바 높이 두배 확대 */
+    --calendar-bar-h:        22px;  /* 3개 숙소 스택 기준 (100px 셀 = 26 offset + 3×22 + 2×2 gap + 4 bottom) */
     --calendar-bar-offset:   26px;  /* 셀 상단에서 바까지 거리 */
 
     /* Chart */

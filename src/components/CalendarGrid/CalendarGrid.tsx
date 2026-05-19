@@ -1,4 +1,3 @@
-import { User } from 'lucide-react';
 import { isHoliday, getHolidayName } from '../../utils/holidays';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { BookingBar } from './useBookingBars';
@@ -7,11 +6,6 @@ import type { BookingBar } from './useBookingBars';
 const DOW_LABELS: Record<string, string[]> = {
   en: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
   ko: ['일', '월', '화', '수', '목', '금', '토'],
-};
-
-const FLAG_MAP: Record<string, string> = {
-  USA: '🇺🇸', UK: '🇬🇧', India: '🇮🇳', France: '🇫🇷', Japan: '🇯🇵',
-  Korea: '🇰🇷', Taiwan: '🇹🇼', Singapore: '🇸🇬', China: '🇨🇳', Others: '🏳️',
 };
 
 // OTA·정비 채널별 이벤트 바 색상 — color.css 토큰 사용
@@ -28,15 +22,14 @@ const CELL_HEIGHT = 100; // --calendar-cell-h
 
 const getBarCls = (ch: string, isFirst: boolean, isLast: boolean, isPast: boolean) =>
   [
-    'absolute box-border flex flex-col justify-center',
-    'z-raise cursor-pointer overflow-hidden shadow-sm',
-    'rounded-tl-none rounded-bl-none transition-all',
-    'hover:brightness-95 hover:-translate-y-px hover:z-fab',
-    'h-[var(--calendar-bar-h)] py-[2px] px-1.5',
+    'absolute flex items-center overflow-hidden',
+    'z-raise cursor-pointer shadow-sm',
+    'transition-all hover:brightness-95 hover:-translate-y-px hover:z-fab',
+    'h-[var(--calendar-bar-h)] px-1',
     BAR_CHANNEL_CLS[ch] ?? BAR_CHANNEL_CLS.airbnb,
-    isLast  ? 'rounded-tr-2xl rounded-br-2xl' : 'rounded-tr-none rounded-br-none',
-    !isFirst ? '!border-l-0 pl-1.5'           : '',
-    isPast ? 'opacity-50' : '',
+    isFirst ? 'rounded-l-full' : 'rounded-l-none',
+    isLast  ? 'rounded-r-[6px]' : 'rounded-r-none',
+    isPast  ? 'opacity-50' : '',
   ].join(' ');
 
 // ── Props ─────────────────────────────────────────────────────
@@ -65,6 +58,7 @@ const CalendarGrid = ({
   const { t, language } = useTranslation();
   const dowLabels = DOW_LABELS[language] ?? DOW_LABELS.en;
   const totalRows = Math.ceil(calendarGrid.length / 7);
+  const ko = language === 'ko';
 
   return (
     <div
@@ -128,15 +122,29 @@ const CalendarGrid = ({
           style={{ top: bar.top, left: bar.left, width: bar.width }}
           onClick={e => onBarClick(e, bar)}
         >
-          <div className="flex flex-col justify-center w-full overflow-hidden">
-            <strong className="text-[10px] font-bold whitespace-nowrap overflow-hidden text-ellipsis leading-tight">
-              {bar.guestName}
-            </strong>
-            <div className="flex items-center gap-1 text-[9px] opacity-90 mt-0.5 leading-none overflow-hidden whitespace-nowrap">
-              {bar.guests > 0 && <span className="shrink-0">{bar.guests}{language === 'ko' ? '인' : 'p'}</span>}
-              {bar.channel && <span className="shrink-0 truncate opacity-80">{bar.channel}</span>}
-            </div>
-          </div>
+          {/* 이름 — 항상 표시, 공간 부족 시 truncate */}
+          <span className="text-[9px] font-bold truncate leading-none min-w-0 shrink">
+            {bar.guestName}
+          </span>
+
+          {/* 2칸 이상: 인원 */}
+          {bar.span >= 2 && bar.guests > 0 && (
+            <span className="text-[8px] opacity-90 leading-none shrink-0 ml-0.5">
+              {bar.guests}{ko ? '인' : 'p'}
+            </span>
+          )}
+
+          {/* 3칸 이상: 박수 + 채널 */}
+          {bar.span >= 3 && (
+            <span className="text-[8px] opacity-80 leading-none shrink-0 ml-0.5">
+              {bar.nights}{ko ? '박' : 'n'}
+            </span>
+          )}
+          {bar.span >= 3 && bar.channel && (
+            <span className="text-[8px] opacity-70 leading-none shrink-0 ml-0.5">
+              {bar.channel}
+            </span>
+          )}
         </div>
       ))}
     </div>
