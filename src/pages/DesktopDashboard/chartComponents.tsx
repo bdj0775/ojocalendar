@@ -1,4 +1,5 @@
-import type { ScatterCustomizedShape } from 'recharts';
+// ScatterCustomizedShape is not a public export in some recharts versions — use any-based shape
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 // ── Constants ─────────────────────────────────────────────────
 export const CHANNEL_COLORS: Record<string, string> = {
@@ -29,37 +30,83 @@ interface TrendTooltipProps {
 export const TrendTooltip = ({ active, payload, label, sym, isDark, ko }: TrendTooltipProps) => {
   if (!active || !payload || payload.length === 0) return null;
   const wrapCls = isDark
-    ? 'bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-inner p-3 px-4 shadow-tooltip'
-    : 'bg-white/96 border border-black/[0.08] rounded-inner p-3 px-4 shadow-tooltip';
-  const labelCls = isDark ? 'text-[11px] font-bold text-slate-400 mb-2 tracking-wider' : 'text-[11px] font-bold text-slate-500 mb-2 tracking-wider';
-  const rowCls = isDark ? 'flex items-center gap-2 text-xs text-slate-200 mb-1.5' : 'flex items-center gap-2 text-xs text-slate-800 mb-1.5';
+    ? 'bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-inner p-3 px-4 shadow-tooltip min-w-[200px]'
+    : 'bg-white/96 border border-black/[0.08] rounded-inner p-3 px-4 shadow-tooltip min-w-[200px]';
+  const labelCls = isDark
+    ? 'text-[11px] font-bold text-slate-400 mb-2 tracking-wider'
+    : 'text-[11px] font-bold text-slate-500 mb-2 tracking-wider';
+  const rowCls = isDark
+    ? 'flex items-center gap-2 text-xs text-slate-200 mb-1.5'
+    : 'flex items-center gap-2 text-xs text-slate-800 mb-1.5';
 
   const data = (payload[0] as any).payload;
-  const margin = data.gross > 0 ? Math.round((data.net / data.gross) * 100) : 0;
+  // isFuture/isCurrent는 선택 월 기준이므로, predictedOcc 존재 여부로만 판단
+  const hasForecast = data.predictedOcc != null;
+
+  // gross/net 은 이제 전 월 OTB 그대로 — 분기 불필요
+  const occ    = data.occupancy ?? 0;
+  const gross  = data.gross ?? 0;
+  const net    = data.net ?? 0;
+  const margin = gross > 0 ? Math.round((net / gross) * 100) : 0;
 
   return (
     <div className={wrapCls}>
-      <div className={labelCls}>{label}</div>
-      {payload.map((p, i) => (
-        <div key={i} className={rowCls}>
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${(p.name === '총매출' || p.name === 'Gross') ? 'bg-primary/40' : ''}`} style={{ background: (p.name === '총매출' || p.name === 'Gross') ? undefined : p.color }} />
-          <span>{p.name}</span>
-          <span className="font-bold ml-auto">
-            {p.name === '점유율' || p.name === 'Occupancy' ? `${p.value}%` : `${sym}${p.value?.toLocaleString()}`}
-          </span>
-        </div>
-      ))}
-      <div className="h-px bg-border my-2" />
+      <div className={labelCls}>{label} {data.year}</div>
+
+      {/* ── 확정 수치 (전 월 공통) ── */}
       <div className={rowCls}>
-        <span className="w-2 h-2 rounded-full flex-shrink-0 bg-transparent" />
+        <span className="w-2 h-2 rounded-full flex-shrink-0 bg-success" />
+        <span>{ko ? '점유율' : 'Occupancy'}</span>
+        <span className="font-bold ml-auto">{occ}%</span>
+      </div>
+      <div className={rowCls}>
+        <span className="w-2 h-2 rounded-full flex-shrink-0 bg-primary/40" />
+        <span>{ko ? '총매출' : 'Gross'}</span>
+        <span className="font-bold ml-auto">{sym}{gross.toLocaleString()}</span>
+      </div>
+      <div className={rowCls}>
+        <span className="w-2 h-2 rounded-full flex-shrink-0 bg-primary" />
+        <span>{ko ? '순이익' : 'Net'}</span>
+        <span className="font-bold ml-auto">{sym}{net.toLocaleString()}</span>
+      </div>
+
+      <div className="h-px bg-border/40 my-2" />
+
+      <div className={rowCls}>
         <span className="text-muted-foreground">ADR</span>
         <span className="font-bold ml-auto">{sym}{data.adr?.toLocaleString()}</span>
       </div>
       <div className={rowCls}>
-        <span className="w-2 h-2 rounded-full flex-shrink-0 bg-transparent" />
         <span className="text-muted-foreground">{ko ? '마진율' : 'Margin'}</span>
         <span className="font-bold ml-auto text-success">{margin}%</span>
       </div>
+
+      {/* ── 월말 예측 (실제 현재월 이후 모든 월) ── */}
+      {hasForecast && (
+        <>
+          <div className="h-px bg-border/40 my-2" />
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              {ko ? '월말 예측' : 'Month-End Forecast'}
+            </span>
+            {data.forecastConfidence != null && (
+              <span className="text-[10px] text-muted-foreground/50 tabular-nums">
+                {ko ? '신뢰도' : 'Conf.'} {Math.round(data.forecastConfidence * 100)}%
+              </span>
+            )}
+          </div>
+          <div className={rowCls}>
+            <span style={{ width: 14, height: 0, borderBottom: '2px dashed var(--success)', display: 'inline-block', flexShrink: 0 }} />
+            <span>{ko ? '예상 최종 점유율' : 'Predicted OCC'}</span>
+            <span className="font-bold ml-auto">{data.predictedOcc ?? '–'}%</span>
+          </div>
+          <div className={rowCls}>
+            <span className="w-2 h-2 rounded-full flex-shrink-0 bg-primary/20" />
+            <span>{ko ? '예상 최종 매출' : 'Predicted Gross'}</span>
+            <span className="font-bold ml-auto">{sym}{(data.predictedGross ?? 0).toLocaleString()}</span>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -149,15 +196,13 @@ export const PaceTooltip = ({ active, payload, label, isDark, ko, paceMode, sym 
 };
 
 // ── Scatter Dot ───────────────────────────────────────────────
-interface ScatterDotPayload { x: number; nights: number }
-type ScatterDotProps = Parameters<ScatterCustomizedShape>[0] & {
-  payload?: ScatterDotPayload;
-  xAxis?: { scale?: (v: number) => number };
-  fill?: string;
-};
-
-export const ScatterDot: ScatterCustomizedShape = (props: ScatterDotProps) => {
-  const { cx, cy, payload, xAxis, fill } = props;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const ScatterDot = (props: any) => {
+  const { cx, cy, payload, xAxis, fill } = props as {
+    cx?: number; cy?: number; fill?: string;
+    payload?: { x: number; nights: number };
+    xAxis?: { scale?: (v: number) => number };
+  };
   if (cx == null || cy == null || !payload) return null;
   let dayWidth = 4;
   if (xAxis?.scale) {

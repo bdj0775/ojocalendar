@@ -215,6 +215,13 @@ export interface MonthlyTrend {
   adr: number;
   occupancy: number;
   isCurrent: boolean;
+  isFuture: boolean;
+  otbOcc: number;
+  otbGross: number;
+  predictedOcc: number | null;
+  predictedGross: number | null;
+  predictedNet: number | null;
+  forecastConfidence: number;
 }
 
 export interface PieDataItem {
@@ -263,6 +270,16 @@ export interface MonthlyTableRow {
   adrByGuestCount: Record<string, number>;
 }
 
+export interface AnnualForecast {
+  confirmedGross: number;
+  confirmedNet: number;
+  predictedGross: number;
+  predictedNet: number;
+  totalGross: number;
+  totalNet: number;
+  avgConfidence: number;
+}
+
 export interface DesktopStats {
   netIncome: number;
   grossRevenue: number;
@@ -277,6 +294,9 @@ export interface DesktopStats {
   adrYearAvg: number;
   otaCommission: number;
   otaCommPct: number;
+  ytdGross: number;
+  ytdNet: number;
+  ytdOtaCommission: number;
   monthlyTrends: MonthlyTrend[];
   channelPieData: PieDataItem[];
   totalChannelBookings: number;
@@ -288,6 +308,7 @@ export interface DesktopStats {
   leadTimeNatKeys: string[];
   monthlyTableData: MonthlyTableRow[];
   currencySymbol: string;
+  annualForecast: AnnualForecast;
 }
 
 export interface PaceTarget {

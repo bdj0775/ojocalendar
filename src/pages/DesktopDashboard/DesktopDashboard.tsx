@@ -7,7 +7,7 @@ import {
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
-  CartesianGrid, ScatterChart, Scatter, ZAxis,
+  CartesianGrid, ScatterChart, Scatter, ZAxis, ReferenceLine,
 } from 'recharts';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -53,23 +53,38 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
     return `${sym}${v.toLocaleString()}`;
   }, [sym]);
 
-  const monthlySummary = useMemo(() => {
-    if (!stats.monthlyTrends || stats.monthlyTrends.length === 0) return '';
-    const validMonths = stats.monthlyTrends.filter(m => m.gross > 0);
-    if (validMonths.length === 0) return '';
-    
-    // Find best month by gross
-    const bestMonth = [...validMonths].sort((a, b) => b.gross - a.gross)[0];
-    
-    // Calculate avg margin
-    const totalGross = validMonths.reduce((sum, m) => sum + m.gross, 0);
-    const totalNet = validMonths.reduce((sum, m) => sum + m.net, 0);
-    const avgMargin = totalGross > 0 ? Math.round((totalNet / totalGross) * 100) : 0;
-    
-    return ko 
-      ? `최고 매출: ${bestMonth.month} (${fmtShort(bestMonth.gross)}) · 평균 마진율 ${avgMargin}%`
-      : `Best Month: ${bestMonth.monthEn} (${fmtShort(bestMonth.gross)}) · Avg Margin: ${avgMargin}%`;
-  }, [stats.monthlyTrends, ko, fmtShort]);
+  // 실제 오늘 날짜 기준 (선택 월과 무관)
+  const actualYear     = new Date().getFullYear();
+  const actualMonthIdx = new Date().getMonth();
+  const MONTH_EN_IDX: Record<string, number> = {
+    Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11,
+  };
+
+  // 차트용 데이터 — 실제 오늘 기준으로 점선/배경바/하이라이트 결정
+  const chartData = useMemo(() => stats.monthlyTrends.map(d => {
+    const dMonthIdx      = MONTH_EN_IDX[d.monthEn] ?? -1;
+    const isActualCurrent = d.year === actualYear && dMonthIdx === actualMonthIdx;
+    const isActualFuture  = d.year > actualYear || (d.year === actualYear && dMonthIdx > actualMonthIdx);
+    return {
+      ...d,
+      isActualCurrent,
+      isActualFuture,
+      // 점선: 현재월 OTB 값에서 시작 → 이후 예측값으로 연결 (선택 월이 달라도 항상 실제 5월 기준)
+      predictedOccLine: isActualCurrent ? d.occupancy : isActualFuture ? d.predictedOcc : null,
+      // 예측 총매출 배경바: 실제 미래월만
+      predictedGrossBar: isActualFuture ? (d.predictedGross ?? null) : null,
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [stats.monthlyTrends, actualYear, actualMonthIdx]);
+
+  // 현재월 라벨 (ReferenceLine x 값) — 실제 오늘의 월
+  const currentMonthLabel = useMemo(() => {
+    const entry = stats.monthlyTrends.find(d =>
+      d.year === actualYear && (MONTH_EN_IDX[d.monthEn] ?? -1) === actualMonthIdx,
+    );
+    return ko ? (entry?.month ?? '') : (entry?.monthEn ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats.monthlyTrends, actualYear, actualMonthIdx, ko]);
 
 
   const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
@@ -262,32 +277,90 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
         {/* Box 4: Monthly Trends (Full Width) */}
         <div className={`col-span-3 ${cardCls}`}>
           <div className="flex items-center justify-between mb-4">
-            <span className={chartTitleCls}>{ko ? '월별 추이 (12개월)' : 'Monthly Trends (12 Months)'}</span>
+            <span className={chartTitleCls}>{ko ? '월별 추이 (11개월)' : 'Monthly Trends (11 Months)'}</span>
             <div className="flex items-center gap-6">
-              {monthlySummary && (
-                <span className="type-micro font-bold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                  {monthlySummary}
+              <div className="flex items-center gap-2">
+                <span className="type-micro font-bold text-muted-foreground mr-1">{ko ? '금년 누적(YTD)' : 'YTD'}</span>
+                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip">{ko ? '총매출' : 'Gross'} {fmt(stats.ytdGross)}</span>
+                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip">{ko ? '순이익' : 'Net'} {fmt(stats.ytdNet)}</span>
+                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip">OTA {fmt(stats.ytdOtaCommission)}</span>
+                <div className="w-px h-4 bg-border/60 mx-0.5" />
+                <span className="type-micro font-bold text-muted-foreground mr-1">{currentYear}{ko ? ' 연간 예상' : ' Annual'}</span>
+                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip">{ko ? '총매출' : 'Gross'} {fmtShort(stats.annualForecast.totalGross)}</span>
+                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip inline-flex items-center gap-1">
+                  <span>{ko ? '순이익' : 'Net'} {fmtShort(stats.annualForecast.totalNet)}</span>
+                  <span className="font-normal text-muted-foreground/50">· {stats.annualForecast.avgConfidence}%</span>
                 </span>
-              )}
+              </div>
               <div className="flex gap-4">
                 <div className={legendItemCls}><span className="w-2 h-2 rounded-full bg-primary/30" />{ko ? '총매출' : 'Gross'}</div>
                 <div className={legendItemCls}><span className="w-2 h-2 rounded-full bg-primary" />{ko ? '순이익' : 'Net'}</div>
-                <div className={legendItemCls}><span className="w-2 h-2 rounded-full bg-success" />{ko ? '점유율' : 'Occupancy'}</div>
+                <div className={legendItemCls}><span className="w-2 h-2 rounded-full bg-success" />{ko ? '점유율' : 'OCC'}</div>
+                <div className={legendItemCls}>
+                  <span style={{ display: 'inline-block', width: 14, height: 0, borderBottom: '2px dashed var(--success)', verticalAlign: 'middle', marginRight: 2 }} />
+                  {ko ? '예상 점유율' : 'Pred. OCC'}
+                </div>
               </div>
             </div>
           </div>
           <div className="-ml-3 -mr-2">
             <ResponsiveContainer width="100%" height={260}>
-              <ComposedChart data={stats.monthlyTrends} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                <XAxis xAxisId="0" dataKey={ko ? 'month' : 'monthEn'} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: tickColor, fontWeight: 600 }} />
+                <XAxis xAxisId="0" dataKey={ko ? 'month' : 'monthEn'} axisLine={false} tickLine={false} tick={(props: any) => {
+                  const { x, y, payload, index } = props;
+                  const isSelected = chartData[index]?.isCurrent; // 대시보드 선택 월 강조
+                  return (
+                    <text x={x} y={y} dy={14} textAnchor="middle"
+                      fill={isSelected ? 'var(--primary)' : tickColor}
+                      fontSize={11} fontWeight={isSelected ? 800 : 600}>
+                      {payload.value}
+                    </text>
+                  );
+                }} />
                 <XAxis xAxisId="1" dataKey={ko ? 'month' : 'monthEn'} hide />
+                <XAxis xAxisId="2" dataKey={ko ? 'month' : 'monthEn'} hide />
                 <YAxis yAxisId="revenue" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColorAlt }} tickFormatter={v => fmtShort(v)} width={70} />
                 <YAxis yAxisId="occ" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColorAlt }} tickFormatter={v => `${v}%`} domain={[0, 100]} width={45} />
                 <Tooltip content={<TrendTooltip sym={sym} isDark={isDark} ko={ko} />} />
-                <Bar xAxisId="0" yAxisId="revenue" dataKey="gross" name={ko ? '총매출' : 'Gross'} fill="var(--primary)" radius={[4, 4, 0, 0]} opacity={0.25} maxBarSize={36} />
-                <Bar xAxisId="1" yAxisId="revenue" dataKey="net" name={ko ? '순이익' : 'Net'} fill="var(--primary)" radius={[4, 4, 0, 0]} opacity={0.9} maxBarSize={36} />
-                <Line xAxisId="0" yAxisId="occ" type="monotone" dataKey="occupancy" name={ko ? '점유율' : 'Occupancy'} stroke="var(--success)" strokeWidth={2.5} dot={{ r: 3, fill: 'var(--success)', strokeWidth: 0 }} activeDot={{ r: 5, fill: 'var(--success)', strokeWidth: 2, stroke: activeDotStroke }} />
+                {/* 현재월 기준선 */}
+                {currentMonthLabel && (
+                  <ReferenceLine xAxisId="0" yAxisId="revenue" x={currentMonthLabel}
+                    stroke="var(--primary)" strokeDasharray="3 3" strokeOpacity={0.35}
+                    label={{ value: ko ? '예측▸' : 'Fcst▸', position: 'insideTopRight', fontSize: 9, fill: 'var(--primary)', fontWeight: 700, opacity: 0.6 }}
+                  />
+                )}
+                {/* 예측 총매출 배경바 — SVG 먼저 렌더 = 뒤에 위치 (미래월만 값 있음) */}
+                <Bar xAxisId="2" yAxisId="revenue" dataKey="predictedGrossBar"
+                  name={ko ? '예상 총매출' : 'Pred. Gross'} radius={[4, 4, 0, 0]} maxBarSize={36} legendType="none">
+                  {chartData.map((_, index) => (
+                    <Cell key={`cell-pred-${index}`} fillOpacity={0.18} fill="var(--primary)" />
+                  ))}
+                </Bar>
+                {/* OTB 총매출 바 */}
+                <Bar xAxisId="0" yAxisId="revenue" dataKey="gross" name={ko ? '총매출' : 'Gross'} radius={[4, 4, 0, 0]} maxBarSize={36}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-gross-${index}`} fillOpacity={entry.isFuture ? 0.35 : index <= 5 ? 0.45 : 0.45} fill="var(--primary)" />
+                  ))}
+                </Bar>
+                {/* OTB 순이익 바 */}
+                <Bar xAxisId="1" yAxisId="revenue" dataKey="net" name={ko ? '순이익' : 'Net'} radius={[4, 4, 0, 0]} maxBarSize={36}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-net-${index}`} fillOpacity={entry.isFuture ? 0.5 : 1} fill="var(--primary)" />
+                  ))}
+                </Bar>
+                {/* 실적 점유율 실선: 전 11개월 OTB 그대로 (작업 이전과 동일) */}
+                <Line xAxisId="0" yAxisId="occ" type="monotone" dataKey="occupancy"
+                  name={ko ? '점유율' : 'Occupancy'}
+                  stroke="var(--success)" strokeWidth={2.5}
+                  dot={{ r: 3, fill: 'var(--success)', strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: 'var(--success)', strokeWidth: 2, stroke: activeDotStroke }} />
+                {/* 예측 점유율 점선: 당월 OTB에서 출발 → 미래 예측으로 부드럽게 연결 */}
+                <Line xAxisId="0" yAxisId="occ" type="monotone" dataKey="predictedOccLine"
+                  name={ko ? '예상 점유율' : 'Pred. OCC'}
+                  stroke="var(--success)" strokeWidth={2} strokeDasharray="5 5" strokeOpacity={0.6}
+                  connectNulls={false} dot={false}
+                  activeDot={{ r: 4, fill: 'var(--success)', strokeWidth: 2, stroke: activeDotStroke }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
