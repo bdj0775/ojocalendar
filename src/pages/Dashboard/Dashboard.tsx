@@ -254,7 +254,7 @@ const DashboardPage = () => {
               <div className="flex items-baseline gap-1.5 overflow-hidden">
                 <span className={`text-[15px] font-semibold ${kpiValueCls} whitespace-nowrap`}>{stats.adrThisMonth.toLocaleString()} 원</span>
                 <span className="text-[9px] text-muted-foreground leading-none whitespace-nowrap shrink-0">
-                  {ko ? `연 ${Math.round(stats.adrYearAvg / 10000)}만` : `avg ${Math.round(stats.adrYearAvg / 1000)}K`}
+                  {ko ? `평균 ${(stats.adrYearAvg / 10000).toFixed(1)}만원` : `avg ${(stats.adrYearAvg / 10000).toFixed(1)}만원`}
                 </span>
               </div>
             </div>
