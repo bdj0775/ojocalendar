@@ -161,6 +161,73 @@ export const useDesktopStats = (
       return samples.length > 0 ? samples.reduce((s, v) => s + v, 0) / samples.length : 65;
     };
 
+    // ── 실증적 τ 추정 ─────────────────────────────────────────────────
+    // 최근 12개월 완료 데이터에서 예약 도착 곡선을 재구성한 뒤,
+    // 프로브 쌍(Da > Db)에 대해 τ = (Da-Db) / ln(cum(Db)/cum(Da)) 로 추정.
+    // bookingDate가 없거나 iCal 자동동기화 예약은 제외 (날짜 신뢰성 없음).
+    // 샘플 부족 시 τ=60 으로 fallback.
+    const estimatedTau: number = (() => {
+      const probeDs = [90, 75, 60, 45, 30, 21, 14, 7];
+      const tauValues: number[] = [];
+
+      for (let offset = 1; offset <= 12; offset++) {
+        let hy = actualTodayYear, hm = actualTodayMonth - offset;
+        while (hm < 0) { hm += 12; hy--; }
+
+        const hms = calcMonthStats(validBookings, hy, hm);
+        if (hms.bookingCount < MIN_RELIABLE_BOOKINGS || hms.occNights === 0) continue;
+
+        // useBookingPace 와 동일하게 자정 기준 monthStart 사용
+        const monthStartMs = new Date(hy, hm, 1).getTime();
+
+        const monthBks = validBookings.filter(b =>
+          b.bookingDate && !b.isAutoSynced &&
+          getOverlapNights(b.checkIn, b.checkOut, hy, hm) > 0,
+        );
+        if (monthBks.length < 3) continue;
+
+        // 각 예약이 월 시작 D일 전에 들어온 박수를 기록
+        const dailyCurve = new Array(121).fill(0);
+        monthBks.forEach(b => {
+          const bookMs = new Date(b.bookingDate! + 'T12:00:00').getTime();
+          const D = Math.max(0, Math.min(120,
+            Math.round((monthStartMs - bookMs) / 86400000),
+          ));
+          dailyCurve[D] += getOverlapNights(b.checkIn, b.checkOut, hy, hm);
+        });
+
+        // 누적 곡선: cumNights[D] = D일 이상 전에 예약된 총 박수
+        const cum: Record<number, number> = {};
+        for (const D of probeDs) {
+          let s = 0;
+          for (let d = D; d <= 120; d++) s += dailyCurve[d];
+          cum[D] = s;
+        }
+
+        // 모든 쌍 (Da > Db) 에서 τ 추정
+        for (let i = 0; i < probeDs.length - 1; i++) {
+          for (let j = i + 1; j < probeDs.length; j++) {
+            const Da = probeDs[i], Db = probeDs[j]; // Da > Db
+            const ca = cum[Da], cb = cum[Db];
+            // cb > ca 이어야 함 (더 가까운 날짜에 더 많이 누적)
+            if (ca > 0 && cb > ca) {
+              const tau = (Da - Db) / Math.log(cb / ca);
+              if (tau > 5 && tau < 300) tauValues.push(tau);
+            }
+          }
+        }
+      }
+
+      if (tauValues.length < 3) return 60; // 데이터 부족 시 기존값 유지
+      const sorted = [...tauValues].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return Math.round(
+        sorted.length % 2 === 0
+          ? (sorted[mid - 1] + sorted[mid]) / 2
+          : sorted[mid],
+      );
+    })();
+
     const computeForecast = (ty: number, tm: number, otb: MonthStats) => {
       const daysInMonth = new Date(ty, tm + 1, 0).getDate();
       const monthStartMs = new Date(ty, tm, 1).getTime();
@@ -188,13 +255,13 @@ export const useDesktopStats = (
         : basePricePerNight;
 
       // ── 부킹커브 ──────────────────────────────────────────────────────
-      // 미래월: 지수감쇠(τ=60일) → "60일 전엔 약 37%만 예약 완료"
+      // 미래월: 지수감쇠(τ=estimatedTau일, 실증 추정) → "τ일 전엔 약 37%만 예약 완료"
       // 당월: 경과일 / 전체일수
       let curveCompletion: number;
       let daysUntilStart: number;
       if (monthStartMs > todayMs) {
         daysUntilStart = Math.floor((monthStartMs - todayMs) / 86400000);
-        curveCompletion = Math.exp(-daysUntilStart / 60);
+        curveCompletion = Math.exp(-daysUntilStart / estimatedTau);
       } else {
         daysUntilStart = 0;
         const elapsed = Math.min(daysInMonth, Math.max(1, Math.floor((todayMs - monthStartMs) / 86400000)));
@@ -236,7 +303,7 @@ export const useDesktopStats = (
 
       // 신뢰도: 신뢰할 수 있는 과거 데이터 수(40%) + 리드타임 근접도(60%)
       const dataScore = Math.min(1, (stlyReliable ? 0.5 : 0) + (historicalOccs.length * 0.25));
-      const timeScore = Math.exp(-daysUntilStart / 60);
+      const timeScore = Math.exp(-daysUntilStart / estimatedTau);
       const forecastConfidence = Math.round((0.4 * dataScore + 0.6 * timeScore) * 100) / 100;
 
       return { predictedOcc, predictedGross, predictedNet, forecastConfidence };
