@@ -217,9 +217,9 @@ const DashboardPage = () => {
           <div className={`${card} !p-3.5 flex flex-col aspect-square`}>
             <div className="flex-1 flex flex-col justify-center">
               <div className={`${sectionLabel} mb-1`}>{ko ? '점유율' : 'OCC'}</div>
-              <div className="flex items-baseline gap-1.5 flex-wrap">
-                <span className={`text-[15px] font-semibold ${kpiValueCls}`}>{stats.occupancyRate}%</span>
-                <span className="text-[10px] text-muted-foreground leading-none">
+              <div className="flex items-baseline gap-1.5 overflow-hidden">
+                <span className={`text-[15px] font-semibold ${kpiValueCls} whitespace-nowrap`}>{stats.occupancyRate}%</span>
+                <span className="text-[10px] text-muted-foreground leading-none whitespace-nowrap shrink-0">
                   {stats.totalBookings}{ko ? '건' : ''}&nbsp;{stats.occupiedNights}{ko ? '박' : 'n'}
                 </span>
               </div>
@@ -230,14 +230,14 @@ const DashboardPage = () => {
             <div className="flex-1 flex flex-col justify-center">
               <div className={`${sectionLabel} mb-1`}>{ko ? '월말 예상 점유율' : 'PREDICTED OCC'}</div>
               {predictedOcc != null ? (
-                <div className="flex items-baseline gap-1.5 flex-wrap">
-                  <span className={`text-[15px] font-semibold ${kpiValueCls}`}>{predictedOcc}%</span>
-                  <div className="flex items-baseline gap-1 flex-wrap">
+                <div className="flex items-baseline gap-1.5 overflow-hidden">
+                  <span className={`text-[15px] font-semibold ${kpiValueCls} whitespace-nowrap`}>{predictedOcc}%</span>
+                  <div className="flex items-baseline gap-1 overflow-hidden">
                     {additionalNights != null && additionalNights > 0 && (
-                      <span className="text-[10px] text-success font-semibold leading-none">+{additionalNights}{ko ? '박' : 'n'}</span>
+                      <span className="text-[10px] text-success font-semibold leading-none whitespace-nowrap shrink-0">+{additionalNights}{ko ? '박' : 'n'}</span>
                     )}
                     {forecastConf != null && (
-                      <span className="text-[10px] text-muted-foreground/70 leading-none">{ko ? '신뢰도' : 'Conf.'} {forecastConf}%</span>
+                      <span className="text-[10px] text-muted-foreground/70 leading-none whitespace-nowrap shrink-0">{ko ? '신뢰도' : 'Conf.'} {forecastConf}%</span>
                     )}
                   </div>
                 </div>
@@ -251,10 +251,10 @@ const DashboardPage = () => {
           <div className={`${card} !p-3.5 flex flex-col aspect-square`}>
             <div className="flex-1 flex flex-col justify-center">
               <div className={`${sectionLabel} mb-1`}>ADR</div>
-              <div className="flex items-baseline gap-1.5 flex-wrap">
-                <span className={`text-[15px] font-semibold ${kpiValueCls}`}>{stats.adrThisMonth.toLocaleString()} 원</span>
-                <span className="text-[10px] text-muted-foreground leading-none whitespace-nowrap">
-                  {ko ? '연평균' : 'Yr avg'} {stats.adrYearAvg.toLocaleString()} 원
+              <div className="flex items-baseline gap-1.5 overflow-hidden">
+                <span className={`text-[15px] font-semibold ${kpiValueCls} whitespace-nowrap`}>{stats.adrThisMonth.toLocaleString()} 원</span>
+                <span className="text-[9px] text-muted-foreground leading-none whitespace-nowrap shrink-0">
+                  {ko ? `연 ${Math.round(stats.adrYearAvg / 10000)}만` : `avg ${Math.round(stats.adrYearAvg / 1000)}K`}
                 </span>
               </div>
             </div>
@@ -263,9 +263,9 @@ const DashboardPage = () => {
 
             <div className="flex-1 flex flex-col justify-center">
               <div className={`${sectionLabel} mb-1`}>{ko ? 'OTA 수수료' : 'OTA COMM.'}</div>
-              <div className="flex items-baseline gap-1.5 flex-wrap">
-                <span className={`text-[15px] font-semibold ${kpiValueCls}`}>{fmtWon(stats.otaCommission)}</span>
-                <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold py-0.5 px-1.5 rounded-full leading-none ${stats.otaCommPct <= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+              <div className="flex items-baseline gap-1.5 overflow-hidden">
+                <span className={`text-[15px] font-semibold ${kpiValueCls} whitespace-nowrap`}>{fmtWon(stats.otaCommission)}</span>
+                <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold py-0.5 px-1.5 rounded-full leading-none shrink-0 ${stats.otaCommPct <= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                   {stats.otaCommPct > 0 ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
                   {Math.abs(stats.otaCommPct)}%
                 </span>
