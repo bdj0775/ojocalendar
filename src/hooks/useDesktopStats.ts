@@ -137,7 +137,8 @@ export const useDesktopStats = (
     // 신뢰 가능한 데이터로 인정하는 최소 예약 건수 (1~2건은 우연일 수 있어 제외)
     const MIN_RELIABLE_BOOKINGS = 3;
 
-    // 오픈 초기 12개월은 시장 안착 전 표본이므로 STLY/hist2y 예측 신호에서 제외
+    // 오픈 첫 여름(6~9월, 4개월)만 초기 표본으로 제외.
+    // 10월부터는 시장 안착이 완료된 것으로 보고 STLY/hist2y 신호에 포함.
     // 가장 빠른 예약의 체크인월을 오픈월로 간주
     let openingMonthKey = Number.MAX_SAFE_INTEGER;
     validBookings.forEach(b => {
@@ -147,7 +148,7 @@ export const useDesktopStats = (
     });
     const openingPeriodEndKey = openingMonthKey === Number.MAX_SAFE_INTEGER
       ? 0
-      : openingMonthKey + 11; // 오픈월 포함 12개월을 초기 기간으로 간주
+      : openingMonthKey + 3; // 오픈월 포함 4개월(6~9월)만 초기 기간으로 간주
 
     // 최근 N개월 평균 점유율 (과거 데이터가 부족할 때 대체값으로 사용)
     const computeRecentAvgOcc = (exceptYear: number, exceptMonth: number): number => {
