@@ -20,42 +20,57 @@ import { getNatColor } from '../../utils/colors';
 import { CHANNEL_COLORS, GUEST_COLORS, TrendTooltip, LeadTimeTooltip, ScatterDot } from '../DesktopDashboard/chartComponents';
 import PaceChart from '../DesktopDashboard/PaceChart';
 
+// ── 가동률 mini ring ───────────────────────────────────────────
+const OccRing = ({ pct }: { pct: number }) => {
+  const r = 26, cx = 32, cy = 32;
+  const circ = 2 * Math.PI * r;
+  const filled = (Math.min(100, Math.max(0, pct)) / 100) * circ;
+  return (
+    <svg width="40" height="40" viewBox="0 0 64 64" style={{ display: 'block', flexShrink: 0 }}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--muted)" strokeWidth="7" />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--primary)" strokeWidth="7"
+        strokeDasharray={`${filled} ${circ}`} strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cy})`} />
+    </svg>
+  );
+};
+
+const CHANNELS_FILTER = ['All', 'Airbnb', 'Booking.com', 'Direct', 'Naver'] as const;
+
 const DashboardPage = () => {
   const { t, language } = useTranslation();
   const { open: openSidebar } = useSidebar();
   const { bookings, nextMonth, prevMonth, userProfile, properties, fetchData, showToast, currentYear, currentMonth } = useStore();
 
-  // 모바일 대시보드는 필터 없이 전체 데이터 표시
-  const stats = useDesktopStats('All', 'All', 'All');
-  const pace = useBookingPace();
-
+  const [tableChannel, setTableChannel] = useState('All');
   const [leadTimeMode, setLeadTimeMode] = useState('channel');
   const [isLeadTimeModalOpen, setIsLeadTimeModalOpen] = useState(false);
   const [tableRange, setTableRange] = useState('12');
 
+  const stats = useDesktopStats(tableChannel, 'All', 'All');
+  const pace  = useBookingPace();
+
   const sym = stats.currencySymbol;
-  const ko = language === 'ko';
+  const ko  = language === 'ko';
   const fmt = (v: number) => `${sym}${Math.abs(v).toLocaleString()}`;
   const fmtShort = useMemo(() => (v: number) => {
     if (Math.abs(v) >= 1000000) return `${sym}${(v / 1000000).toFixed(1)}M`;
-    if (Math.abs(v) >= 1000) return `${sym}${(v / 1000).toFixed(0)}K`;
+    if (Math.abs(v) >= 1000)    return `${sym}${(v / 1000).toFixed(0)}K`;
     return `${sym}${v.toLocaleString()}`;
   }, [sym]);
 
-  const isDark = document.documentElement.classList.contains('dark');
+  const isDark    = document.documentElement.classList.contains('dark');
   const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
   const tickColor = isDark ? '#64748b' : '#94a3b8';
 
-  // 실제 오늘 기준 (선택 월 무관)
   const actualYear     = new Date().getFullYear();
   const actualMonthIdx = new Date().getMonth();
   const MONTH_EN_IDX: Record<string, number> = {
     Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11,
   };
 
-  // 차트용 데이터 — 예측 필드 포함
   const chartData = useMemo(() => stats.monthlyTrends.map(d => {
-    const dMonthIdx      = MONTH_EN_IDX[d.monthEn] ?? -1;
+    const dMonthIdx       = MONTH_EN_IDX[d.monthEn] ?? -1;
     const isActualCurrent = d.year === actualYear && dMonthIdx === actualMonthIdx;
     const isActualFuture  = d.year > actualYear || (d.year === actualYear && dMonthIdx > actualMonthIdx);
     return {
@@ -68,7 +83,6 @@ const DashboardPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [stats.monthlyTrends, actualYear, actualMonthIdx]);
 
-  // ReferenceLine x 값 — 실제 오늘의 월 라벨
   const currentMonthLabel = useMemo(() => {
     const entry = stats.monthlyTrends.find(d =>
       d.year === actualYear && (MONTH_EN_IDX[d.monthEn] ?? -1) === actualMonthIdx,
@@ -77,39 +91,31 @@ const DashboardPage = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stats.monthlyTrends, actualYear, actualMonthIdx, ko]);
 
-  // 월별 분석 테이블 — 기간 필터 적용
   const mobileTableData = useMemo(() => {
     let data = [...(stats.monthlyTableData || [])];
     const now = new Date();
-    const nowYear = now.getFullYear();
-    const nowMonth = now.getMonth();
+    const nowYear = now.getFullYear(), nowMonth = now.getMonth();
     if (tableRange === '6') {
-      let cutY = nowYear; let cutM = nowMonth - 5;
+      let cutY = nowYear, cutM = nowMonth - 5;
       while (cutM < 0) { cutM += 12; cutY--; }
       data = data.filter(r => r.sortKey >= cutY * 100 + cutM);
     } else if (tableRange === '12') {
-      let cutY = nowYear; let cutM = nowMonth - 11;
+      let cutY = nowYear, cutM = nowMonth - 11;
       while (cutM < 0) { cutM += 12; cutY--; }
       data = data.filter(r => r.sortKey >= cutY * 100 + cutM);
     }
     return data.sort((a, b) => b.sortKey - a.sortKey);
   }, [stats.monthlyTableData, tableRange]);
 
-  // ── CSS helpers ────────────────────────────────────────────────
-  const card = 'bg-card text-card-foreground border border-border/60 rounded-2xl p-4 relative overflow-hidden shadow-sm w-full';
-  const kpiLabel = 'text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1';
-  const kpiValue = 'text-[24px] font-extrabold text-foreground tracking-tight leading-none mb-3';
-  const kpiSubGrid = 'grid grid-cols-2 gap-2 pt-3 border-t border-border/50';
-  const kpiSubLabel = 'text-[10px] text-muted-foreground';
-  const kpiSubVal = 'text-[12px] font-bold text-foreground/90';
-  const chartTitle = 'text-[14px] font-bold text-foreground mb-3 block';
-  const legendItem = 'flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground';
+  // ── CSS tokens ─────────────────────────────────────────────────
+  const card        = 'bg-card text-card-foreground border border-border/60 rounded-2xl p-4 relative overflow-hidden shadow-sm w-full';
+  const kpiLabel    = 'text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1';
+  const chartTitle  = 'text-[14px] font-bold text-foreground mb-3 block';
+  const legendItem  = 'flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground';
   const donutLegRow = 'flex items-center py-1.5 text-xs border-b border-border/50 last:border-0';
   const toggleGroup = 'flex bg-muted/50 rounded-lg border border-border/50 p-0.5 mt-2';
-  const toggleBtn = 'flex-1 py-1.5 text-[10px] font-bold text-muted-foreground bg-transparent border-0 cursor-pointer rounded-md text-center transition-all whitespace-nowrap';
+  const toggleBtn   = 'flex-1 py-1.5 text-[10px] font-bold text-muted-foreground bg-transparent border-0 cursor-pointer rounded-md text-center transition-all whitespace-nowrap';
   const toggleBtnActive = 'bg-background text-primary shadow-sm';
-  const thCls = 'py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap text-right first:text-left';
-  const tdCls = 'py-2 text-[11px] text-right text-foreground/80 border-b border-border/40 whitespace-nowrap';
 
   return (
     <div className="bg-background min-h-screen pb-24 overflow-x-hidden w-full">
@@ -184,14 +190,14 @@ const DashboardPage = () => {
               {stats.momNetPct > 0 ? '+' : ''}{stats.momNetPct}%
             </span>
           </div>
-          <div className={kpiValue}>{fmt(stats.netIncome)}</div>
-          <div className={kpiSubGrid}>
+          <div className="text-[24px] font-extrabold text-foreground tracking-tight leading-none mb-3">{fmt(stats.netIncome)}</div>
+          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border/50">
             <div className="flex flex-col gap-0.5">
-              <span className={kpiSubLabel}>{ko ? '총매출' : 'Gross'}</span>
-              <strong className={kpiSubVal}>{fmt(stats.grossRevenue)}</strong>
+              <span className="text-[10px] text-muted-foreground">{ko ? '총매출' : 'Gross'}</span>
+              <strong className="text-[12px] font-bold text-foreground/90">{fmt(stats.grossRevenue)}</strong>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className={kpiSubLabel}>{ko ? '전월 대비' : 'MOM'}</span>
+              <span className="text-[10px] text-muted-foreground">{ko ? '전월 대비' : 'MoM'}</span>
               <strong className={`text-[12px] font-bold ${stats.momNetChange >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {stats.momNetChange >= 0 ? '+' : '-'}{fmt(stats.momNetChange)}
               </strong>
@@ -201,50 +207,56 @@ const DashboardPage = () => {
 
         {/* ── KPI 2: 가동률 + ADR ── */}
         <div className="grid grid-cols-2 gap-3">
+
+          {/* 가동률 */}
           <div className={`${card} !p-3.5`}>
             <div className={kpiLabel}>{ko ? '가동률' : 'OCC'}</div>
-            <div className="text-[20px] font-extrabold text-foreground mb-2.5">{stats.occupancyRate}%</div>
-            <div className="pt-2.5 border-t border-border/50">
-              <span className={kpiSubLabel}>예약</span>
-              <strong className="block text-[12px] font-bold text-foreground/90 mt-0.5">{stats.totalBookings}건</strong>
+            <div className="flex items-center gap-2 mb-2">
+              <OccRing pct={stats.occupancyRate} />
+              <div>
+                <div className="text-[20px] font-extrabold text-foreground leading-none">{stats.occupancyRate}%</div>
+                <div className="text-[11px] font-bold text-muted-foreground mt-0.5">{stats.occupiedNights}{ko ? '박' : 'n'}</div>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-border/50">
+              <span className="text-[10px] text-muted-foreground">{ko ? '예약' : 'Bookings'}</span>
+              <strong className="block text-[12px] font-bold text-foreground/90 mt-0.5">{stats.totalBookings}{ko ? '건' : ''}</strong>
             </div>
           </div>
+
+          {/* ADR */}
           <div className={`${card} !p-3.5`}>
             <div className={kpiLabel}>ADR</div>
-            <div className="text-[16px] font-extrabold text-foreground mb-2.5 truncate" title={fmt(stats.adrThisMonth)}>{fmt(stats.adrThisMonth)}</div>
-            <div className="pt-2.5 border-t border-border/50">
-              <span className={kpiSubLabel}>OTA변동</span>
-              <strong className={`block text-[12px] font-bold mt-0.5 ${stats.otaCommPct <= 0 ? 'text-success' : 'text-destructive'}`}>
-                {stats.otaCommPct > 0 ? '+' : ''}{stats.otaCommPct}%
-              </strong>
+            <div className="text-[16px] font-extrabold text-foreground mb-2 truncate" title={fmt(stats.adrThisMonth)}>{fmt(stats.adrThisMonth)}</div>
+            <div className="pt-2 border-t border-border/50">
+              <span className="text-[10px] text-muted-foreground">{ko ? 'OTA 수수료' : 'OTA Comm.'}</span>
+              <div className="flex items-center justify-between mt-0.5 gap-1">
+                <strong className="text-[11px] font-bold text-foreground/90 truncate">{fmtShort(stats.otaCommission)}</strong>
+                <span className={`shrink-0 text-[9px] font-bold py-0.5 px-1.5 rounded-full flex items-center gap-0.5 ${stats.otaCommPct <= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                  {stats.otaCommPct > 0 ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
+                  {Math.abs(stats.otaCommPct)}%
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ── 월별 추이 (11개월) ── */}
+        {/* ── 월별 추이 ── */}
         <div className={card}>
           <span className={chartTitle}>{ko ? '월별 추이 (11개월)' : 'Monthly Trends (11 Months)'}</span>
 
-          {/* YTD + 연간 예상 — 2행 compact strip */}
-          <div className="mb-3 bg-muted/30 rounded-xl overflow-hidden">
-            <div className="flex items-center gap-2 px-2.5 py-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap shrink-0 w-14">{ko ? '금년(YTD)' : 'YTD'}</span>
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-                <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded whitespace-nowrap">{ko ? '매출' : 'Gr'} {fmtShort(stats.ytdGross)}</span>
-                <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded whitespace-nowrap">{ko ? '순이익' : 'Net'} {fmtShort(stats.ytdNet)}</span>
-              </div>
-            </div>
-            <div className="h-px bg-border/40 mx-2.5" />
-            <div className="flex items-center gap-2 px-2.5 py-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap shrink-0 w-14">{currentYear}{ko ? ' 예상' : ' Fcst'}</span>
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-                <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded whitespace-nowrap">{ko ? '매출' : 'Gr'} {fmtShort(stats.annualForecast.totalGross)}</span>
-                <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded whitespace-nowrap inline-flex items-center gap-1">
-                  <span>{ko ? '순이익' : 'Net'} {fmtShort(stats.annualForecast.totalNet)}</span>
-                  <span className="font-normal text-muted-foreground/50">· {stats.annualForecast.avgConfidence}%</span>
-                </span>
-              </div>
-            </div>
+          {/* YTD + 연간 예상 — 한 줄 compact */}
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-3 text-[10px] leading-relaxed">
+            <span className="font-bold text-muted-foreground">YTD</span>
+            <span className="text-foreground/80">{ko ? '매출' : 'Gr'} <strong className="text-foreground">{fmtShort(stats.ytdGross)}</strong></span>
+            <span className="text-foreground/80">{ko ? '순이익' : 'Net'} <strong className="text-foreground">{fmtShort(stats.ytdNet)}</strong></span>
+            <span className="text-border select-none">·</span>
+            <span className="font-bold text-muted-foreground">{currentYear} {ko ? '예상' : 'Fcst'}</span>
+            <span className="text-foreground/80">{ko ? '매출' : 'Gr'} <strong className="text-foreground">{fmtShort(stats.annualForecast.totalGross)}</strong></span>
+            <span className="text-foreground/80">
+              {ko ? '순이익' : 'Net'} <strong className="text-foreground">{fmtShort(stats.annualForecast.totalNet)}</strong>
+              <span className="text-muted-foreground/50"> · {stats.annualForecast.avgConfidence}%</span>
+            </span>
           </div>
 
           {/* 범례 */}
@@ -278,29 +290,28 @@ const DashboardPage = () => {
                 <XAxis xAxisId="2" dataKey={ko ? 'month' : 'monthEn'} hide />
                 <YAxis yAxisId="revenue" hide domain={['auto', 'auto']} />
                 <YAxis yAxisId="occ"     hide domain={[0, 100]} />
-                <Tooltip content={<TrendTooltip sym={sym} isDark={isDark} ko={ko} />} cursor={{ fill: 'transparent' }} />
+                <Tooltip
+                  content={<TrendTooltip sym={sym} isDark={isDark} ko={ko} compact />}
+                  cursor={{ fill: 'transparent' }}
+                  allowEscapeViewBox={{ x: false, y: false }}
+                />
                 {currentMonthLabel && (
                   <ReferenceLine xAxisId="0" yAxisId="revenue" x={currentMonthLabel}
                     stroke="var(--primary)" strokeDasharray="3 3" strokeOpacity={0.3} />
                 )}
-                {/* 예측 총매출 배경바 — 가장 먼저 렌더 (뒤에 위치) */}
                 <Bar xAxisId="2" yAxisId="revenue" dataKey="predictedGrossBar"
                   radius={[3,3,0,0]} maxBarSize={20} legendType="none">
                   {chartData.map((_, i) => <Cell key={`pm-${i}`} fill="var(--primary)" fillOpacity={0.13} />)}
                 </Bar>
-                {/* OTB 총매출 */}
                 <Bar xAxisId="0" yAxisId="revenue" dataKey="gross" name={ko ? '총매출' : 'Gross'} radius={[3,3,0,0]} maxBarSize={20}>
                   {chartData.map((e, i) => <Cell key={`g-${i}`} fill="var(--primary)" fillOpacity={e.isActualFuture ? 0.3 : 0.45} />)}
                 </Bar>
-                {/* OTB 순이익 */}
                 <Bar xAxisId="1" yAxisId="revenue" dataKey="net" name={ko ? '순이익' : 'Net'} radius={[3,3,0,0]} maxBarSize={20}>
                   {chartData.map((e, i) => <Cell key={`n-${i}`} fill="var(--primary)" fillOpacity={e.isActualFuture ? 0.5 : 1} />)}
                 </Bar>
-                {/* OTB 점유율 실선 */}
                 <Line xAxisId="0" yAxisId="occ" type="monotone" dataKey="occupancy"
                   name={ko ? '점유율' : 'OCC'} stroke="var(--success)" strokeWidth={2}
                   dot={{ r: 2, fill: 'var(--success)', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                {/* 예측 점유율 점선 */}
                 <Line xAxisId="0" yAxisId="occ" type="monotone" dataKey="predictedOccLine"
                   name={ko ? '예상OCC' : 'Pred.OCC'} stroke="var(--success)" strokeWidth={1.5}
                   strokeDasharray="5 5" strokeOpacity={0.6} connectNulls={false} dot={false} />
@@ -313,7 +324,6 @@ const DashboardPage = () => {
         <div className={card}>
           <span className={chartTitle}>{ko ? '예약 채널 분포' : 'Booking Channels'}</span>
           <div className="flex gap-4 items-center">
-            {/* 도넛 — 모바일에서 좌측 절반 */}
             <div className="relative shrink-0" style={{ width: 140, height: 140 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -327,7 +337,6 @@ const DashboardPage = () => {
                 <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">{ko ? '가동률' : 'OCC'}</span>
               </div>
             </div>
-            {/* 범례 — 우측 */}
             <ul className="flex-1 m-0 p-0 list-none min-w-0">
               {stats.channelPieData.map(item => (
                 <li key={item.name} className={donutLegRow}>
@@ -391,9 +400,10 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* ── 월별 분석 테이블 (모바일 최적화) ── */}
+        {/* ── 월별 분석 테이블 ── */}
         <div className={card}>
-          <div className="flex items-center justify-between mb-3">
+          {/* 헤더 */}
+          <div className="flex items-center justify-between mb-2">
             <span className={chartTitle} style={{ marginBottom: 0 }}>{ko ? '월별 분석' : 'Monthly Summary'}</span>
             <select
               className="bg-muted border border-border rounded-lg py-1 pl-2 pr-6 text-[10px] font-semibold text-foreground cursor-pointer outline-none appearance-none"
@@ -405,34 +415,85 @@ const DashboardPage = () => {
               <option value="all">{ko ? '전체' : 'All'}</option>
             </select>
           </div>
-          {/* 가로 스크롤 — 카드 패딩 밖으로 확장 */}
+
+          {/* 채널 필터 */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {CHANNELS_FILTER.map(ch => (
+              <button
+                key={ch}
+                onClick={() => setTableChannel(ch)}
+                className={`text-[10px] font-bold py-0.5 px-2.5 rounded-full border transition-colors whitespace-nowrap
+                  ${tableChannel === ch
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-transparent text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'}`}
+              >
+                {ch === 'All' ? (ko ? '전체' : 'All') : ch === 'Booking.com' ? 'Booking' : ch}
+              </button>
+            ))}
+          </div>
+
+          {/* 테이블 */}
           <div className="overflow-x-auto -mx-4 px-4">
-            <table className="w-full border-collapse" style={{ minWidth: 320 }}>
+            <table className="w-full border-collapse" style={{ minWidth: 300 }}>
               <thead>
-                <tr className="border-b border-border">
-                  <th className={`${thCls} text-left w-12`}>{ko ? '월' : 'Mo'}</th>
-                  <th className={thCls}>{ko ? '매출' : 'Rev'}</th>
-                  <th className={thCls}>{ko ? '순이익' : 'Net'}</th>
-                  <th className={thCls}>{ko ? '가동률' : 'OCC'}</th>
-                  <th className={thCls}>{ko ? '예약' : 'Bks'}</th>
-                  <th className={thCls}>ADR</th>
+                <tr className="border-b-2 border-border/50">
+                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-left w-14 whitespace-nowrap">{ko ? '월' : 'Mo'}</th>
+                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">{ko ? '가동률' : 'OCC'}</th>
+                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right whitespace-nowrap">{ko ? '매출' : 'Rev'}</th>
+                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right whitespace-nowrap">{ko ? '순이익' : 'Net'}</th>
+                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right whitespace-nowrap">ADR</th>
+                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right whitespace-nowrap">{ko ? '수수료' : 'Comm.'}</th>
                 </tr>
               </thead>
               <tbody>
-                {mobileTableData.map(row => (
-                  <tr key={row.sortKey} className="hover:bg-muted/30 transition-colors">
-                    <td className={`${tdCls} text-left font-bold text-foreground`}>{ko ? row.label : row.labelEn}</td>
-                    <td className={tdCls}><span className="font-semibold">{fmtShort(row.gross)}</span></td>
-                    <td className={tdCls}><span className="text-muted-foreground">{fmtShort(row.net)}</span></td>
-                    <td className={tdCls}><span className="font-semibold">{row.occupancy}%</span></td>
-                    <td className={tdCls}>{row.bookingCount}{ko ? '건' : ''}</td>
-                    <td className={tdCls}>{fmtShort(row.adr)}</td>
-                  </tr>
-                ))}
+                {mobileTableData.map(row => {
+                  const nights = Math.round(row.occupancy / 100 * new Date(row.year, row.month + 1, 0).getDate());
+                  const isNow  = row.year === actualYear && row.month === actualMonthIdx;
+                  const margin = row.gross > 0 ? Math.round((row.net / row.gross) * 100) : 0;
+                  return (
+                    <tr key={row.sortKey}
+                      className={`border-b border-border/25 transition-colors ${isNow ? 'bg-primary/5' : 'hover:bg-muted/20'}`}>
+                      {/* 월 */}
+                      <td className="py-2 text-left whitespace-nowrap">
+                        <span className={`text-[11px] font-bold ${isNow ? 'text-primary' : 'text-foreground'}`}>
+                          {ko ? row.label : row.labelEn}
+                        </span>
+                        {isNow && (
+                          <span className="ml-1 inline-block text-[8px] font-bold text-primary-foreground bg-primary px-1 py-0 rounded-full leading-[14px]">NOW</span>
+                        )}
+                      </td>
+                      {/* 가동률 */}
+                      <td className="py-2 text-center">
+                        <span className="text-[11px] font-bold text-foreground block">{row.occupancy}%</span>
+                        <span className="text-[9px] text-muted-foreground">{nights}{ko ? '박' : 'n'}</span>
+                      </td>
+                      {/* 매출 */}
+                      <td className="py-2 text-right">
+                        <span className="text-[11px] font-semibold text-foreground/90">{fmtShort(row.gross)}</span>
+                      </td>
+                      {/* 순이익 */}
+                      <td className="py-2 text-right">
+                        <span className="text-[11px] text-foreground/80">{fmtShort(row.net)}</span>
+                        <span className="block text-[9px] text-muted-foreground">{margin}%</span>
+                      </td>
+                      {/* ADR */}
+                      <td className="py-2 text-right">
+                        <span className="text-[11px] text-foreground/80">{fmtShort(row.adr)}</span>
+                      </td>
+                      {/* 수수료 */}
+                      <td className="py-2 text-right">
+                        <span className="text-[11px] text-muted-foreground">{fmtShort(row.otaComm)}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          <p className="text-[10px] text-muted-foreground/60 mt-2 text-right">{ko ? `${mobileTableData.length}개월` : `${mobileTableData.length}mo`}</p>
+          <p className="text-[10px] text-muted-foreground/50 mt-2 text-right">
+            {tableChannel !== 'All' && <span className="mr-1 text-primary font-semibold">{tableChannel === 'Booking.com' ? 'Booking' : tableChannel}</span>}
+            {ko ? `${mobileTableData.length}개월` : `${mobileTableData.length}mo`}
+          </p>
         </div>
 
         {/* ── 예약 속도 추이 ── */}

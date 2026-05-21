@@ -47,12 +47,14 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false }: PaceCha
               <button className={`${toggleBtnCls} ${paceMode === 'occ' ? toggleBtnActiveCls : ''}`} onClick={() => setPaceMode('occ')}>{ko ? '점유율' : 'Occupancy'}</button>
               <button className={`${toggleBtnCls} ${paceMode === 'rev' ? toggleBtnActiveCls : ''}`} onClick={() => setPaceMode('rev')}>{ko ? '매출' : 'Revenue'}</button>
             </div>
-            <button
-              className="bg-primary/10 text-primary border border-primary/20 py-1 px-2.5 rounded-chip text-xs font-semibold cursor-pointer transition-colors hover:bg-primary/15"
-              onClick={() => setIsPaceModalOpen(true)}
-            >
-              {ko ? '자세히 보기 >' : 'View Details >'}
-            </button>
+            {!compact && (
+              <button
+                className="bg-primary/10 text-primary border border-primary/20 py-1 px-2.5 rounded-chip text-xs font-semibold cursor-pointer transition-colors hover:bg-primary/15"
+                onClick={() => setIsPaceModalOpen(true)}
+              >
+                {ko ? '자세히 보기 >' : 'View Details >'}
+              </button>
+            )}
           </div>
 
           {/* Legend — full on desktop, current-month-only on compact */}
@@ -117,7 +119,7 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false }: PaceCha
         </div>
       </div>
 
-      <PaceDetailsModal isOpen={isPaceModalOpen} onClose={() => setIsPaceModalOpen(false)} />
+      {!compact && <PaceDetailsModal isOpen={isPaceModalOpen} onClose={() => setIsPaceModalOpen(false)} />}
     </>
   );
 };

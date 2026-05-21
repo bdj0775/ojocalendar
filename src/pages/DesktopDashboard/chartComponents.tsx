@@ -25,13 +25,15 @@ interface TrendTooltipProps {
   sym: string;
   isDark: boolean;
   ko: boolean;
+  compact?: boolean;
 }
 
-export const TrendTooltip = ({ active, payload, label, sym, isDark, ko }: TrendTooltipProps) => {
+export const TrendTooltip = ({ active, payload, label, sym, isDark, ko, compact }: TrendTooltipProps) => {
   if (!active || !payload || payload.length === 0) return null;
+  const minW = compact ? 'min-w-[170px]' : 'min-w-[200px]';
   const wrapCls = isDark
-    ? 'bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-inner p-3 px-4 shadow-tooltip min-w-[200px]'
-    : 'bg-white/96 border border-black/[0.08] rounded-inner p-3 px-4 shadow-tooltip min-w-[200px]';
+    ? `bg-slate-950/95 backdrop-blur-xl border border-white/10 rounded-inner p-3 px-4 shadow-tooltip ${minW}`
+    : `bg-white/96 border border-black/[0.08] rounded-inner p-3 px-4 shadow-tooltip ${minW}`;
   const labelCls = isDark
     ? 'text-[11px] font-bold text-slate-400 mb-2 tracking-wider'
     : 'text-[11px] font-bold text-slate-500 mb-2 tracking-wider';
