@@ -214,62 +214,62 @@ const DashboardPage = () => {
         <div className="grid grid-cols-2 gap-3">
 
           {/* 점유율 */}
-          <div className={`${card} !p-3.5 flex flex-col`}>
-            {/* 상단: 현재 점유율 */}
-            <div className={`${sectionLabel} mb-1.5`}>{ko ? '점유율' : 'OCC'}</div>
-            <div className="flex items-baseline gap-2 mb-0.5">
-              <span className={`text-[22px] font-extrabold ${kpiValueCls}`}>{stats.occupancyRate}%</span>
-            </div>
-            <div className="text-[10px] text-muted-foreground mb-3">
-              {stats.totalBookings}{ko ? '건' : ''}&nbsp;&nbsp;{stats.occupiedNights}{ko ? '박' : 'n'}
+          <div className={`${card} !p-3.5 flex flex-col aspect-square`}>
+            <div className="flex-1 flex flex-col justify-center">
+              <div className={`${sectionLabel} mb-1`}>{ko ? '점유율' : 'OCC'}</div>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className={`text-[15px] font-semibold ${kpiValueCls}`}>{stats.occupancyRate}%</span>
+                <span className="text-[10px] text-muted-foreground leading-none">
+                  {stats.totalBookings}{ko ? '건' : ''}&nbsp;{stats.occupiedNights}{ko ? '박' : 'n'}
+                </span>
+              </div>
             </div>
 
-            {/* 구분선 */}
-            <div className="h-px bg-border/50 mb-3" />
+            <div className="h-px bg-border/50 shrink-0" />
 
-            {/* 하단: 월말 예상 점유율 */}
-            <div className={`${sectionLabel} mb-1.5`}>{ko ? '월말 예상 점유율' : 'PREDICTED OCC'}</div>
-            {predictedOcc != null ? (
-              <>
-                <div className={`text-[18px] font-extrabold ${kpiValueCls} mb-0.5`}>{predictedOcc}%</div>
-                <div className="text-[10px] text-muted-foreground leading-relaxed">
-                  {additionalNights != null && additionalNights > 0 && (
-                    <span className="text-success font-semibold">+{additionalNights}{ko ? '박' : 'n'}&nbsp;&nbsp;</span>
-                  )}
-                  {forecastConf != null && (
-                    <span className="text-muted-foreground/70">{ko ? '신뢰도' : 'Conf.'} {forecastConf}%</span>
-                  )}
+            <div className="flex-1 flex flex-col justify-center">
+              <div className={`${sectionLabel} mb-1`}>{ko ? '월말 예상 점유율' : 'PREDICTED OCC'}</div>
+              {predictedOcc != null ? (
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className={`text-[15px] font-semibold ${kpiValueCls}`}>{predictedOcc}%</span>
+                  <div className="flex items-baseline gap-1 flex-wrap">
+                    {additionalNights != null && additionalNights > 0 && (
+                      <span className="text-[10px] text-success font-semibold leading-none">+{additionalNights}{ko ? '박' : 'n'}</span>
+                    )}
+                    {forecastConf != null && (
+                      <span className="text-[10px] text-muted-foreground/70 leading-none">{ko ? '신뢰도' : 'Conf.'} {forecastConf}%</span>
+                    )}
+                  </div>
                 </div>
-              </>
-            ) : (
-              <span className="text-[13px] text-muted-foreground/50">–</span>
-            )}
+              ) : (
+                <span className="text-[13px] text-muted-foreground/50">–</span>
+              )}
+            </div>
           </div>
 
           {/* ADR */}
-          <div className={`${card} !p-3.5 flex flex-col`}>
-            {/* 상단: ADR */}
-            <div className={`${sectionLabel} mb-1.5`}>ADR</div>
-            <div className={`text-[14px] font-extrabold ${kpiValueCls} leading-tight`}>
-              {stats.adrThisMonth.toLocaleString()} 원
-            </div>
-            <div className="text-[10px] text-muted-foreground mb-3">
-              {ko ? '연평균' : 'Yr avg'} {stats.adrYearAvg.toLocaleString()} 원
+          <div className={`${card} !p-3.5 flex flex-col aspect-square`}>
+            <div className="flex-1 flex flex-col justify-center">
+              <div className={`${sectionLabel} mb-1`}>ADR</div>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className={`text-[15px] font-semibold ${kpiValueCls}`}>{stats.adrThisMonth.toLocaleString()} 원</span>
+                <span className="text-[10px] text-muted-foreground leading-none whitespace-nowrap">
+                  {ko ? '연평균' : 'Yr avg'} {stats.adrYearAvg.toLocaleString()} 원
+                </span>
+              </div>
             </div>
 
-            {/* 구분선 */}
-            <div className="h-px bg-border/50 mb-3" />
+            <div className="h-px bg-border/50 shrink-0" />
 
-            {/* 하단: OTA 수수료 */}
-            <div className={`${sectionLabel} mb-1.5`}>{ko ? 'OTA 수수료' : 'OTA COMM.'}</div>
-            <div className={`text-[13px] font-bold ${kpiValueCls} leading-tight`}>
-              {fmtWon(stats.otaCommission)}
-            </div>
-            <div className="mt-1">
-              <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold py-0.5 px-1.5 rounded-full ${stats.otaCommPct <= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                {stats.otaCommPct > 0 ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
-                {Math.abs(stats.otaCommPct)}%
-              </span>
+            <div className="flex-1 flex flex-col justify-center">
+              <div className={`${sectionLabel} mb-1`}>{ko ? 'OTA 수수료' : 'OTA COMM.'}</div>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className={`text-[15px] font-semibold ${kpiValueCls}`}>{fmtWon(stats.otaCommission)}</span>
+                <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold py-0.5 px-1.5 rounded-full leading-none ${stats.otaCommPct <= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                  {stats.otaCommPct > 0 ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
+                  {Math.abs(stats.otaCommPct)}%
+                </span>
+              </div>
             </div>
           </div>
         </div>
