@@ -23,8 +23,8 @@ export const useBookingPace = (): BookingPaceResult => {
         isCurrent: offset === 0,
         revenue: 0, profit: 0, auc: 0, finalOcc: 0,
         daysInMonth, startMs, endMs, cutoffDay,
-        dailyBookedNights: new Array(121).fill(0),
-        dailyRevenue: new Array(121).fill(0),
+        dailyBookedNights: new Array(181).fill(0),
+        dailyRevenue: new Array(181).fill(0),
       };
     });
 
@@ -47,7 +47,7 @@ export const useBookingPace = (): BookingPaceResult => {
           let daysBeforeMonthStart = b.bookingDate
             ? Math.round((t.startMs - new Date(b.bookingDate + 'T12:00:00').getTime()) / 86400000)
             : 45;
-          daysBeforeMonthStart = Math.max(0, Math.min(120, daysBeforeMonthStart));
+          daysBeforeMonthStart = Math.max(0, Math.min(180, daysBeforeMonthStart));
           t.dailyBookedNights[daysBeforeMonthStart] += overlapNights;
           t.dailyRevenue[daysBeforeMonthStart] += amt * portion;
         }
@@ -58,7 +58,7 @@ export const useBookingPace = (): BookingPaceResult => {
     const accumulatorsNights = new Array(12).fill(0);
     const accumulatorsRev = new Array(12).fill(0);
 
-    for (let day = 120; day >= 0; day--) {
+    for (let day = 180; day >= 0; day--) {
       const dataPoint: PaceDataPoint = { leadDay: day };
       targets.forEach((t, i) => {
         accumulatorsNights[i] += t.dailyBookedNights[day];
