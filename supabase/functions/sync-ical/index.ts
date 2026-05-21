@@ -98,9 +98,20 @@ const CHANNEL_PRIORITY: Record<string, number> = { Airbnb: 1, 'Booking.com': 2, 
 
 
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};
+
 serve(async (req) => {
+  // 브라우저 CORS preflight — 반드시 200으로 응답해야 실제 POST가 진행됨
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS });
+  }
+
   if (req.method !== 'POST' && req.method !== 'GET') {
-    return new Response('Method Not Allowed', { status: 405 });
+    return new Response('Method Not Allowed', { status: 405, headers: CORS });
   }
 
   const cronSecret  = Deno.env.get('CRON_SECRET');
@@ -119,7 +130,7 @@ serve(async (req) => {
     );
     const { data: { user }, error: authErr } = await anonClient.auth.getUser();
     if (authErr || !user) {
-      return new Response('Unauthorized', { status: 401 });
+      return new Response('Unauthorized', { status: 401, headers: CORS });
     }
     filterHostId = user.id;
   }
@@ -133,8 +144,8 @@ serve(async (req) => {
   if (filterHostId) query = query.eq('host_id', filterHostId);
   const { data: channels, error } = await query;
 
-  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
-  if (!channels?.length) return new Response(JSON.stringify({ message: 'no active channels' }));
+  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } });
+  if (!channels?.length) return new Response(JSON.stringify({ message: 'no active channels' }), { headers: { ...CORS, 'Content-Type': 'application/json' } });
 
   // Airbnb → Booking.com → Naver 순 정렬 (선행 채널이 날짜 선점 → 후행 채널 중복 스킵)
   const sorted = [...channels].sort((a, b) =>
@@ -265,6 +276,6 @@ serve(async (req) => {
   }
 
   return new Response(JSON.stringify({ synced: results.length, results }), {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 });

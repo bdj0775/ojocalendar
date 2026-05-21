@@ -408,8 +408,6 @@ export const useStore = create<StoreState>()(
         if (!get().userProfile) return;
         set({ syncLoading: true, lastSyncResults: [] });
         try {
-          // 서버사이드 Edge Function 직접 호출 → CORS 프록시 불필요
-          // JWT가 자동으로 전달되어 Edge Function이 해당 유저 채널만 동기화함
           const { data, error } = await supabase.functions.invoke('sync-ical');
           if (error) throw error;
 
@@ -425,6 +423,9 @@ export const useStore = create<StoreState>()(
             await get().fetchData();
           }
           await get().fetchSyncChannels();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          get().showToast(`동기화 실패: ${msg}`, 'error');
         } finally {
           set({ syncLoading: false });
         }
