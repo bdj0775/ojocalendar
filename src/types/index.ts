@@ -177,6 +177,10 @@ export interface StoreState {
 
   updateSettings: (patch: Partial<Settings>) => void;
 
+  // Property visibility filter (null = all visible)
+  visiblePropertyIds: string[] | null;
+  setVisiblePropertyIds: (ids: string[] | null) => void;
+
   // Toast
   toast: { message: string; type: 'success' | 'error' | 'info' } | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -341,4 +345,16 @@ export interface BookingPaceResult {
   todayOccupancyPct: number;
   todayRevenueVal: number;
   todayLeadDay: number;
+}
+
+export type InsightStatus = 'positive' | 'neutral' | 'negative';
+
+export interface PaceInsight {
+  // 1. Pace Variance: 최근 3개월 평균 대비 현재 예약 속도 차이
+  paceVariancePct: number;     // 점유율 %p 차이 (예: +5.2)
+
+  // Summary
+  summaryText: string;         // 1줄 요약 (한국어)
+  summaryTextEn: string;       // 1줄 요약 (영어)
+  hasEnoughData: boolean;      // 데이터 충분 여부
 }

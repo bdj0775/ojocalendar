@@ -29,7 +29,14 @@ const DashboardPage = () => {
 
   const [tableChannel, setTableChannel] = useState('All');
   const [isLeadTimeModalOpen, setIsLeadTimeModalOpen] = useState(false);
-  const [tableRange, setTableRange]         = useState('12');
+  const [tableRange, setTableRange]   = useState('12');
+  const [sortCol, setSortCol]         = useState<'sortKey' | 'occupancy' | 'gross' | 'adr' | 'otaComm'>('sortKey');
+  const [sortDir, setSortDir]         = useState<'desc' | 'asc'>('desc');
+
+  const handleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setSortCol(col); setSortDir('desc'); }
+  };
 
   const stats  = useDesktopStats(tableChannel, 'All', 'All');
   const pace   = useBookingPace();
@@ -49,6 +56,12 @@ const DashboardPage = () => {
     if (Math.abs(v) >= 1000)    return `${sym}${(v / 1000).toFixed(0)}K`;
     return `${sym}${v.toLocaleString()}`;
   }, [sym]);
+  // 통화 기호 없이 숫자만 — 월별 분석 테이블 전용
+  const fmtN = (v: number) => {
+    if (Math.abs(v) >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+    if (Math.abs(v) >= 1000)    return `${(v / 1000).toFixed(0)}K`;
+    return `${Math.round(v).toLocaleString()}`;
+  };
   const fmt = (v: number) => `${sym}${Math.abs(v).toLocaleString()}`;
 
   const isDark    = document.documentElement.classList.contains('dark');
@@ -96,6 +109,15 @@ const DashboardPage = () => {
     let data = [...(stats.monthlyTableData || [])];
     const now = new Date();
     const nowYear = now.getFullYear(), nowMonth = now.getMonth();
+
+    // Bug fix: cap at current month — checkouts that spill into future months
+    // (e.g. Dec→Jan) can create spurious future-month entries with bookingCount > 0
+    data = data.filter(r => {
+      const ry = Math.floor(r.sortKey / 100);
+      const rm = r.sortKey % 100;
+      return ry * 12 + rm <= nowYear * 12 + nowMonth;
+    });
+
     if (tableRange === '6') {
       let cutY = nowYear, cutM = nowMonth - 5;
       while (cutM < 0) { cutM += 12; cutY--; }
@@ -105,8 +127,21 @@ const DashboardPage = () => {
       while (cutM < 0) { cutM += 12; cutY--; }
       data = data.filter(r => r.sortKey >= cutY * 100 + cutM);
     }
-    return data.sort((a, b) => b.sortKey - a.sortKey);
-  }, [stats.monthlyTableData, tableRange]);
+
+    data.sort((a, b) => {
+      let va = 0, vb = 0;
+      switch (sortCol) {
+        case 'sortKey':    va = a.sortKey;   vb = b.sortKey;   break;
+        case 'occupancy':  va = a.occupancy; vb = b.occupancy; break;
+        case 'gross':      va = a.gross;     vb = b.gross;     break;
+        case 'adr':        va = a.adr;       vb = b.adr;       break;
+        case 'otaComm':    va = a.otaComm;   vb = b.otaComm;   break;
+      }
+      return sortDir === 'desc' ? vb - va : va - vb;
+    });
+
+    return data;
+  }, [stats.monthlyTableData, tableRange, sortCol, sortDir]);
 
   // ── CSS 토큰 ────────────────────────────────────────────────────
   const card        = 'bg-card text-card-foreground border border-border/60 rounded-2xl p-4 relative overflow-hidden shadow-sm w-full';
@@ -397,6 +432,9 @@ const DashboardPage = () => {
           </div>
         </div>
 
+        {/* ── 예약 속도 추이 (채널분포 바로 아래) ── */}
+        <PaceChart pace={pace} isDark={isDark} ko={ko} sym={sym} fmtShort={fmtShort} compact predictedOcc={predictedOcc} />
+
         {/* ── 리드타임 구간별 비중 ── */}
         <div className={card}>
           <div className="flex items-center justify-between gap-2 mb-3">
@@ -468,9 +506,11 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* ── 월별 분석 테이블 ── */}
+        {/* ── 월별 분석 ── */}
         <div className={card}>
-          <div className="flex items-center justify-between mb-2">
+
+          {/* 헤더 줄: 제목 + 기간 선택 */}
+          <div className="flex items-center justify-between mb-3">
             <span className={chartTitle} style={{ marginBottom: 0 }}>{ko ? '월별 분석' : 'Monthly Summary'}</span>
             <select
               className="bg-muted border border-border rounded-lg py-1 pl-2 pr-6 text-[10px] font-semibold text-foreground cursor-pointer outline-none appearance-none"
@@ -485,80 +525,165 @@ const DashboardPage = () => {
 
           {/* 채널 필터 칩 */}
           <div className="flex flex-wrap gap-1.5 mb-3">
-            {CHANNELS_FILTER.map(ch => (
+            {CHANNELS_FILTER.map(ch => {
+              const label = ch === 'All' ? (ko ? '전체' : 'All') : ch === 'Booking.com' ? 'Booking' : ch;
+              const active = tableChannel === ch;
+              return (
+                <button
+                  key={ch}
+                  onClick={() => setTableChannel(ch)}
+                  className={`text-[10px] font-bold py-0.5 px-2.5 rounded-full border transition-colors whitespace-nowrap
+                    ${active
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-transparent text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+            {tableChannel !== 'All' && (
               <button
-                key={ch}
-                onClick={() => setTableChannel(ch)}
-                className={`text-[10px] font-bold py-0.5 px-2.5 rounded-full border transition-colors whitespace-nowrap
-                  ${tableChannel === ch
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-transparent text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'}`}
+                onClick={() => setTableChannel('All')}
+                className="text-[10px] font-bold py-0.5 px-2 rounded-full border border-border/40 text-muted-foreground/60 hover:text-destructive hover:border-destructive/40 transition-colors"
               >
-                {ch === 'All' ? (ko ? '전체' : 'All') : ch === 'Booking.com' ? 'Booking' : ch}
+                ✕
               </button>
-            ))}
+            )}
           </div>
 
+          {/* 정렬 표시 줄 (기본 월 정렬이 아닐 때만) */}
+          {sortCol !== 'sortKey' && (
+            <div className="flex items-center gap-1.5 mb-2 text-[10px] text-muted-foreground">
+              <span>{ko ? '정렬:' : 'Sort:'}</span>
+              <span className="text-primary font-semibold">
+                {{ occupancy: ko ? '점유율' : 'OCC', gross: ko ? '매출' : 'Rev', net: ko ? '순이익' : 'Net', adr: 'ADR', otaComm: ko ? '수수료' : 'Comm' }[sortCol]}
+                {' '}{sortDir === 'desc' ? '↓' : '↑'}
+              </span>
+              <button onClick={() => { setSortCol('sortKey'); setSortDir('desc'); }} className="ml-auto text-[9px] text-muted-foreground/50 hover:text-foreground">
+                {ko ? '초기화' : 'Reset'}
+              </button>
+            </div>
+          )}
+
           {/* 테이블 */}
-          <div className="overflow-x-auto -mx-4 px-4">
-            <table className="w-full border-collapse" style={{ minWidth: 300 }}>
-              <thead>
-                <tr className="border-b-2 border-border/50">
-                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-left w-14 whitespace-nowrap">{ko ? '월' : 'Mo'}</th>
-                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-center whitespace-nowrap">{ko ? '점유율' : 'OCC'}</th>
-                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right whitespace-nowrap">{ko ? '매출' : 'Rev'}</th>
-                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right whitespace-nowrap">{ko ? '순이익' : 'Net'}</th>
-                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right whitespace-nowrap">ADR</th>
-                  <th className="py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right whitespace-nowrap">{ko ? '수수료' : 'Comm.'}</th>
+          {(() => {
+            // 대시보드 선택월을 상단 고정, 나머지는 정렬
+            const pinnedRow = mobileTableData.find(r => r.year === currentYear && r.month === currentMonth);
+            const bodyRows  = mobileTableData.filter(r => !(r.year === currentYear && r.month === currentMonth));
+
+            // 컬럼 정의 — 순이익 제외, 5컬럼
+            const COLS = [
+              { col: 'sortKey',   label: ko ? '월' : 'Mo',      align: 'left'   },
+              { col: 'occupancy', label: ko ? '점유율' : 'OCC', align: 'center' },
+              { col: 'gross',     label: ko ? '매출' : 'Rev',   align: 'right'  },
+              { col: 'adr',       label: 'ADR',                  align: 'right'  },
+              { col: 'otaComm',   label: ko ? '수수료' : 'Comm', align: 'right'  },
+            ] as const;
+
+            // 단일 행 렌더링 — isPinned: 대시보드 선택월, isNow: 실제 오늘
+            const renderRow = (row: typeof mobileTableData[0], isPinned: boolean) => {
+              const nights     = Math.round(row.occupancy / 100 * new Date(row.year, row.month + 1, 0).getDate());
+              const isNow      = row.year === actualYear && row.month === actualMonthIdx;
+              // 타이포그래피 — 크기 통일, 서브는 opacity로만 구분
+              const val = 'text-[11px] font-medium text-foreground tabular-nums leading-none';
+              const sub = 'text-[11px] text-muted-foreground/50 tabular-nums leading-none';
+              return (
+                <tr
+                  key={row.sortKey}
+                  className={`border-b border-border/20 ${
+                    isPinned && isNow  ? 'bg-primary/5' :
+                    isPinned           ? 'bg-muted/40'  :
+                    isNow              ? 'bg-primary/5' : ''
+                  }`}
+                >
+                  {/* 월 */}
+                  <td className="py-2 pr-2 align-middle whitespace-nowrap">
+                    <div className="flex items-center gap-1">
+                      <span className={`text-[11px] font-semibold leading-none ${isNow ? 'text-primary' : 'text-foreground'}`}>
+                        {ko ? row.label : row.labelEn}
+                      </span>
+                      {isPinned && !isNow && (
+                        <span className="text-[8px] text-primary/50 leading-none">◀</span>
+                      )}
+                    </div>
+                  </td>
+                  {/* 점유율 · 박 — 같은 크기, 같은 baseline */}
+                  <td className="py-2 align-middle">
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className={val}>{row.occupancy}%</span>
+                      <span className={sub}>{nights}{ko ? '박' : 'n'}</span>
+                    </div>
+                  </td>
+                  {/* 매출 */}
+                  <td className="py-2 align-middle text-right">
+                    <span className={val}>{fmtN(row.gross)}</span>
+                  </td>
+                  {/* ADR */}
+                  <td className="py-2 align-middle text-right">
+                    <span className={val}>{fmtN(row.adr)}</span>
+                  </td>
+                  {/* 수수료 */}
+                  <td className="py-2 align-middle text-right">
+                    <span className={`text-[11px] font-medium text-muted-foreground/70 tabular-nums leading-none`}>{fmtN(row.otaComm)}</span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {mobileTableData.map(row => {
-                  const nights = Math.round(row.occupancy / 100 * new Date(row.year, row.month + 1, 0).getDate());
-                  const isNow  = row.year === actualYear && row.month === actualMonthIdx;
-                  const margin = row.gross > 0 ? Math.round((row.net / row.gross) * 100) : 0;
-                  return (
-                    <tr key={row.sortKey}
-                      className={`border-b border-border/25 transition-colors ${isNow ? 'bg-primary/5' : 'hover:bg-muted/20'}`}>
-                      <td className="py-2 text-left whitespace-nowrap">
-                        <span className={`text-[11px] font-bold ${isNow ? 'text-primary' : kpiValueCls}`}>
-                          {ko ? row.label : row.labelEn}
-                        </span>
-                        {isNow && (
-                          <span className="ml-1 inline-block text-[8px] font-bold text-primary-foreground bg-primary px-1 rounded-full leading-[14px]">NOW</span>
-                        )}
-                      </td>
-                      <td className="py-2 text-center">
-                        <span className={`text-[11px] font-bold ${kpiValueCls} block`}>{row.occupancy}%</span>
-                        <span className="text-[9px] text-muted-foreground">{nights}{ko ? '박' : 'n'}</span>
-                      </td>
-                      <td className="py-2 text-right">
-                        <span className={`text-[11px] font-semibold ${kpiValueCls}`}>{fmtShort(row.gross)}</span>
-                      </td>
-                      <td className="py-2 text-right">
-                        <span className={`text-[11px] ${kpiValueCls}`}>{fmtShort(row.net)}</span>
-                        <span className="block text-[9px] text-muted-foreground">{margin}%</span>
-                      </td>
-                      <td className="py-2 text-right">
-                        <span className={`text-[11px] ${kpiValueCls}`}>{fmtShort(row.adr)}</span>
-                      </td>
-                      <td className="py-2 text-right">
-                        <span className="text-[11px] text-muted-foreground">{fmtShort(row.otaComm)}</span>
-                      </td>
+              );
+            };
+
+            return (
+              <div className="overflow-x-auto -mx-4 px-4">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-border/50">
+                      {COLS.map(({ col, label, align }) => {
+                        const active = sortCol === col;
+                        return (
+                          <th key={col} className="pb-1.5 pt-0">
+                            <button
+                              onClick={() => handleSort(col)}
+                              className={`flex items-center gap-0.5 whitespace-nowrap select-none
+                                text-[9px] font-semibold uppercase tracking-wider leading-none transition-colors
+                                ${active ? 'text-primary' : 'text-muted-foreground/60'}
+                                ${align === 'center' ? 'w-full justify-center' : align === 'right' ? 'w-full justify-end' : ''}`}
+                            >
+                              {label}
+                              <span className={`leading-none ${active ? 'text-primary' : 'text-border'}`}>
+                                {active ? (sortDir === 'desc' ? '▼' : '▲') : '⇅'}
+                              </span>
+                            </button>
+                          </th>
+                        );
+                      })}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {pinnedRow && renderRow(pinnedRow, true)}
+                    {bodyRows.map(row => renderRow(row, false))}
+                    {mobileTableData.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-5 text-center text-[10px] text-muted-foreground/50">
+                          {ko ? '표시할 데이터가 없습니다' : 'No data'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* 푸터: 건수 + 활성 필터 표시 */}
           <p className="text-[10px] text-muted-foreground/50 mt-2 text-right">
-            {tableChannel !== 'All' && <span className="mr-1 text-primary font-semibold">{tableChannel === 'Booking.com' ? 'Booking' : tableChannel}</span>}
+            {tableChannel !== 'All' && (
+              <span className="mr-1.5 text-primary font-semibold">
+                {tableChannel === 'Booking.com' ? 'Booking' : tableChannel}
+              </span>
+            )}
             {ko ? `${mobileTableData.length}개월` : `${mobileTableData.length}mo`}
           </p>
         </div>
 
-        {/* ── 예약 속도 추이 ── */}
-        <PaceChart pace={pace} isDark={isDark} ko={ko} sym={sym} fmtShort={fmtShort} compact />
+
 
       </div>
 

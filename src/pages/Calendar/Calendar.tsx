@@ -12,14 +12,12 @@ import MaintenanceModal from '../../components/Modals/MaintenanceModal';
 import YearMonthPickerModal from '../../components/Modals/YearMonthPickerModal';
 import SwipeableCalendar from '../../components/CalendarGrid/SwipeableCalendar';
 import { useBookingBars } from '../../components/CalendarGrid/useBookingBars';
-import type { BookingBar } from '../../components/CalendarGrid/useBookingBars';
-import type { GridCell } from '../../components/CalendarGrid/CalendarGrid';
 import { SectionTitle, CardTitle, Body } from '../../components/ui/Typography';
 
-const PROPERTIES = [
-  { id: 'ojorok', name: '오조록' },
-  { id: 'prop2', name: '숙소2' },
-  { id: 'prop3', name: '숙소3' }
+// Test-only placeholder properties (no real bookings)
+const TEST_PROPERTIES = [
+  { id: '__test_prop_2__', name: '숙소2' },
+  { id: '__test_prop_3__', name: '숙소3' },
 ];
 
 // ── 순수 헬퍼 ────────────────────────────────────────────────────
@@ -32,13 +30,13 @@ function offsetMonth(year: number, month: number, delta: number): [number, numbe
   return [y, m];
 }
 
-function buildCalendarGrid(year: number, month: number): GridCell[] {
-  const firstDay       = new Date(year, month, 1).getDay();
-  const daysInMonth    = new Date(year, month + 1, 0).getDate();
+function buildCalendarGrid(year: number, month: number) {
+  const firstDay        = new Date(year, month, 1).getDay();
+  const daysInMonth     = new Date(year, month + 1, 0).getDate();
   const daysInPrevMonth = new Date(year, month, 0).getDate();
   const [py, pm] = offsetMonth(year, month, -1);
   const [ny, nm] = offsetMonth(year, month,  1);
-  const cells: GridCell[] = [];
+  const cells = [];
 
   for (let i = firstDay - 1; i >= 0; i--) {
     cells.push({
@@ -54,8 +52,6 @@ function buildCalendarGrid(year: number, month: number): GridCell[] {
       dateStr: `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
     });
   }
-  // 항상 42셀(6행×7열) 고정 — 부족하면 다음 달 날짜로 채움
-  // 5행 달과 6행 달의 높이를 통일해 스와이프 중 레이아웃 점프 방지
   for (let i = 1; cells.length < 42; i++) {
     cells.push({
       day: i,
@@ -72,8 +68,9 @@ const CalendarPage = () => {
   const navigate = useNavigate();
   const { t, language } = useTranslation();
   const {
-    bookings, maintenance, currentYear, currentMonth,
+    bookings, maintenance, currentYear, currentMonth, properties,
     nextMonth, prevMonth, goToday, setMonth, openBookingModal, openEditMaintModal,
+    visiblePropertyIds, setVisiblePropertyIds,
   } = useStore();
 
   const { open: openSidebar } = useSidebar();
@@ -84,11 +81,35 @@ const CalendarPage = () => {
   const today    = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  const [selectedProperties, setSelectedProperties] = useState<string[]>(['ojorok', 'prop2', 'prop3']);
-  const toggleProperty = (id: string) =>
-    setSelectedProperties(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    );
+  // Combined property list: real (deduped by store) + test placeholders
+  const allProperties = useMemo(
+    () => [...properties, ...TEST_PROPERTIES],
+    [properties],
+  );
+
+  const toggleProperty = (id: string) => {
+    const allIds = allProperties.map(p => p.id);
+    const current = visiblePropertyIds ?? allIds;
+    const next = current.includes(id)
+      ? current.filter(x => x !== id)
+      : [...current, id];
+    setVisiblePropertyIds(next.length === allIds.length ? null : next);
+  };
+
+  // Filter bookings and maintenance by visible properties before bar computation
+  const visibleBookings = useMemo(
+    () => visiblePropertyIds === null
+      ? bookings
+      : bookings.filter(b => b.propertyId != null && visiblePropertyIds.includes(b.propertyId)),
+    [bookings, visiblePropertyIds],
+  );
+
+  const visibleMaintenance = useMemo(
+    () => visiblePropertyIds === null
+      ? maintenance
+      : maintenance.filter(m => m.propertyId != null && visiblePropertyIds.includes(m.propertyId)),
+    [maintenance, visiblePropertyIds],
+  );
 
   // ── 3개월 그리드 ────────────────────────────────────────────────
   const [prevYear,  prevMonthIdx]  = useMemo(() => offsetMonth(currentYear, currentMonth, -1), [currentYear, currentMonth]);
@@ -98,36 +119,31 @@ const CalendarPage = () => {
   const currentGrid = useMemo(() => buildCalendarGrid(currentYear, currentMonth),  [currentYear, currentMonth]);
   const nextGrid    = useMemo(() => buildCalendarGrid(nextYear,    nextMonthIdx),  [nextYear,    nextMonthIdx]);
 
-  // 각 달 예약 바 (hook 3회 호출 순서 보장)
-  const prevBars    = useBookingBars(bookings, maintenance, prevGrid);
-  const currentBars = useBookingBars(bookings, maintenance, currentGrid);
-  const nextBars    = useBookingBars(bookings, maintenance, nextGrid);
+  const prevBars    = useBookingBars(visibleBookings, visibleMaintenance, prevGrid);
+  const currentBars = useBookingBars(visibleBookings, visibleMaintenance, currentGrid);
+  const nextBars    = useBookingBars(visibleBookings, visibleMaintenance, nextGrid);
 
-  // 숙소 필터 적용
-  const panels = useMemo(() => {
-    const show = selectedProperties.includes('ojorok');
-    return {
-      prev:    { grid: prevGrid,    bars: show ? prevBars    : [] as BookingBar[] },
-      current: { grid: currentGrid, bars: show ? currentBars : [] as BookingBar[] },
-      next:    { grid: nextGrid,    bars: show ? nextBars    : [] as BookingBar[] },
-    };
-  }, [prevGrid, currentGrid, nextGrid, prevBars, currentBars, nextBars, selectedProperties]);
+  const panels = useMemo(() => ({
+    prev:    { grid: prevGrid,    bars: prevBars    },
+    current: { grid: currentGrid, bars: currentBars },
+    next:    { grid: nextGrid,    bars: nextBars    },
+  }), [prevGrid, currentGrid, nextGrid, prevBars, currentBars, nextBars]);
 
   // ── 다가오는 예약 ────────────────────────────────────────────────
   const upcomingStays = useMemo(() =>
-    bookings
+    visibleBookings
       .filter(b => new Date(b.checkIn) >= new Date(todayStr))
       .sort((a, b) => new Date(a.checkIn).getTime() - new Date(b.checkIn).getTime())
       .slice(0, 5),
-    [bookings, todayStr]
+    [visibleBookings, todayStr],
   );
 
-  const handleDateClick = (cell: GridCell) => {
+  const handleDateClick = (cell: { isCurrentMonth: boolean; dateStr: string }) => {
     if (!cell.isCurrentMonth || !cell.dateStr) return;
     setQuickBookingDate(cell.dateStr);
   };
 
-  const handleBarClick = (e: React.MouseEvent, bar: BookingBar) => {
+  const handleBarClick = (e: React.MouseEvent, bar: { type: string; id: string | number }) => {
     e.stopPropagation();
     if (bar.type === 'booking') openBookingModal(String(bar.id));
     else openEditMaintModal(String(bar.id));
@@ -177,8 +193,8 @@ const CalendarPage = () => {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {PROPERTIES.map(prop => {
-            const isSelected = selectedProperties.includes(prop.id);
+          {allProperties.map(prop => {
+            const isSelected = visiblePropertyIds === null || visiblePropertyIds.includes(prop.id);
             return (
               <button
                 key={prop.id}
@@ -237,7 +253,7 @@ const CalendarPage = () => {
           </div>
         ))}
 
-        {/* FAB — 작게 조정 */}
+        {/* FAB */}
         <button
           className="fixed right-5 bottom-nav-clear w-11 h-11 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/35 z-fab active:scale-[0.90] transition-transform lg:hidden"
           onClick={() => navigate('/new-booking')}

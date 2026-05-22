@@ -150,8 +150,15 @@ export const useStore = create<StoreState>()(
           if (pErr) throw pErr;
           if (pData?.length === 0) { await get().migrateData(); return; }
           if (pData) {
+            // Deduplicate by name — keep first occurrence per name
+            const seenNames = new Set<string>();
+            const deduped = pData.filter(p => {
+              if (seenNames.has(p.name)) return false;
+              seenNames.add(p.name);
+              return true;
+            });
             set({
-              properties: pData.map(p => ({
+              properties: deduped.map(p => ({
                 id: p.id, name: p.name,
                 baseGuests: p.base_guests, basePrice: p.base_price,
                 weekendPrice: p.weekend_price, extraGuestFee: p.extra_guest_fee,
@@ -326,6 +333,9 @@ export const useStore = create<StoreState>()(
 
       updateSettings: (patch) =>
         set(state => ({ settings: { ...state.settings, ...patch } })),
+
+      visiblePropertyIds: null,
+      setVisiblePropertyIds: (ids) => set({ visiblePropertyIds: ids }),
 
       // ── iCal Sync ──────────────────────────────────────────
       syncChannels: [],

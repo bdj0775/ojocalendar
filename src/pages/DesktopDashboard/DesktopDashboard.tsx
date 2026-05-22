@@ -489,7 +489,7 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
       </div>
 
       {/* Box 9: Booking Pace */}
-      <PaceChart pace={pace} isDark={isDark} ko={ko} sym={sym} fmtShort={fmtShort} />
+      <PaceChart pace={pace} isDark={isDark} ko={ko} sym={sym} fmtShort={fmtShort} predictedOcc={stats.monthlyTrends.find(t => t.isCurrent)?.predictedOcc ?? null} />
 
       {isLeadTimeModalOpen && <LeadTimeDetailModal isDark={isDark} onClose={() => setIsLeadTimeModalOpen(false)} />}
     </div>
