@@ -7,7 +7,7 @@ import { useSidebar } from '../../context/SidebarContext';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
-  CartesianGrid, ScatterChart, Scatter, ZAxis, ReferenceLine,
+  CartesianGrid, ReferenceLine,
 } from 'recharts';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -16,8 +16,8 @@ import { useBookingPace } from '../../hooks/useBookingPace';
 import { supabase } from '../../services/supabaseClient';
 import { DUMMY_BOOKINGS, DUMMY_MAINTENANCE } from '../../utils/dummyData';
 import LeadTimeDetailModal from '../../components/Modals/LeadTimeDetailModal';
-import { getNatColor } from '../../utils/colors';
-import { CHANNEL_COLORS, GUEST_COLORS, TrendTooltip, LeadTimeTooltip, ScatterDot } from '../DesktopDashboard/chartComponents';
+import { TrendTooltip } from '../DesktopDashboard/chartComponents';
+import { useLeadTimeReport } from '../../hooks/useLeadTimeReport';
 import PaceChart from '../DesktopDashboard/PaceChart';
 
 const CHANNELS_FILTER = ['All', 'Airbnb', 'Booking.com', 'Direct', 'Naver'] as const;
@@ -28,12 +28,12 @@ const DashboardPage = () => {
   const { bookings, nextMonth, prevMonth, userProfile, properties, fetchData, showToast, currentYear, currentMonth } = useStore();
 
   const [tableChannel, setTableChannel] = useState('All');
-  const [leadTimeMode, setLeadTimeMode]     = useState('channel');
   const [isLeadTimeModalOpen, setIsLeadTimeModalOpen] = useState(false);
   const [tableRange, setTableRange]         = useState('12');
 
-  const stats = useDesktopStats(tableChannel, 'All', 'All');
-  const pace  = useBookingPace();
+  const stats  = useDesktopStats(tableChannel, 'All', 'All');
+  const pace   = useBookingPace();
+  const report = useLeadTimeReport();
 
   const ko = language === 'ko';
 
@@ -397,55 +397,69 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* ── 리드타임 ── */}
+        {/* ── 리드타임 구간별 비중 ── */}
         <div className={card}>
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <span className={chartTitle} style={{ marginBottom: 0 }}>{ko ? '리드타임' : 'Lead Time'}</span>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className={chartTitle} style={{ marginBottom: 0 }}>
+              {ko ? '리드타임 구간별 비중' : 'Lead Time Breakdown'}
+            </span>
             <button
               className="text-[10px] font-bold py-1 px-2 rounded-lg bg-primary/10 text-primary whitespace-nowrap"
               onClick={() => setIsLeadTimeModalOpen(true)}
             >
-              자세히 보기
+              {ko ? '분포 보기 >' : 'View >'}
             </button>
           </div>
-          <div className={toggleGroup}>
-            {(['channel', 'nationality', 'guests'] as const).map(m => (
-              <button key={m} className={`${toggleBtn} ${leadTimeMode === m ? toggleBtnActive : ''}`} onClick={() => setLeadTimeMode(m)}>
-                {m === 'channel' ? (ko ? '채널' : 'Ch') : m === 'nationality' ? (ko ? '국적' : 'Nat') : (ko ? '인원' : 'G')}
-              </button>
-            ))}
-          </div>
-          <div className="-mx-3 mt-3">
-            <ResponsiveContainer width="100%" height={180}>
-              <ScatterChart margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                <XAxis dataKey="x" type="number" domain={[stats.leadTimeStartX, stats.leadTimeEndX]} hide />
-                <YAxis dataKey="y" type="number" domain={[0, 150]} hide />
-                <ZAxis dataKey="nights" range={[8, 60]} />
-                <Tooltip cursor={{ strokeDasharray: '3 3', stroke: gridColor }} content={<LeadTimeTooltip isDark={isDark} ko={ko} />} />
-                {leadTimeMode === 'channel' && Object.keys(CHANNEL_COLORS).map(ch => (
-                  <Scatter key={ch} name={ch} data={(stats.leadTimeScatterData || []).filter(d => d.channel === ch)} fill={CHANNEL_COLORS[ch]} shape={ScatterDot} />
+
+          {/* 전체 평균 요약 */}
+          {report.totalBookings > 0 ? (
+            <div className="flex items-baseline gap-1.5 mb-4">
+              <span className="text-[22px] font-bold text-foreground leading-none">{report.overallAvgDays}</span>
+              <span className="text-[11px] text-muted-foreground">{ko ? '일 전 평균 예약' : 'days avg lead time'}</span>
+              <span className="text-[10px] text-muted-foreground/50 ml-auto">{ko ? `총 ${report.totalBookings}건` : `${report.totalBookings} bookings`}</span>
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground/50 mb-4">{ko ? '예약 데이터 없음' : 'No booking data'}</p>
+          )}
+
+          {/* 구간별 가로 막대 */}
+          {(() => {
+            const uniformPct = Math.round(100 / report.buckets.length); // 균등 기준선 (20%)
+            return (
+              <div className="flex flex-col gap-3">
+                {report.buckets.map(b => (
+                  <div key={b.key}>
+                    <div className="flex items-baseline justify-between mb-1">
+                      <span className="text-[11px] font-semibold text-foreground">
+                        {ko ? b.label : b.labelEn}
+                      </span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-[12px] font-bold text-foreground">{b.pct}%</span>
+                        <span className="text-[9px] text-muted-foreground">{b.count}{ko ? '건' : ''}</span>
+                      </div>
+                    </div>
+                    {/* 트랙: 회색 배경 + 균등선 + 실제 막대 */}
+                    <div className="relative h-2 w-full rounded-full overflow-hidden bg-muted/50">
+                      {/* 균등 기준선 */}
+                      <div
+                        className="absolute top-0 h-full w-px z-10 bg-border"
+                        style={{ left: `${uniformPct}%` }}
+                      />
+                      {/* 실제 막대 */}
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, b.pct)}%`, background: b.color }}
+                      />
+                    </div>
+                  </div>
                 ))}
-                {leadTimeMode === 'nationality' && stats.leadTimeNatKeys.map((nat) => (
-                  <Scatter key={nat} name={nat} data={(stats.leadTimeScatterData || []).filter(d => d.nationality === nat)} fill={getNatColor(nat)} shape={ScatterDot} />
-                ))}
-                {leadTimeMode === 'guests' && ['1', '2', '3', '4', '5+'].map(gKey => (
-                  <Scatter key={gKey} name={`${gKey}${ko ? '인' : 'G'}`} data={(stats.leadTimeScatterData || []).filter(d => { const g = d.guests || 2; return gKey === '5+' ? g >= 5 : g === parseInt(gKey); })} fill={GUEST_COLORS[gKey]} shape={ScatterDot} />
-                ))}
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-2.5 mt-2">
-            {leadTimeMode === 'channel' && Object.keys(CHANNEL_COLORS).map(ch => (
-              <div key={ch} className={legendItem}><span className="w-1.5 h-1.5 rounded-full" style={{ background: CHANNEL_COLORS[ch] }} />{ch}</div>
-            ))}
-            {leadTimeMode === 'nationality' && stats.leadTimeNatKeys.map((nat) => (
-              <div key={nat} className={legendItem}><span className="w-1.5 h-1.5 rounded-full" style={{ background: getNatColor(nat) }} />{nat}</div>
-            ))}
-            {leadTimeMode === 'guests' && ['1', '2', '3', '4', '5+'].map(gKey => (
-              <div key={gKey} className={legendItem}><span className="w-1.5 h-1.5 rounded-full" style={{ background: GUEST_COLORS[gKey] }} />{gKey}{ko ? '인' : 'G'}</div>
-            ))}
-          </div>
+              </div>
+            );
+          })()}
+
+          <p className="text-[9px] text-muted-foreground/40 mt-2.5 text-right">
+            ▏{ko ? `균등 기준선 ${Math.round(100 / report.buckets.length)}%` : `uniform baseline ${Math.round(100 / report.buckets.length)}%`}
+          </p>
         </div>
 
         {/* ── 월별 분석 테이블 ── */}
