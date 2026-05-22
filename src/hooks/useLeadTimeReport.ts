@@ -26,6 +26,11 @@ export interface LeadTimeReport {
   startX: number;
   endX: number;
   natKeys: string[];
+  /** 선택 월 예약 기준 구간 비중 */
+  currentMonthBuckets: LeadTimeBucket[];
+  currentMonthTotal: number;
+  currentMonthAvgDays: number;
+  /** 전체 기간(8개월+3개월) 기준 구간 비중 — 비교용 회색 바 */
   buckets: LeadTimeBucket[];
   totalBookings: number;
   overallAvgDays: number;
@@ -118,9 +123,40 @@ export const useLeadTimeReport = (): LeadTimeReport => {
       color:   def.color,
     }));
 
+    // ── 선택 월(currentYear/currentMonth) 체크인 예약만 따로 집계 ──
+    const cmStart = new Date(currentYear, currentMonth, 1).getTime();
+    const cmEnd   = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).getTime();
+    const cmCounts = LEAD_TIME_BUCKET_DEFS.map(() => 0);
+    let cmTotal = 0, cmWeighted = 0;
+
+    validBookings.forEach(b => {
+      if (!b.bookingDate) return;
+      const ciTime = new Date(b.checkIn + 'T12:00:00').getTime();
+      if (ciTime < cmStart || ciTime > cmEnd) return;
+      const leadDays = Math.min(150, Math.max(0, Math.round(
+        (ciTime - new Date(b.bookingDate + 'T12:00:00').getTime()) / 86400000,
+      )));
+      const idx = LEAD_TIME_BUCKET_DEFS.findIndex(def => leadDays >= def.min && leadDays <= def.max);
+      if (idx >= 0) cmCounts[idx]++;
+      cmTotal++;
+      cmWeighted += leadDays;
+    });
+
+    const currentMonthBuckets: LeadTimeBucket[] = LEAD_TIME_BUCKET_DEFS.map((def, i) => ({
+      key:     def.key,
+      label:   def.label,
+      labelEn: def.labelEn,
+      count:   cmCounts[i],
+      pct:     cmTotal > 0 ? Math.round((cmCounts[i] / cmTotal) * 100) : 0,
+      color:   def.color,
+    }));
+
     return {
       scatterData, startX, endX,
       natKeys: [...allNats],
+      currentMonthBuckets,
+      currentMonthTotal:   cmTotal,
+      currentMonthAvgDays: cmTotal > 0 ? Math.round(cmWeighted / cmTotal) : 0,
       buckets,
       totalBookings:  total,
       overallAvgDays: total > 0 ? Math.round(weightedDays / total) : 0,

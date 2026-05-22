@@ -411,55 +411,61 @@ const DashboardPage = () => {
             </button>
           </div>
 
-          {/* 전체 평균 요약 */}
-          {report.totalBookings > 0 ? (
+          {/* 선택 월 평균 요약 */}
+          {report.currentMonthTotal > 0 ? (
             <div className="flex items-baseline gap-1.5 mb-4">
-              <span className="text-[22px] font-bold text-foreground leading-none">{report.overallAvgDays}</span>
+              <span className="text-[22px] font-bold text-foreground leading-none">{report.currentMonthAvgDays}</span>
               <span className="text-[11px] text-muted-foreground">{ko ? '일 전 평균 예약' : 'days avg lead time'}</span>
-              <span className="text-[10px] text-muted-foreground/50 ml-auto">{ko ? `총 ${report.totalBookings}건` : `${report.totalBookings} bookings`}</span>
+              <span className="text-[10px] text-muted-foreground/50 ml-auto">{ko ? `이번 달 ${report.currentMonthTotal}건` : `${report.currentMonthTotal} this month`}</span>
             </div>
           ) : (
-            <p className="text-[11px] text-muted-foreground/50 mb-4">{ko ? '예약 데이터 없음' : 'No booking data'}</p>
+            <p className="text-[11px] text-muted-foreground/50 mb-4">{ko ? '이번 달 예약 없음' : 'No bookings this month'}</p>
           )}
 
-          {/* 구간별 가로 막대 */}
-          {(() => {
-            const uniformPct = Math.round(100 / report.buckets.length); // 균등 기준선 (20%)
-            return (
-              <div className="flex flex-col gap-3">
-                {report.buckets.map(b => (
-                  <div key={b.key}>
-                    <div className="flex items-baseline justify-between mb-1">
-                      <span className="text-[11px] font-semibold text-foreground">
-                        {ko ? b.label : b.labelEn}
-                      </span>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-[12px] font-bold text-foreground">{b.pct}%</span>
-                        <span className="text-[9px] text-muted-foreground">{b.count}{ko ? '건' : ''}</span>
-                      </div>
-                    </div>
-                    {/* 트랙: 회색 배경 + 균등선 + 실제 막대 */}
-                    <div className="relative h-2 w-full rounded-full overflow-hidden bg-muted/50">
-                      {/* 균등 기준선 */}
-                      <div
-                        className="absolute top-0 h-full w-px z-10 bg-border"
-                        style={{ left: `${uniformPct}%` }}
-                      />
-                      {/* 실제 막대 */}
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, b.pct)}%`, background: b.color }}
-                      />
+          {/* 구간별 가로 막대: 진한 바(이번달) + 연한 바(전체) */}
+          <div className="flex flex-col gap-3">
+            {report.currentMonthBuckets.map((cm, i) => {
+              const overall = report.buckets[i];
+              return (
+                <div key={cm.key}>
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-foreground">
+                      {ko ? cm.label : cm.labelEn}
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-[12px] font-bold text-foreground">{cm.pct}%</span>
+                      <span className="text-[9px] text-muted-foreground/60">{overall.pct}%</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            );
-          })()}
+                  {/* 연한 회색 바 (전체 평균) */}
+                  <div className="relative h-1 w-full rounded-full bg-muted/40 mb-0.5">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, overall.pct)}%`, background: 'var(--muted-foreground)', opacity: 0.3 }}
+                    />
+                  </div>
+                  {/* 진한 컬러 바 (이번 달) */}
+                  <div className="relative h-2 w-full rounded-full bg-muted/30">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, cm.pct)}%`, background: cm.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-          <p className="text-[9px] text-muted-foreground/40 mt-2.5 text-right">
-            ▏{ko ? `균등 기준선 ${Math.round(100 / report.buckets.length)}%` : `uniform baseline ${Math.round(100 / report.buckets.length)}%`}
-          </p>
+          <div className="flex items-center gap-3 mt-3">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-1.5 rounded-full bg-primary" />
+              <span className="text-[9px] text-muted-foreground">{ko ? '이번 달' : 'This month'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-1 rounded-full bg-muted-foreground/30" />
+              <span className="text-[9px] text-muted-foreground">{ko ? '전체 평균' : 'Overall'}</span>
+            </div>
+          </div>
         </div>
 
         {/* ── 월별 분석 테이블 ── */}
