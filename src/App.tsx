@@ -13,35 +13,35 @@ import BookingsPage from './pages/Bookings/Bookings';
 import SettingsPage from './pages/Settings/Settings';
 import NewBookingPage from './pages/NewBooking/NewBooking';
 import DesktopOverview from './pages/DesktopOverview/DesktopOverview';
+import LandingPage from './landing/LandingPage';
 import { Loader2 } from 'lucide-react';
+
+const Spinner = ({ text }: { text: string }) => (
+  <div className="flex h-screen items-center justify-center gap-2 text-muted-foreground">
+    <Loader2 size={20} className="animate-spin" />
+    <span className="text-sm">{text}</span>
+  </div>
+);
+
+/** / 경로 전용 — 비인증 시 랜딩, 인증 시 앱 렌더 */
+const RootGate = () => {
+  const { isAuthenticated, authLoading, dataLoading } = useStore();
+  if (authLoading) return <Spinner text="세션 확인 중..." />;
+  if (!isAuthenticated) return <LandingPage />;
+  if (dataLoading) return <Spinner text="데이터 불러오는 중..." />;
+  return <MainLayout />;
+};
 
 interface RequireAuthProps {
   children: React.ReactNode;
 }
 
+/** /new-booking 등 서브 경로 전용 — 비인증 시 /login 리다이렉트 */
 const RequireAuth = ({ children }: RequireAuthProps) => {
   const { isAuthenticated, authLoading, dataLoading } = useStore();
-
-  if (authLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 size={20} className="animate-spin" />
-        <span className="text-sm">세션 확인 중...</span>
-      </div>
-    );
-  }
-
+  if (authLoading) return <Spinner text="세션 확인 중..." />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-
-  if (dataLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 size={20} className="animate-spin" />
-        <span className="text-sm">데이터 불러오는 중...</span>
-      </div>
-    );
-  }
-
+  if (dataLoading) return <Spinner text="데이터 불러오는 중..." />;
   return <>{children}</>;
 };
 
@@ -59,7 +59,7 @@ const App = () => {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
+          <Route path="/" element={<RootGate />}>
             <Route index element={isDesktop ? <DesktopOverview /> : <CalendarPage />} />
             <Route path="dashboard" element={isDesktop ? <Navigate to="/" replace /> : <DashboardPage />} />
             <Route path="bookings" element={<BookingsPage />} />
