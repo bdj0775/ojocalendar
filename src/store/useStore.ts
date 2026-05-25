@@ -515,8 +515,6 @@ export const useStore = create<StoreState>()(
       // This prevents data leakage between different logged-in accounts.
       partialize: (state) => ({
         settings: state.settings,
-        currentYear: state.currentYear,
-        currentMonth: state.currentMonth,
         visiblePropertyIds: state.visiblePropertyIds,
       }),
     },
