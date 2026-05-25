@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { FeatureCarousel } from '../../pages/Login/FeatureCarousel';
+import { useInstallPrompt } from '../../hooks/useInstallPrompt';
 import { CONTENT } from '../config/content';
 
 export const HeroSection = () => {
   const navigate = useNavigate();
+  const { androidReady, triggerAndroid } = useInstallPrompt();
 
   return (
     <section className="relative w-full min-h-screen flex items-center overflow-hidden pt-16">
@@ -51,7 +53,7 @@ export const HeroSection = () => {
             <Button
               size="lg"
               variant="secondary"
-              onClick={() => navigate('/login')}
+              onClick={androidReady ? triggerAndroid : () => navigate('/login')}
               className="text-base px-7"
             >
               {CONTENT.hero.ctaSecondary}

@@ -14,6 +14,7 @@ import SettingsPage from './pages/Settings/Settings';
 import NewBookingPage from './pages/NewBooking/NewBooking';
 import DesktopOverview from './pages/DesktopOverview/DesktopOverview';
 import LandingPage from './landing/LandingPage';
+import { InstallPrompt } from './components/InstallPrompt/InstallPrompt';
 import { Loader2 } from 'lucide-react';
 
 const Spinner = ({ text }: { text: string }) => (
@@ -68,6 +69,7 @@ const App = () => {
           <Route path="/new-booking" element={<RequireAuth><NewBookingPage /></RequireAuth>} />
         </Routes>
         <Toast />
+        <InstallPrompt />
       </BrowserRouter>
     </ErrorBoundary>
   );
