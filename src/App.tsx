@@ -5,6 +5,7 @@ import { useMediaQuery } from './hooks/useMediaQuery';
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
 import Toast from './components/Toast/Toast';
 import LoginPage from './pages/Login/Login';
+import AuthCallback from './pages/Auth/AuthCallback';
 import MainLayout from './components/Layout/MainLayout';
 import CalendarPage from './pages/Calendar/Calendar';
 import DashboardPage from './pages/Dashboard/Dashboard';
@@ -57,6 +58,7 @@ const App = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
             <Route index element={isDesktop ? <DesktopOverview /> : <CalendarPage />} />
             <Route path="dashboard" element={isDesktop ? <Navigate to="/" replace /> : <DashboardPage />} />

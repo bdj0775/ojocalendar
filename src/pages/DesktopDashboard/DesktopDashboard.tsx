@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  Bell, User,
+  Bell,
   ChevronLeft, ChevronRight,
   ArrowUpRight, ArrowDownRight, Database, Sun, Moon,
 } from 'lucide-react';
@@ -146,9 +146,6 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
               {isDark ? <Sun size={14} /> : <Moon size={14} />}
             </button>
             <button className={headerBtnCls}><Bell size={14} /></button>
-            <div className="w-7 h-7 rounded-full flex items-center justify-center bg-gradient-to-br from-primary to-accent-foreground shadow-sm">
-              <User size={13} color="white" />
-            </div>
           </div>
         </div>
       </header>

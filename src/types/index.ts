@@ -147,6 +147,8 @@ export interface StoreState {
   initAuth: () => void;
   login: (email: string, password: string) => Promise<unknown>;
   signup: (email: string, password: string, name: string) => Promise<unknown>;
+  signInWithGoogle: () => Promise<void>;
+  signInWithKakao: () => Promise<void>;
   logout: () => Promise<void>;
 
   setMonth: (year: number, month: number) => void;

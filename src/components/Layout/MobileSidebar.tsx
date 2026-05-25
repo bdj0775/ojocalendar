@@ -221,9 +221,12 @@ const MobileSidebar = () => {
         <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col pt-6 pb-6 px-3">
 
           <div className="mb-4 px-2">
-            <h1 className="text-[16px] font-bold text-foreground tracking-tight mb-0.5">
-              Ojo Calendar <span className="text-[10px] font-normal text-muted-foreground ml-1">(가칭)</span>
-            </h1>
+            <div className="flex items-center gap-2 mb-0.5">
+              <img src="/logo-mark.png" alt="OZO Calendar" className="w-7 h-7" />
+              <span className="text-[16px] font-extrabold text-foreground tracking-tight">
+                OZO <span className="font-light text-muted-foreground">Calendar</span>
+              </span>
+            </div>
             <p className="text-[10px] text-muted-foreground/80 truncate">
               {settings?.profileName || '호스트 이름'} ({userProfile?.email || 'email@example.com'})
             </p>

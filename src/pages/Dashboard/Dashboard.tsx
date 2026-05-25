@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  Bell, User, ChevronLeft, ChevronRight, TrendingUp,
+  Bell, ChevronLeft, ChevronRight, TrendingUp,
   ArrowUpRight, ArrowDownRight, Database, Menu,
 } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
@@ -179,7 +179,6 @@ const DashboardPage = () => {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button className="w-8 h-8 rounded-full bg-muted/30 border border-border/50 flex items-center justify-center text-muted-foreground"><Bell size={15} /></button>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent-foreground flex items-center justify-center shadow-sm"><User size={14} color="white" /></div>
         </div>
       </header>
 

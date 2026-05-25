@@ -1,10 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../services/supabaseClient';
-import { DUMMY_BOOKINGS, DUMMY_MAINTENANCE } from '../utils/dummyData';
 import { validateICalUrl } from '../services/icalSync/icalFetcher';
 import type {
-  StoreState, Property, BookingStatus, Settings, SyncNotification,
+  StoreState, BookingStatus, Settings, SyncNotification,
 } from '../types';
 
 const today = new Date();
@@ -30,12 +29,22 @@ export const useStore = create<StoreState>()(
       dataLoading: false,
 
       initAuth: () => {
+        const syncName = (user: { user_metadata?: { full_name?: string } } | null) => {
+          const name = user?.user_metadata?.full_name;
+          if (name && !get().settings.profileName) {
+            set(state => ({ settings: { ...state.settings, profileName: name } }));
+          }
+        };
+
         supabase.auth.getSession().then(({ data: { session } }) => {
-          set({
-            isAuthenticated: !!session,
-            userProfile: session?.user ?? null,
+          set(state => ({
+            // Don't downgrade: if onAuthStateChange already set isAuthenticated=true
+            // (e.g. PKCE exchange completed mid-flight), preserve it.
+            isAuthenticated: state.isAuthenticated || !!session,
+            userProfile: state.userProfile ?? (session?.user ?? null),
             authLoading: false,
-          });
+          }));
+          syncName(session?.user ?? null);
           if (session) get().fetchData();
         });
 
@@ -45,10 +54,11 @@ export const useStore = create<StoreState>()(
             userProfile: session?.user ?? null,
             authLoading: false,
           });
+          syncName(session?.user ?? null);
           if (session) {
             get().fetchData();
           } else {
-            set({ properties: [], bookings: [], maintenance: [] });
+            set({ properties: [], bookings: [], maintenance: [], settings: { ...get().settings, profileName: '' } });
           }
         });
       },
@@ -66,6 +76,26 @@ export const useStore = create<StoreState>()(
         });
         if (error) throw error;
         return data;
+      },
+      signInWithGoogle: async () => {
+        const redirectTo = `${window.location.origin}/auth/callback`;
+        console.log('[OAuth] Google 시작, redirectTo:', redirectTo);
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo },
+        });
+        console.log('[OAuth] Google 결과:', { url: data?.url, error });
+        if (error) throw error;
+      },
+      signInWithKakao: async () => {
+        const redirectTo = `${window.location.origin}/auth/callback`;
+        console.log('[OAuth] Kakao 시작, redirectTo:', redirectTo);
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'kakao',
+          options: { redirectTo },
+        });
+        console.log('[OAuth] Kakao 결과:', { url: data?.url, error });
+        if (error) throw error;
       },
       logout: async () => {
         await supabase.auth.signOut();
@@ -92,51 +122,28 @@ export const useStore = create<StoreState>()(
       maintenance: [],
 
       migrateData: async () => {
-        const state = get();
-        const user = state.userProfile;
+        const user = get().userProfile;
         if (!user) return;
         try {
-          const { data: existingProps } = await supabase.from('properties').select('id');
+          const { data: existingProps } = await supabase.from('properties').select('id').eq('host_id', user.id);
           if (existingProps && existingProps.length > 0) return;
 
-          const propToInsert = state.properties[0] ?? { name: '오조록 본점', base_guests: 2, base_price: 150000 };
-          const { data: newProp, error: pErr } = await supabase.from('properties')
-            .insert({
-              host_id: user.id,
-              name: (propToInsert as Property).name ?? '오조록',
-              base_guests: (propToInsert as Property).baseGuests ?? 2,
-              base_price: (propToInsert as Property).basePrice ?? 150000,
-              weekend_price: (propToInsert as Property).weekendPrice ?? 180000,
-              extra_guest_fee: (propToInsert as Property).extraGuestFee ?? 30000,
-              no_extra_guest_fee: (propToInsert as Property).noExtraGuestFee ?? false,
-              check_in_time: (propToInsert as Property).checkInTime ?? '16:00',
-              check_out_time: (propToInsert as Property).checkOutTime ?? '11:00',
-              cleaning_fee: (propToInsert as Property).cleaningFee ?? 0,
-            }).select('id').single();
-
+          // New user: create a single blank property.
+          // Do NOT auto-insert dummy bookings — real users start with clean data.
+          // Dummy data can be restored via the "샘플 데이터 복구" button in the dashboard.
+          const { error: pErr } = await supabase.from('properties').insert({
+            host_id: user.id,
+            name: '내 숙소',
+            base_guests: 2,
+            base_price: 100000,
+            weekend_price: 120000,
+            extra_guest_fee: 20000,
+            no_extra_guest_fee: false,
+            check_in_time: '15:00',
+            check_out_time: '11:00',
+            cleaning_fee: 0,
+          });
           if (pErr) throw pErr;
-          const propId = newProp.id as string;
-
-          const sourceBookings = (state.bookings.length > 0) ? state.bookings : DUMMY_BOOKINGS;
-          if (sourceBookings.length > 0) {
-            const bkRows = sourceBookings.map(b => ({
-              host_id: user.id, property_id: propId,
-              guestname: b.guestName, checkin: b.checkIn, checkout: b.checkOut,
-              guests: b.guests, infants: b.infants, nationality: b.nationality,
-              channel: b.channel, status: b.status ?? 'confirmed',
-              amount: b.amount ?? 0, commission: b.commission ?? 0,
-            }));
-            await supabase.from('bookings').insert(bkRows);
-          }
-
-          const sourceMaint = (state.maintenance.length > 0) ? state.maintenance : DUMMY_MAINTENANCE;
-          if (sourceMaint.length > 0) {
-            const mtRows = sourceMaint.map(m => ({
-              host_id: user.id, property_id: propId,
-              startdate: m.startDate, enddate: m.endDate, label: m.label,
-            }));
-            await supabase.from('maintenance').insert(mtRows);
-          }
           get().fetchData();
         } catch (e) {
           console.error('Migration failed:', e);
@@ -144,13 +151,15 @@ export const useStore = create<StoreState>()(
       },
 
       fetchData: async () => {
+        const user = get().userProfile;
+        if (!user) return;
         set({ dataLoading: true });
         try {
-          const { data: pData, error: pErr } = await supabase.from('properties').select('*');
+          const { data: pData, error: pErr } = await supabase
+            .from('properties').select('*').eq('host_id', user.id);
           if (pErr) throw pErr;
           if (pData?.length === 0) { await get().migrateData(); return; }
           if (pData) {
-            // Deduplicate by name — keep first occurrence per name
             const seenNames = new Set<string>();
             const deduped = pData.filter(p => {
               if (seenNames.has(p.name)) return false;
@@ -167,7 +176,8 @@ export const useStore = create<StoreState>()(
               })),
             });
           }
-          const { data: bData, error: bErr } = await supabase.from('bookings').select('*');
+          const { data: bData, error: bErr } = await supabase
+            .from('bookings').select('*').eq('host_id', user.id);
           if (bErr) throw bErr;
           if (bData) {
             set({
@@ -180,7 +190,8 @@ export const useStore = create<StoreState>()(
               })),
             });
           }
-          const { data: mData, error: mErr } = await supabase.from('maintenance').select('*');
+          const { data: mData, error: mErr } = await supabase
+            .from('maintenance').select('*').eq('host_id', user.id);
           if (mErr) throw mErr;
           if (mData) {
             set({
@@ -326,8 +337,8 @@ export const useStore = create<StoreState>()(
         notifications: true,
         language: 'ko',
         currency: 'KRW',
-        profileName: 'Alex Johnson',
-        profileRole: 'Room Manager',
+        profileName: '',
+        profileRole: '',
         propertyName: '오조록',
       } as Settings,
 
@@ -499,7 +510,15 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'booking-calendar-storage',
-      version: 10,
+      version: 11,
+      // Only persist UI preferences — never user-specific data (bookings, properties, etc.)
+      // This prevents data leakage between different logged-in accounts.
+      partialize: (state) => ({
+        settings: state.settings,
+        currentYear: state.currentYear,
+        currentMonth: state.currentMonth,
+        visiblePropertyIds: state.visiblePropertyIds,
+      }),
     },
   ),
 );

@@ -1,4 +1,4 @@
-import { Menu, ChevronRight, Edit, Bed, Bell, Globe, CircleDollarSign, LogOut, Plus, Link, Percent, RefreshCw, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Menu, ChevronRight, Edit, Bed, Bell, Globe, CircleDollarSign, LogOut, Plus, Link, Percent, RefreshCw, CheckCircle, XCircle, Trash2, Moon, Sun } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
@@ -68,6 +68,19 @@ const SettingsPage = () => {
 
   const [notifications, setNotifications] = useState(settings?.notifications ?? true);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+
+  const toggleDark = () => {
+    const next = !isDark;
+    setIsDark(next);
+    if (next) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   // iCal URL 입력 상태 (채널별)
   const [icalInputs, setIcalInputs] = useState<Record<Channel, string>>({
@@ -177,21 +190,14 @@ const SettingsPage = () => {
         <div style={{ width: 32 }} />
       </header>
 
-      {/* Profile Section */}
-      <div className="flex flex-col items-center px-5 pt-4 pb-7">
-        <div className="relative mb-3">
-          <img
-            src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80"
-            alt="Profile"
-            className="w-24 h-24 rounded-full object-cover border-4 border-primary-100 shadow-[0_8px_24px_var(--primary-glow)]"
-          />
-          <button className="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-[0_2px_8px_var(--primary-glow-lg)]">
-            <Edit size={12} color="white" />
-          </button>
+      {/* Account strip */}
+      <div className="flex items-center gap-3 px-5 pt-3 pb-5">
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-bold text-foreground truncate">{settings?.profileName || '오조록 사장님'}</p>
+          <p className="text-[12px] text-muted-foreground truncate mt-0.5">{useStore.getState().userProfile?.email || ''}</p>
         </div>
-        <h2 className="text-xl font-bold mb-1.5">{settings?.profileName || '오조록 사장님'}</h2>
-        <div className="bg-muted text-muted-foreground type-label font-semibold px-3 py-1 rounded-xl">
-          {settings?.plan === 'pro' ? 'Pro Plan' : 'Basic Plan (1객실)'}
+        <div className="flex-shrink-0 bg-primary/10 text-primary text-[10px] font-bold px-2.5 py-1 rounded-lg">
+          {settings?.plan === 'pro' ? 'Pro' : 'Basic'}
         </div>
       </div>
 
@@ -417,6 +423,23 @@ const SettingsPage = () => {
             </button>
           </div>
           <div className={dividerCls} />
+          {/* Dark mode */}
+          <div className={menuItemCls}>
+            <div className={`${menuIconCls} bg-primary-50`}>
+              {isDark ? <Moon size={18} color="var(--primary)" /> : <Sun size={18} color="var(--primary)" />}
+            </div>
+            <div className="flex-1 flex flex-col">
+              <span className={menuTextCls}>{isDark ? '다크 모드' : '라이트 모드'}</span>
+            </div>
+            <button
+              type="button"
+              className={`relative w-[50px] h-7 rounded-2xl flex-shrink-0 transition-colors duration-300 ${isDark ? 'bg-primary' : 'bg-border'}`}
+              onClick={toggleDark}
+            >
+              <div className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-sm transition-transform duration-300 ${isDark ? 'translate-x-[22px]' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          <div className={dividerCls} />
           <button className={menuItemCls} onClick={toggleLanguage}>
             <div className={`${menuIconCls} bg-primary-50`}>
               <Globe size={18} color="var(--primary)" />
@@ -436,7 +459,7 @@ const SettingsPage = () => {
 
         {/* Sign Out */}
         <button
-          className="flex items-center justify-center gap-2 w-full py-4 text-red-500 text-base font-semibold mt-2 bg-white rounded-2xl shadow-card-xs cursor-pointer"
+          className="flex items-center justify-center gap-2 w-full py-4 text-destructive text-base font-semibold mt-2 bg-card rounded-2xl shadow-card-xs cursor-pointer"
           onClick={() => useStore.getState().logout()}
         >
           <LogOut size={18} color="var(--destructive)" />
