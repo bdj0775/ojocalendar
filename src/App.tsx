@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './store/useStore';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
 import Toast from './components/Toast/Toast';
@@ -15,6 +15,7 @@ import NewBookingPage from './pages/NewBooking/NewBooking';
 import DesktopOverview from './pages/DesktopOverview/DesktopOverview';
 import LandingPage from './landing/LandingPage';
 import { InstallPrompt } from './components/InstallPrompt/InstallPrompt';
+import { SplashScreen } from './components/Splash/SplashScreen';
 import { Loader2 } from 'lucide-react';
 
 const Spinner = ({ text }: { text: string }) => (
@@ -49,10 +50,22 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
 const App = () => {
   const { initAuth } = useStore();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  // Skip splash on OAuth callback route so auth isn't blocked
+  const [splashDone, setSplashDone] = useState(
+    () => window.location.pathname.startsWith('/auth'),
+  );
 
   useEffect(() => {
     initAuth();
   }, [initAuth]);
+
+  if (!splashDone) {
+    return (
+      <ErrorBoundary>
+        <SplashScreen onDone={() => setSplashDone(true)} />
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
