@@ -150,7 +150,7 @@ const CalendarPage = () => {
   };
 
   return (
-    <div className="pt-2 relative">
+    <div className="pt-2 relative w-full">
 
       {/* ── Header ── */}
       <div className="px-3 mb-2">

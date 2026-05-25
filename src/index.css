@@ -21,6 +21,10 @@
     padding: 0;
   }
 
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     font-family: var(--font-sans);
     background-color: var(--background);
@@ -29,6 +33,7 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     padding-bottom: 70px;
+    overflow-x: hidden;
   }
 
   a      { text-decoration: none; color: inherit; }
