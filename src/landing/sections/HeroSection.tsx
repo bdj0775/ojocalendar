@@ -9,10 +9,10 @@ export const HeroSection = () => {
   const { androidReady, triggerAndroid } = useInstallPrompt();
 
   return (
-    <section className="relative w-full min-h-screen flex items-center overflow-hidden pt-16">
+    <section className="relative w-full min-h-[100dvh] flex items-center overflow-hidden pt-16">
       {/* 배경 장식 블롭 */}
-      <div className="pointer-events-none absolute -top-32 right-0 h-[600px] w-[600px] rounded-full bg-primary/8 blur-[120px]" />
-      <div className="pointer-events-none absolute bottom-0 left-0 h-[400px] w-[400px] rounded-full bg-primary/5 blur-[100px]" />
+      <div className="pointer-events-none absolute -top-32 right-0 h-[min(600px,80vw)] w-[min(600px,80vw)] rounded-full bg-primary/8 blur-[120px]" />
+      <div className="pointer-events-none absolute bottom-0 left-0 h-[min(400px,60vw)] w-[min(400px,60vw)] rounded-full bg-primary/5 blur-[100px]" />
 
       <div className="relative mx-auto grid w-full max-w-6xl grid-cols-1 gap-12 px-6 py-20 lg:grid-cols-2 lg:items-center lg:gap-16">
 

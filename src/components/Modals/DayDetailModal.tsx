@@ -26,9 +26,9 @@ const DayDetailModal = () => {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-overlay flex items-end justify-center animate-[fadeIn_0.2s_ease]" onClick={closeDayModal}>
-      <div className="bg-white w-full max-w-[600px] max-h-[85vh] rounded-t-3xl overflow-y-auto animate-[slideUp_0.25s_ease]" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card w-full max-w-[600px] max-h-[85dvh] rounded-t-3xl overflow-y-auto animate-[slideUp_0.25s_ease]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex justify-between items-start px-6 pt-6 pb-4 sticky top-0 bg-white z-10">
+        <div className="flex justify-between items-start px-6 pt-6 pb-4 sticky top-0 bg-card z-10">
           <div>
             <h2 className="text-xl font-bold">{dayStr}</h2>
             <p className="text-[13px] text-slate-500 mt-0.5">{dayOfWeek}</p>
@@ -80,9 +80,9 @@ const DayDetailModal = () => {
         </div>
 
         {/* Footer actions */}
-        <div className="px-6 pb-6 flex gap-3">
+        <div className="px-6 pb-[max(24px,env(safe-area-inset-bottom))] flex gap-3">
           <button
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white border-2 border-dashed border-primary-200 text-primary-700 font-semibold text-sm transition-colors hover:bg-primary-50"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-card border-2 border-dashed border-primary/20 text-primary font-semibold text-sm transition-colors hover:bg-primary/5"
             onClick={() => { closeDayModal(); navigate('/new-booking', { state: { prefilledDate: selectedDate } }); }}
           >
             <Plus size={18} /> {t('dayModal.addBooking')}

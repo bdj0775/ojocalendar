@@ -26,7 +26,7 @@ const BottomNav = () => {
   return (
     <>
       {/* ── Mobile bottom nav (hidden on desktop) ── */}
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[600px] bg-card flex justify-around pt-3 pb-5 shadow-nav z-nav lg:hidden">
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[600px] bg-card flex justify-around pt-3 pb-[max(20px,env(safe-area-inset-bottom))] shadow-nav z-nav lg:hidden">
         <NavLink to="/" className={({ isActive }) => `${mobileItemBase} ${isActive ? 'text-primary' : ''}`}>
           <Calendar size={ICON_SIZES.base} strokeWidth={2} className="transition-transform duration-200 hover:-translate-y-0.5" />
           <span>{t('nav.calendar').toUpperCase()}</span>
@@ -46,7 +46,7 @@ const BottomNav = () => {
       </nav>
 
       {/* ── Desktop sidebar (hidden on mobile) ── */}
-      <nav className="hidden lg:flex flex-col items-center w-14 h-screen py-5 gap-2 border-r border-border bg-card z-nav flex-shrink-0">
+      <nav className="hidden lg:flex flex-col items-center w-14 h-[100dvh] py-5 gap-2 border-r border-border bg-card z-nav flex-shrink-0">
         {/* Calendar — navigates home (shows calendar sidebar) */}
         <NavLink
           to="/"
