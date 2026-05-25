@@ -32,9 +32,6 @@ export const SplashScreen = ({ onDone }: Props) => {
         size={200}
         drawMs={DRAW_MS}
         holdMs={99999}
-        countUp
-        countFrom={1}
-        countTo={31}
       />
       <p
         className="font-semibold text-muted-foreground select-none uppercase"
