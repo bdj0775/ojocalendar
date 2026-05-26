@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X, User } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import DatePickerOverlay from '../ui/DatePickerOverlay';
@@ -58,8 +58,36 @@ interface Props {
 }
 
 const QuickBookingModal = ({ date, onClose }: Props) => {
-  const { properties, bookings, addBooking, showToast } = useStore();
-  const basePrice = properties[0]?.basePrice ?? 0;
+  const { properties, bookings, maintenance, addBooking, showToast } = useStore();
+
+  // 해당 날짜에 이미 예약/휴무가 있는 숙소 ID 집합
+  const occupiedPropertyIds = useMemo(() => {
+    const s = new Set<string>();
+    bookings.forEach(b => {
+      if (b.checkIn <= date && b.checkOut > date && b.propertyId) s.add(b.propertyId);
+    });
+    maintenance.forEach(m => {
+      if (m.startDate <= date && m.endDate > date && m.propertyId) s.add(m.propertyId);
+    });
+    return s;
+  }, [bookings, maintenance, date]);
+
+  // 첫 번째 여유 숙소로 자동 선택
+  const [selectedPropertyId, setSelectedPropertyId] = useState(() => {
+    const state = useStore.getState();
+    const occ = new Set<string>();
+    state.bookings.forEach(b => {
+      if (b.checkIn <= date && b.checkOut > date && b.propertyId) occ.add(b.propertyId);
+    });
+    state.maintenance.forEach(m => {
+      if (m.startDate <= date && m.endDate > date && m.propertyId) occ.add(m.propertyId);
+    });
+    const firstAvail = state.properties.find(p => !occ.has(p.id));
+    return (firstAvail ?? state.properties[0])?.id ?? '';
+  });
+
+  const selectedProperty = properties.find(p => p.id === selectedPropertyId) ?? properties[0];
+  const basePrice = selectedProperty?.basePrice ?? 0;
   const today = getToday();
 
   const [guestName,    setGuestName]    = useState('');
@@ -80,6 +108,12 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
   const [pickerType, setPickerType] = useState<'checkIn' | 'checkOut' | null>(null);
 
   const nights     = diffDays(checkIn, checkOut);
+
+  // Recalculate amount when selected property changes (if not manually edited)
+  useEffect(() => {
+    if (!amountCustom) syncAmount((selectedProperty?.basePrice ?? 0) * nights);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPropertyId]);
   const leadTime   = diffDays(today, checkIn);
   const commission = Math.round(amount * commRate / 100);
   const weekend    = isWeekendDate(checkIn);
@@ -164,6 +198,8 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
         nationality, channel,
         amount, commission: commRate,
         bookingDate: today,
+        propertyId: selectedPropertyId || undefined,
+        memo: memo.trim() || undefined,
       });
       showToast('예약이 저장되었습니다.', 'success');
       onClose();
@@ -190,11 +226,11 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-[28px] shadow-modal w-full max-w-[420px] relative animate-[fadeIn_0.15s_ease] overflow-hidden flex flex-col"
+        className="bg-card rounded-[24px] shadow-modal w-full max-w-[420px] max-h-[90vh] relative animate-[fadeIn_0.15s_ease] overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="px-7 pt-7 pb-5">
+        <div className="px-5 pt-5 pb-4 sm:px-7 sm:pt-7 sm:pb-5 shrink-0">
           <button
             onClick={onClose}
             className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
@@ -202,10 +238,31 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
             <X size={18} />
           </button>
 
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold tracking-wider uppercase">
               New Booking
             </span>
+            {properties.length > 1 && properties.map(p => {
+              const occupied = occupiedPropertyIds.has(p.id);
+              const selected = selectedPropertyId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => !occupied && setSelectedPropertyId(p.id)}
+                  disabled={occupied}
+                  title={occupied ? '해당 날짜에 이미 예약이 있습니다' : p.name}
+                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold tracking-wider transition-colors ${
+                    selected
+                      ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                      : occupied
+                        ? 'bg-muted/30 text-muted-foreground/30 line-through cursor-not-allowed'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted cursor-pointer'
+                  }`}
+                >
+                  {p.name}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-3">
@@ -240,7 +297,7 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
         </div>
 
         {/* ── Body ── */}
-        <div className="px-7 pb-7 space-y-6">
+        <div className="px-5 pb-5 sm:px-7 sm:pb-7 space-y-4 sm:space-y-5 overflow-y-auto flex-1 custom-scrollbar">
           {/* Dates */}
           <div className="flex items-center bg-muted/20 p-4 rounded-2xl relative">
             <div className="flex-1 flex flex-col relative z-10 cursor-pointer" onClick={() => setPickerType('checkIn')}>

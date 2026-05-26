@@ -14,17 +14,19 @@ interface Props {
   prev:    MonthPanel;
   current: MonthPanel;
   next:    MonthPanel;
-  todayStr:    string;
-  onDateClick: (cell: GridCell) => void;
-  onBarClick:  (e: React.MouseEvent, bar: BookingBar) => void;
+  todayStr:        string;
+  onDateClick:     (cell: GridCell) => void;
+  onBarClick:      (e: React.MouseEvent, bar: BookingBar) => void;
   onPrev: () => void;
   onNext: () => void;
+  eventColorMode?: 'channel' | 'property';
 }
 
 const SwipeableCalendar = ({
   prev, current, next,
   todayStr, onDateClick, onBarClick,
   onPrev, onNext,
+  eventColorMode = 'channel',
 }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragX, setDragX]       = useState(0);
@@ -115,6 +117,7 @@ const SwipeableCalendar = ({
               todayStr={todayStr}
               onDateClick={onDateClick}
               onBarClick={onBarClick}
+              eventColorMode={eventColorMode}
             />
           </div>
         ))}

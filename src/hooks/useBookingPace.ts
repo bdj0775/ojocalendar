@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import type { BookingPaceResult, PaceTarget, PaceDataPoint } from '../types';
 
 export const useBookingPace = (): BookingPaceResult => {
-  const { bookings, currentYear, currentMonth } = useStore();
+  const { bookings, properties, currentYear, currentMonth } = useStore();
 
   return useMemo(() => {
     const today = new Date();
@@ -28,7 +28,10 @@ export const useBookingPace = (): BookingPaceResult => {
       };
     });
 
-    const validBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed');
+    const firstPropId = properties[0]?.id;
+    const validBookings = bookings
+      .filter(b => !firstPropId || !b.propertyId || b.propertyId === firstPropId)
+      .filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed');
 
     validBookings.forEach(b => {
       const ciTime = new Date(b.checkIn + 'T12:00:00').getTime();

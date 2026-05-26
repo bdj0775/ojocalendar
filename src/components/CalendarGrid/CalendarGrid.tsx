@@ -39,11 +39,12 @@ export interface GridCell {
 }
 
 interface CalendarGridProps {
-  calendarGrid: GridCell[];
-  bookingBars:  BookingBar[];
-  todayStr:     string;
-  onDateClick:  (cell: GridCell) => void;
-  onBarClick:   (e: React.MouseEvent, bar: BookingBar) => void;
+  calendarGrid:    GridCell[];
+  bookingBars:     BookingBar[];
+  todayStr:        string;
+  onDateClick:     (cell: GridCell) => void;
+  onBarClick:      (e: React.MouseEvent, bar: BookingBar) => void;
+  eventColorMode?: 'channel' | 'property';
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -53,6 +54,7 @@ const CalendarGrid = ({
   todayStr,
   onDateClick,
   onBarClick,
+  eventColorMode = 'channel',
 }: CalendarGridProps) => {
   const { language } = useTranslation();
   const dowLabels = DOW_LABELS[language] ?? DOW_LABELS.en;
@@ -118,7 +120,10 @@ const CalendarGrid = ({
         <div
           key={`${bar.id}-${i}`}
           className={getBarCls(bar.channelClass, bar.isPast)}
-          style={{ top: bar.top, left: bar.left, width: bar.width }}
+          style={{
+            top: bar.top, left: bar.left, width: bar.width,
+            ...(eventColorMode === 'property' && { backgroundColor: bar.propColor }),
+          }}
           onClick={e => onBarClick(e, bar)}
         >
           {/* items-baseline 으로 서로 다른 폰트 크기의 베이스라인 통일 */}

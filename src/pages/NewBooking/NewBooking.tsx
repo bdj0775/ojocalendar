@@ -31,7 +31,9 @@ const NewBookingPage = () => {
   const addBooking = useStore(s => s.addBooking);
   const updateBooking = useStore(s => s.updateBooking);
   const settings = useStore(s => s.settings);
-  const property = useStore(s => s.properties[0]);
+  const properties = useStore(s => s.properties);
+  const [selectedPropertyId, setSelectedPropertyId] = useState(() => properties[0]?.id ?? '');
+  const property = properties.find(p => p.id === selectedPropertyId) ?? properties[0];
   const { t, language } = useTranslation();
 
   const _initAmount = (() => {
@@ -192,10 +194,12 @@ const NewBookingPage = () => {
       }
     }
     const state = useStore.getState();
-    type AnyEvent = { id: string; checkIn?: string; checkOut?: string; startDate?: string; endDate?: string };
+    type AnyEvent = { id: string; propertyId?: string; checkIn?: string; checkOut?: string; startDate?: string; endDate?: string };
     const allEvents = [...state.bookings, ...state.maintenance] as AnyEvent[];
     return allEvents.some(e => {
       if (editBooking && e.id === editBooking.id) return false;
+      // 다른 숙소 이벤트는 겹침 검사 제외
+      if (e.propertyId && selectedPropertyId && e.propertyId !== selectedPropertyId) return false;
       const eStart = parseSafeDate(e.checkIn || e.startDate);
       const eEnd = parseSafeDate(e.checkOut || e.endDate);
       if (!eStart || !eEnd) return false;
@@ -234,7 +238,7 @@ const NewBookingPage = () => {
       room: settings?.propertyName || 'Deluxe Suite',
     };
     if (editBooking) updateBooking(editBooking.id, payload);
-    else addBooking(payload);
+    else addBooking({ ...payload, propertyId: selectedPropertyId || undefined });
     navigate('/');
   };
 
@@ -257,6 +261,24 @@ const NewBookingPage = () => {
       <div className="px-5">
         <h1 className="text-2xl font-bold mt-2.5 mb-0.5 text-foreground">{t('booking.guestInfo')}</h1>
         <p className="text-muted-foreground text-[13px] mb-6">{language === 'ko' ? '새로운 예약 정보를 입력하세요.' : 'Enter the information to schedule a new stay.'}</p>
+
+        {/* Property Selector — shown only when 2+ properties */}
+        {properties.length > 1 && (
+          <div className="mb-6">
+            <label className={labelCls}>숙소</label>
+            <div className="flex flex-wrap gap-2.5">
+              {properties.map(p => (
+                <button
+                  key={p.id}
+                  className={`${chipCls} ${selectedPropertyId === p.id ? chipActiveCls : ''}`}
+                  onClick={() => setSelectedPropertyId(p.id)}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Guest Name */}
         <div className="mb-6">

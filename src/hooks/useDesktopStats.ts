@@ -85,7 +85,9 @@ export const useDesktopStats = (
 
     type ValidBooking = Booking & { amount: number; isEstimated: boolean; originalAmount: number };
 
+    const firstPropId = properties[0]?.id;
     const validBookings: ValidBooking[] = bookings
+      .filter(b => !firstPropId || !b.propertyId || b.propertyId === firstPropId)
       .filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed')
       .map(b => {
         const realAmount = Number(b.amount) || 0;

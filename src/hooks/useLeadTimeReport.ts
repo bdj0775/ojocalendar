@@ -40,7 +40,7 @@ export interface LeadTimeReport {
 }
 
 export const useLeadTimeReport = (): LeadTimeReport => {
-  const { bookings, currentYear, currentMonth } = useStore();
+  const { bookings, properties, currentYear, currentMonth } = useStore();
 
   return useMemo(() => {
     const startX = new Date(currentYear, currentMonth - 8, 1).getTime();
@@ -52,9 +52,10 @@ export const useLeadTimeReport = (): LeadTimeReport => {
     const guestFreq:   Record<string, number[]> = {};
     const allNats = new Set<string>();
 
-    const validBookings = bookings.filter(
-      b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed',
-    );
+    const firstPropId = properties[0]?.id;
+    const validBookings = bookings
+      .filter(b => !firstPropId || !b.propertyId || b.propertyId === firstPropId)
+      .filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed');
 
     const scatterData = validBookings.map(b => {
       const ciTime = new Date(b.checkIn + 'T12:00:00').getTime();

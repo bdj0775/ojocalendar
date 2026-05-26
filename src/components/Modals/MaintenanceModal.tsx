@@ -8,7 +8,7 @@ const MaintenanceModal = () => {
   const {
     selectedMaintDate, selectedMaintenanceId,
     closeMaintModal, addMaintenance, updateMaintenance, deleteMaintenance,
-    maintenance,
+    maintenance, properties,
   } = useStore();
 
   const [startDate, setStartDate] = useState('');
@@ -16,6 +16,7 @@ const MaintenanceModal = () => {
   const [label, setLabel] = useState('ROOM MAINTENANCE');
   const [errorMsg, setErrorMsg] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState(() => properties[0]?.id ?? '');
 
   useEffect(() => {
     setErrorMsg('');
@@ -65,7 +66,7 @@ const MaintenanceModal = () => {
     if (selectedMaintenanceId) {
       updateMaintenance(selectedMaintenanceId, { startDate, endDate, label: label.trim() });
     } else {
-      addMaintenance({ startDate, endDate, label: label.trim() });
+      addMaintenance({ startDate, endDate, label: label.trim(), propertyId: selectedPropertyId || undefined });
     }
     closeMaintModal();
   };
@@ -83,9 +84,28 @@ const MaintenanceModal = () => {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-overlay flex items-end justify-center animate-[fadeIn_0.2s_ease]" onClick={closeMaintModal}>
-      <div className="bg-white w-full max-w-[600px] max-h-[85vh] rounded-t-3xl overflow-y-auto animate-[slideUp_0.25s_ease]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-start px-6 pt-6 pb-4 sticky top-0 bg-white z-10">
-          <h2 className="text-xl font-bold">{t('maintenance.title')}</h2>
+      <div className="bg-card w-full max-w-[600px] max-h-[85vh] rounded-t-3xl overflow-y-auto animate-[slideUp_0.25s_ease]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-start px-6 pt-6 pb-4 sticky top-0 bg-card z-10">
+          <div>
+            <h2 className="text-xl font-bold">{t('maintenance.title')}</h2>
+            {properties.length > 1 && !selectedMaintenanceId && (
+              <div className="flex gap-1.5 mt-2 flex-wrap">
+                {properties.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedPropertyId(p.id)}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                      selectedPropertyId === p.id
+                        ? 'bg-primary text-white'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button onClick={closeMaintModal} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 bg-slate-100">
             <X size={20} />
           </button>

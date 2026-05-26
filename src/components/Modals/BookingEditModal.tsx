@@ -94,7 +94,7 @@ const BookingEditModal = () => {
     setAmountRaw(amt.toLocaleString());
     setCommRate(channelRate);
     setCommCustom(false);
-    setMemo('');
+    setMemo(booking.memo ?? '');
     setConfirmDel(false);
   }, [selectedBookingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -158,6 +158,7 @@ const BookingEditModal = () => {
         guests: guestCount,
         nationality, channel: channel as 'Airbnb' | 'Booking.com' | 'Naver' | 'Direct',
         amount, commission: commRate,
+        memo: memo.trim() || undefined,
       });
       showToast('예약이 수정되었습니다.', 'success');
       closeBookingModal();

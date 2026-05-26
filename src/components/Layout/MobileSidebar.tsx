@@ -1,16 +1,11 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSidebar } from '../../context/SidebarContext';
 import { useStore } from '../../store/useStore';
-import { useEffect, useState, useMemo } from 'react';
-import type { Booking } from '../../types';
-
-const PROP_COLORS = ['#5C6BC0', '#FF7043', '#9CCC65', '#29B6F6', '#26A69A', '#7E57C2'];
-
-// Test-only placeholder properties — same constant as Calendar.tsx
-const TEST_PROPERTIES = [
-  { id: '__test_prop_2__', name: '숙소2' },
-  { id: '__test_prop_3__', name: '숙소3' },
-];
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { GripVertical } from 'lucide-react';
+import type { Booking, Property } from '../../types';
+import PropertyDetailModal from '../Modals/PropertyDetailModal';
+import { PROP_COLORS } from '../CalendarGrid/useBookingBars';
 
 // ── MiniCalendar ─────────────────────────────────────────────────
 
@@ -18,11 +13,12 @@ interface MiniCalendarProps {
   currentYear: number;
   currentMonth: number;
   bookings: Booking[];
+  properties: Property[];
   setMonth: (year: number, month: number) => void;
   onNavigate: (path: string) => void;
 }
 
-const MiniCalendar = ({ currentYear, currentMonth, bookings, setMonth, onNavigate }: MiniCalendarProps) => {
+const MiniCalendar = ({ currentYear, currentMonth, bookings, properties, setMonth, onNavigate }: MiniCalendarProps) => {
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   const firstDay = new Date(currentYear, currentMonth, 1).getDay();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -47,10 +43,15 @@ const MiniCalendar = ({ currentYear, currentMonth, bookings, setMonth, onNavigat
     currentMonth === today.getMonth() &&
     d === today.getDate();
 
-  const hasBooking = (d: number, monthOffset: number) => {
+  const getBookedColors = (d: number, monthOffset: number): string[] => {
     const dateObj = new Date(currentYear, currentMonth + monthOffset, d);
     const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-    return bookings.some(b => b.checkIn <= dateStr && b.checkOut > dateStr);
+    const colors: string[] = [];
+    properties.forEach((prop, idx) => {
+      const occupied = bookings.some(b => b.propertyId === prop.id && b.checkIn <= dateStr && b.checkOut > dateStr);
+      if (occupied) colors.push(prop.color || PROP_COLORS[idx % PROP_COLORS.length]);
+    });
+    return colors.slice(0, 3);
   };
 
   const handleDateClick = (e: React.MouseEvent, d: number, monthOffset: number) => {
@@ -73,7 +74,7 @@ const MiniCalendar = ({ currentYear, currentMonth, bookings, setMonth, onNavigat
       <div className="grid grid-cols-7 w-full gap-y-1">
         {dates.map((item, i) => {
           const todayFlag = isToday(item.date, item.isCurrent);
-          const booked = hasBooking(item.date, item.monthOffset);
+          const dotColors = getBookedColors(item.date, item.monthOffset);
           return (
             <div
               key={i}
@@ -89,8 +90,12 @@ const MiniCalendar = ({ currentYear, currentMonth, bookings, setMonth, onNavigat
               }`}>
                 {item.date}
               </div>
-              {booked && (
-                <div className="w-1 h-1 rounded-full bg-primary absolute bottom-0" />
+              {dotColors.length > 0 && (
+                <div className="flex gap-[2px] absolute bottom-0">
+                  {dotColors.map((c, di) => (
+                    <div key={di} className="w-1 h-1 rounded-full" style={{ backgroundColor: c }} />
+                  ))}
+                </div>
               )}
             </div>
           );
@@ -110,16 +115,56 @@ const MobileSidebar = () => {
     properties, settings, logout,
     currentYear, currentMonth, prevMonth, nextMonth, setMonth, bookings,
     userProfile, triggerSync, syncLoading,
-    visiblePropertyIds, setVisiblePropertyIds,
+    visiblePropertyIds, setVisiblePropertyIds, updateProperty, deleteProperty, updateSettings,
+    propertyOrder, setPropertyOrder,
   } = useStore();
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
 
-  // Combined property list: real (deduped by store) + test placeholders
-  const allProperties = useMemo(
-    () => [...properties, ...TEST_PROPERTIES],
-    [properties],
-  );
+  // ── 숙소 정렬 ──────────────────────────────────────────────────
+  const sortedProperties = useMemo(() => {
+    if (!propertyOrder.length) return properties;
+    const orderMap = new Map(propertyOrder.map((id, i) => [id, i]));
+    return [...properties].sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999));
+  }, [properties, propertyOrder]);
+
+  // ── 드래그 순서 변경 ───────────────────────────────────────────
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId,  setDragOverId]  = useState<string | null>(null);
+  const propItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const onGripTouchStart = (e: React.TouchEvent, propId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingId(propId);
+  };
+  const onListTouchMove = (e: React.TouchEvent) => {
+    if (!draggingId) return;
+    const touch = e.touches[0];
+    for (const [id, el] of Object.entries(propItemRefs.current)) {
+      if (!el || id === draggingId) continue;
+      const rect = el.getBoundingClientRect();
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        setDragOverId(id);
+        break;
+      }
+    }
+  };
+  const onListTouchEnd = () => {
+    if (draggingId && dragOverId) {
+      const ids = sortedProperties.map(p => p.id);
+      const from = ids.indexOf(draggingId);
+      const to   = ids.indexOf(dragOverId);
+      const newOrder = [...ids];
+      newOrder.splice(from, 1);
+      newOrder.splice(to, 0, draggingId);
+      setPropertyOrder(newOrder);
+    }
+    setDraggingId(null);
+    setDragOverId(null);
+  };
+
 
   // KPI for current month — lightweight, no forecast computation
   const kpi = useMemo(() => {
@@ -176,7 +221,7 @@ const MobileSidebar = () => {
 
   const toggleCheck = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const allIds = allProperties.map(p => p.id);
+    const allIds = properties.map(p => p.id);
     const current = visiblePropertyIds ?? allIds;
     const next = current.includes(id)
       ? current.filter(x => x !== id)
@@ -206,6 +251,7 @@ const MobileSidebar = () => {
     }`;
 
   return (
+    <>
     <div
       className={`fixed inset-0 z-[100] flex lg:hidden transition-opacity duration-300 ${
         isOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
@@ -234,19 +280,36 @@ const MobileSidebar = () => {
 
           {/* Properties List */}
           <div className="mb-2">
-            <div className="flex flex-col gap-0.5 relative">
-              {allProperties.map((prop, index) => {
-                const color = PROP_COLORS[index % PROP_COLORS.length];
-                const isChecked = visiblePropertyIds === null || visiblePropertyIds.includes(prop.id);
+            <div
+              className="flex flex-col gap-0.5 relative"
+              onTouchMove={draggingId ? onListTouchMove : undefined}
+              onTouchEnd={draggingId ? onListTouchEnd : undefined}
+            >
+              {sortedProperties.map((prop, index) => {
+                const color = prop.color || PROP_COLORS[index % PROP_COLORS.length];
+                const isChecked  = visiblePropertyIds === null || visiblePropertyIds.includes(prop.id);
                 const isMenuOpen = openMenuId === prop.id;
+                const isDragging = draggingId === prop.id;
+                const isDragOver = dragOverId  === prop.id;
 
                 return (
-                  <div key={prop.id} className="relative group">
+                  <div
+                    key={prop.id}
+                    ref={el => { propItemRefs.current[prop.id] = el; }}
+                    className={`relative group transition-all ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'ring-1 ring-primary/40 rounded-lg' : ''}`}
+                  >
                     <div
                       className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                      onClick={(e) => toggleCheck(e, prop.id)}
+                      onClick={(e) => !isDragging && toggleCheck(e, prop.id)}
                     >
-                      <div className="flex items-center gap-2 overflow-hidden">
+                      <div className="flex items-center gap-1.5 overflow-hidden">
+                        {/* Drag handle */}
+                        <div
+                          className="text-muted-foreground/30 hover:text-muted-foreground/70 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none"
+                          onTouchStart={(e) => onGripTouchStart(e, prop.id)}
+                        >
+                          <GripVertical size={12} />
+                        </div>
                         <div
                           className="w-[16px] h-[16px] rounded flex items-center justify-center flex-shrink-0 transition-colors border"
                           style={{
@@ -269,12 +332,33 @@ const MobileSidebar = () => {
                     </div>
 
                     {isMenuOpen && (
-                      <div className="absolute right-2 top-full mt-1 w-32 bg-popover border border-border rounded-xl shadow-lg z-50 p-2 flex flex-col gap-1">
-                        <button className="text-[11px] text-left px-2 py-1.5 rounded-md hover:bg-muted text-foreground transition-colors">설정</button>
-                        <div className="px-2 py-1 flex gap-1.5 flex-wrap">
-                          {PROP_COLORS.map(c => (
-                            <div key={c} className="w-3.5 h-3.5 rounded-full cursor-pointer hover:scale-110 transition-transform" style={{ backgroundColor: c }} />
-                          ))}
+                      <div className="absolute right-2 top-full mt-1 w-36 bg-popover border border-border rounded-xl shadow-lg z-50 p-2 flex flex-col gap-1.5" onMouseDown={e => e.stopPropagation()}>
+                        <button
+                          className="text-[11px] text-left px-2 py-1.5 rounded-md hover:bg-muted text-foreground transition-colors font-medium"
+                          onClick={(e) => { e.stopPropagation(); setEditingProperty(prop); setOpenMenuId(null); }}
+                        >
+                          설정
+                        </button>
+                        <div className="h-px bg-border/50 -mx-2" />
+                        <p className="text-[10px] font-semibold text-muted-foreground px-1 pt-0.5">인디케이터 색상</p>
+                        <div className="px-1 py-0.5 flex gap-2 flex-wrap">
+                          {PROP_COLORS.map(c => {
+                            const isActive = (prop.color || PROP_COLORS[index % PROP_COLORS.length]) === c;
+                            return (
+                              <button
+                                key={c}
+                                className="w-5 h-5 rounded-full flex items-center justify-center hover:scale-110 transition-transform"
+                                style={{ backgroundColor: c, boxShadow: isActive ? `0 0 0 2px var(--popover), 0 0 0 3.5px ${c}` : 'none' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateProperty(prop.id, { ...prop, color: c });
+                                  setOpenMenuId(null);
+                                }}
+                              >
+                                {isActive && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -282,12 +366,28 @@ const MobileSidebar = () => {
                 );
               })}
             </div>
+          <div className="flex items-center mt-0.5">
             <button
               onClick={() => handleNav('/settings')}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors w-full text-left px-2 py-1.5 mt-0.5"
+              className="text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors flex-1 text-left px-2 py-1.5"
             >
               + 추가하기
             </button>
+            <button
+              onClick={() => updateSettings({ eventColorMode: (settings?.eventColorMode ?? 'channel') === 'channel' ? 'property' : 'channel' })}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted transition-colors shrink-0"
+              title="이벤트 색상 모드 전환"
+            >
+              {(['channel', 'property'] as const).map(m => {
+                const active = (settings?.eventColorMode ?? 'channel') === m;
+                return (
+                  <span key={m} className={`text-[10px] font-semibold transition-colors ${active ? 'text-primary' : 'text-muted-foreground/40'}`}>
+                    {m === 'channel' ? '채널' : '숙소'}
+                  </span>
+                );
+              })}
+            </button>
+          </div>
           </div>
 
           <div className="h-px bg-border/20 w-full my-1" />
@@ -322,6 +422,7 @@ const MobileSidebar = () => {
                 currentYear={currentYear}
                 currentMonth={currentMonth}
                 bookings={bookings}
+                properties={sortedProperties}
                 setMonth={setMonth}
                 onNavigate={handleNav}
               />
@@ -381,6 +482,24 @@ const MobileSidebar = () => {
         </div>
       </div>
     </div>
+
+    {editingProperty && (
+      <PropertyDetailModal
+        isOpen
+        property={editingProperty}
+        onClose={() => setEditingProperty(null)}
+        onSave={(propId, data) => {
+          if (propId) updateProperty(propId, data);
+          setEditingProperty(null);
+        }}
+        onDelete={() => {
+          const id = editingProperty.id;
+          setEditingProperty(null);
+          deleteProperty(id);
+        }}
+      />
+    )}
+    </>
   );
 };
 

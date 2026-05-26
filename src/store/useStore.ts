@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { supabase } from '../services/supabaseClient';
 import { validateICalUrl } from '../services/icalSync/icalFetcher';
 import type {
-  StoreState, BookingStatus, Settings, SyncNotification,
+  StoreState, BookingStatus, Settings, SyncNotification, Property,
 } from '../types';
 
 const today = new Date();
@@ -168,7 +168,7 @@ export const useStore = create<StoreState>()(
             });
             set({
               properties: deduped.map(p => ({
-                id: p.id, name: p.name,
+                id: p.id, name: p.name, color: p.color ?? undefined,
                 baseGuests: p.base_guests, basePrice: p.base_price,
                 weekendPrice: p.weekend_price, extraGuestFee: p.extra_guest_fee,
                 noExtraGuestFee: p.no_extra_guest_fee, checkInTime: p.check_in_time,
@@ -187,6 +187,7 @@ export const useStore = create<StoreState>()(
                 guests: b.guests, infants: b.infants, nationality: b.nationality,
                 channel: b.channel, status: b.status, amount: b.amount, commission: b.commission,
                 externalId: b.external_id, isAutoSynced: b.is_auto_synced, rawIcalSummary: b.raw_ical_summary,
+                memo: b.memo,
               })),
             });
           }
@@ -218,6 +219,7 @@ export const useStore = create<StoreState>()(
           weekend_price: pd.weekendPrice, extra_guest_fee: pd.extraGuestFee,
           no_extra_guest_fee: pd.noExtraGuestFee, check_in_time: pd.checkInTime,
           check_out_time: pd.checkOutTime, cleaning_fee: pd.cleaningFee,
+          ...(pd.color !== undefined && { color: pd.color }),
         }).eq('id', propId);
         if (error) {
           set({ properties: prev });
@@ -226,9 +228,83 @@ export const useStore = create<StoreState>()(
         }
       },
 
+      addProperty: async (data: Omit<Property, 'id'>) => {
+        const user = get().userProfile;
+        if (!user) return;
+        const { data: row, error } = await supabase.from('properties').insert({
+          host_id: user.id,
+          name: data.name,
+          color: data.color ?? null,
+          base_guests: data.baseGuests,
+          base_price: data.basePrice,
+          weekend_price: data.weekendPrice,
+          extra_guest_fee: data.extraGuestFee,
+          no_extra_guest_fee: data.noExtraGuestFee,
+          check_in_time: data.checkInTime,
+          check_out_time: data.checkOutTime,
+          cleaning_fee: data.cleaningFee,
+        }).select().single();
+        if (error) {
+          get().showToast('숙소 추가에 실패했습니다.', 'error');
+          throw error;
+        }
+        set(state => ({
+          properties: [...state.properties, {
+            id: row.id, name: row.name, color: row.color ?? undefined,
+            baseGuests: row.base_guests, basePrice: row.base_price,
+            weekendPrice: row.weekend_price, extraGuestFee: row.extra_guest_fee,
+            noExtraGuestFee: row.no_extra_guest_fee, checkInTime: row.check_in_time,
+            checkOutTime: row.check_out_time, cleaningFee: row.cleaning_fee,
+          }],
+        }));
+        get().showToast('숙소가 추가되었습니다.', 'success');
+      },
+
+      deleteProperty: async (propId: string) => {
+        const snap = {
+          properties:    get().properties,
+          bookings:      get().bookings,
+          maintenance:   get().maintenance,
+          syncChannels:  get().syncChannels,
+        };
+
+        // Optimistic: remove property and all related records from local state
+        set(state => {
+          const remaining = state.properties.filter(p => p.id !== propId);
+          const currentVis = state.visiblePropertyIds;
+          const filtered = currentVis === null ? null : currentVis.filter(id => id !== propId);
+          const allRemainingIds = remaining.map(p => p.id);
+          return {
+            properties:   remaining,
+            bookings:     state.bookings.filter(b => b.propertyId !== propId),
+            maintenance:  state.maintenance.filter(m => m.propertyId !== propId),
+            syncChannels: state.syncChannels.filter(c => c.propertyId !== propId),
+            visiblePropertyIds:
+              filtered === null || filtered.length === allRemainingIds.length ? null : filtered,
+          };
+        });
+
+        // Delete related records first, then the property itself
+        // (Supabase foreign keys may not have CASCADE — handle explicitly)
+        const [bErr, mErr, sErr, pErr] = await Promise.all([
+          supabase.from('bookings').delete().eq('property_id', propId),
+          supabase.from('maintenance').delete().eq('property_id', propId),
+          supabase.from('sync_channels').delete().eq('property_id', propId),
+          supabase.from('properties').delete().eq('id', propId),
+        ]).then(results => results.map(r => r.error));
+
+        const error = bErr || mErr || sErr || pErr;
+        if (error) {
+          set(snap);
+          get().showToast('숙소 삭제에 실패했습니다.', 'error');
+          throw error;
+        }
+        get().showToast('숙소가 삭제되었습니다.', 'success');
+      },
+
       addBooking: async (booking) => {
         const user = get().userProfile;
-        const pId = get().properties[0]?.id;
+        const pId = booking.propertyId ?? get().properties[0]?.id;
         if (!user || !pId) return;
         const row = {
           host_id: user.id, property_id: pId,
@@ -236,6 +312,7 @@ export const useStore = create<StoreState>()(
           bookingdate: booking.bookingDate ?? new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
           guests: booking.guests, infants: booking.infants, nationality: booking.nationality,
           channel: booking.channel, amount: booking.amount, commission: booking.commission, status: 'confirmed',
+          memo: booking.memo,
         };
         const { data, error } = await supabase.from('bookings').insert(row).select().single();
         if (error) {
@@ -261,6 +338,7 @@ export const useStore = create<StoreState>()(
         if (patch.amount !== undefined) rowData.amount = patch.amount;
         if (patch.commission !== undefined) rowData.commission = patch.commission;
         if (patch.status !== undefined) rowData.status = patch.status;
+        if (patch.memo !== undefined) rowData.memo = patch.memo;
         const { error } = await supabase.from('bookings').update(rowData).eq('id', id);
         if (error) {
           get().showToast('예약 수정에 실패했습니다. 다시 시도해주세요.', 'error');
@@ -285,7 +363,7 @@ export const useStore = create<StoreState>()(
 
       addMaintenance: async (m) => {
         const user = get().userProfile;
-        const pId = get().properties[0]?.id;
+        const pId = m.propertyId ?? get().properties[0]?.id;
         if (!user || !pId) return;
         const { data, error } = await supabase.from('maintenance').insert({
           host_id: user.id, property_id: pId,
@@ -348,6 +426,9 @@ export const useStore = create<StoreState>()(
       visiblePropertyIds: null,
       setVisiblePropertyIds: (ids) => set({ visiblePropertyIds: ids }),
 
+      propertyOrder: [],
+      setPropertyOrder: (order) => set({ propertyOrder: order }),
+
       // ── iCal Sync ──────────────────────────────────────────
       syncChannels: [],
       syncLoading: false,
@@ -378,9 +459,9 @@ export const useStore = create<StoreState>()(
         }
       },
 
-      saveSyncChannel: async (channel, icalUrl) => {
+      saveSyncChannel: async (channel, icalUrl, propertyId) => {
         const user = get().userProfile;
-        const pId = get().properties[0]?.id;
+        const pId = propertyId ?? get().properties[0]?.id;
         if (!user || !pId) return;
 
         if (!icalUrl.startsWith('http')) {
@@ -516,6 +597,7 @@ export const useStore = create<StoreState>()(
       partialize: (state) => ({
         settings: state.settings,
         visiblePropertyIds: state.visiblePropertyIds,
+        propertyOrder: state.propertyOrder,
       }),
     },
   ),

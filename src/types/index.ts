@@ -26,6 +26,7 @@ export interface Booking {
   externalId?: string;
   isAutoSynced?: boolean;
   rawIcalSummary?: string;
+  memo?: string;
 }
 
 // ============================================================
@@ -79,6 +80,7 @@ export interface ICalEvent {
 export interface Property {
   id: string;
   name: string;
+  color?: string;
   baseGuests: number;
   basePrice: number;
   weekendPrice: number;
@@ -113,6 +115,7 @@ export interface Settings {
   profileRole: string;
   propertyName: string;
   plan?: string;
+  eventColorMode?: 'channel' | 'property';
 }
 
 // ============================================================
@@ -160,12 +163,14 @@ export interface StoreState {
   migrateData: () => Promise<void>;
 
   updateProperty: (propId: string, pd: Partial<Property>) => Promise<void>;
-  addBooking: (booking: Omit<Booking, 'id' | 'propertyId' | 'status'>) => Promise<void>;
+  addProperty: (data: Omit<Property, 'id'>) => Promise<void>;
+  deleteProperty: (propId: string) => Promise<void>;
+  addBooking: (booking: Omit<Booking, 'id' | 'status'>) => Promise<void>;
   updateBooking: (id: string, patch: Partial<Booking>) => Promise<void>;
   updateBookingStatus: (id: string, status: BookingStatus) => Promise<void>;
   deleteBooking: (id: string) => Promise<void>;
 
-  addMaintenance: (m: Omit<Maintenance, 'id' | 'propertyId'>) => Promise<void>;
+  addMaintenance: (m: Omit<Maintenance, 'id'>) => Promise<void>;
   updateMaintenance: (id: string, patch: Partial<Maintenance>) => Promise<void>;
   deleteMaintenance: (id: string) => Promise<void>;
 
@@ -183,6 +188,10 @@ export interface StoreState {
   visiblePropertyIds: string[] | null;
   setVisiblePropertyIds: (ids: string[] | null) => void;
 
+  // Property display order (empty = use DB order)
+  propertyOrder: string[];
+  setPropertyOrder: (order: string[]) => void;
+
   // Toast
   toast: { message: string; type: 'success' | 'error' | 'info' } | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -196,7 +205,7 @@ export interface StoreState {
   syncLoading: boolean;
   lastSyncResults: { channel: string; added: number; updated: number; error?: string }[];
   fetchSyncChannels: () => Promise<void>;
-  saveSyncChannel: (channel: Channel, icalUrl: string) => Promise<void>;
+  saveSyncChannel: (channel: Channel, icalUrl: string, propertyId?: string) => Promise<void>;
   deleteSyncChannel: (channelId: string) => Promise<void>;
   triggerSync: () => Promise<void>;
 

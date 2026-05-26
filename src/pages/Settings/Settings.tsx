@@ -1,4 +1,4 @@
-import { Menu, ChevronRight, Edit, Bed, Bell, Globe, CircleDollarSign, LogOut, Plus, Link, Percent, RefreshCw, CheckCircle, XCircle, Trash2, Moon, Sun } from 'lucide-react';
+import { Menu, ChevronRight, Edit, Bed, Bell, Globe, CircleDollarSign, LogOut, Plus, Link, Percent, RefreshCw, CheckCircle, XCircle, Trash2, Moon, Sun, Palette } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
@@ -12,58 +12,13 @@ const ICAL_CHANNELS: { channel: Channel; label: string; color: string; bg: strin
   { channel: 'Booking.com', label: 'Booking.com', color: 'var(--channel-booking)', bg: 'var(--channel-booking-bg)' },
 ];
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-
-function ExportIcalSection({ hostId, propertyId }: { hostId: string; propertyId: string }) {
-  const [copied, setCopied] = useState(false);
-  const exportUrl = `${SUPABASE_URL}/functions/v1/export-ical?host=${hostId}&property=${propertyId}`;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(exportUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    });
-  };
-
-  return (
-    <div className="bg-card rounded-sheet shadow-card-xs mb-3 px-5 py-4">
-      <p className="type-card-title text-foreground mb-1">내 예약 캘린더 URL</p>
-      <p className="type-label text-muted-foreground mb-3 leading-relaxed">
-        이 URL을 각 플랫폼의 "외부 캘린더 가져오기"에 등록하면,
-        한 채널에 예약이 들어올 때 다른 채널의 해당 날짜가 자동으로 차단됩니다.
-      </p>
-      <div className="flex gap-2">
-        <div className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-muted text-xs text-muted-foreground font-mono truncate select-all">
-          {exportUrl}
-        </div>
-        <button
-          onClick={handleCopy}
-          className="px-3 py-2.5 rounded-xl text-xs font-semibold bg-primary text-white flex items-center gap-1.5 flex-shrink-0"
-        >
-          {copied ? <CheckCircle size={13} /> : <Link size={13} />}
-          {copied ? '복사됨' : '복사'}
-        </button>
-      </div>
-      <div className="mt-3 space-y-1">
-        <p className="type-label text-muted-foreground">
-          <span className="font-semibold text-foreground">Airbnb:</span> 캘린더 &gt; 캘린더 가져오기 &gt; URL 붙여넣기
-        </p>
-        <p className="type-label text-muted-foreground">
-          <span className="font-semibold text-foreground">Booking.com:</span> Extranet &gt; 객실 &gt; 이용 불가 설정 &gt; iCal
-        </p>
-      </div>
-    </div>
-  );
-}
-
 const SettingsPage = () => {
   const { open: openSidebar } = useSidebar();
   const { t, language } = useTranslation();
   const {
-    settings, properties, updateSettings, updateProperty,
+    settings, properties, updateSettings, updateProperty, addProperty, deleteProperty,
     syncChannels, syncLoading, lastSyncResults,
     fetchSyncChannels, saveSyncChannel, deleteSyncChannel, triggerSync,
-    showToast,
   } = useStore();
 
   const [notifications, setNotifications] = useState(settings?.notifications ?? true);
@@ -157,16 +112,19 @@ const SettingsPage = () => {
     updateSettings({ language: language === 'en' ? 'ko' : 'en' });
   };
 
-  const handleSaveProperty = (propId: string, updatedData: Partial<Property>) => {
-    updateProperty(propId, updatedData);
-    setEditingProperty(null);
+  const [isAddingProperty, setIsAddingProperty] = useState(false);
+
+  const handleSaveProperty = (propId: string | null, updatedData: Partial<Property>) => {
+    if (propId === null) {
+      addProperty(updatedData as Omit<Property, 'id'>);
+      setIsAddingProperty(false);
+    } else {
+      updateProperty(propId, updatedData);
+      setEditingProperty(null);
+    }
   };
 
-  const showComingSoon = () => {
-    showToast(t('settings.comingSoon') || '서비스 준비중입니다.', 'info');
-  };
-
-  const activePropertiesCount = properties?.length || 1;
+  const activePropertiesCount = properties?.length ?? 0;
   const maxProperties = 3;
 
   const menuItemCls = 'flex items-center w-full px-5 py-4 gap-3.5 text-left cursor-pointer';
@@ -224,13 +182,13 @@ const SettingsPage = () => {
           {activePropertiesCount < maxProperties && (
             <>
               <div className={dividerCls} />
-              <button className={`${menuItemCls} opacity-80`} onClick={showComingSoon}>
-                <div className={`${menuIconCls} bg-slate-100`}>
-                  <Plus size={18} color="var(--muted-foreground)" />
+              <button className={menuItemCls} onClick={() => setIsAddingProperty(true)}>
+                <div className={`${menuIconCls} bg-primary-50`}>
+                  <Plus size={18} color="var(--primary)" />
                 </div>
                 <div className="flex-1 flex flex-col">
-                  <span className="type-card-title text-muted-foreground">객실 추가</span>
-                  <span className={menuSubCls}>Pro Plan 전용 (최대 3개 객실)</span>
+                  <span className={menuTextCls}>객실 추가</span>
+                  <span className={menuSubCls}>최대 {maxProperties}개 등록 가능</span>
                 </div>
               </button>
             </>
@@ -372,17 +330,6 @@ const SettingsPage = () => {
           </div>
         )}
 
-        {/* 자동 예약 막기: Export iCal URL */}
-        {properties[0] && (
-          <>
-            <p className={sectionLabelCls}>자동 예약 막기 (크로스 채널 블로킹)</p>
-            <ExportIcalSection
-              hostId={useStore.getState().userProfile?.id ?? ''}
-              propertyId={properties[0].id}
-            />
-          </>
-        )}
-
         {/* 수수료 설정 */}
         <p className={sectionLabelCls}>수수료 세팅</p>
         <div className={cardCls}>
@@ -396,6 +343,63 @@ const SettingsPage = () => {
             </div>
             <span className="text-sm font-semibold text-primary">0%</span>
           </button>
+        </div>
+
+        {/* 캘린더 표시 */}
+        <p className={sectionLabelCls}>캘린더 표시</p>
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <Palette size={14} color="var(--muted-foreground)" />
+            <span className="text-[12px] text-muted-foreground">이벤트 바 색상 기준</span>
+          </div>
+          <div className="flex gap-3">
+            {([
+              {
+                mode: 'channel' as const,
+                label: '채널 색상',
+                sub: 'Airbnb · Booking.com · Direct',
+                preview: (
+                  <div className="flex gap-1 mt-2">
+                    {['var(--channel-airbnb)', 'var(--channel-booking)', 'var(--channel-direct)'].map((c, i) => (
+                      <div key={i} className="h-2.5 flex-1 rounded-sm" style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                ),
+              },
+              {
+                mode: 'property' as const,
+                label: '숙소 색상',
+                sub: '숙소별 인디케이터 색상 사용',
+                preview: (
+                  <div className="flex gap-1 mt-2">
+                    {properties.slice(0, 3).map((p, i) => {
+                      const FALLBACKS = ['#5C6BC0','#FF7043','#9CCC65'];
+                      return (
+                        <div key={p.id} className="h-2.5 flex-1 rounded-sm" style={{ backgroundColor: p.color || FALLBACKS[i] }} />
+                      );
+                    })}
+                  </div>
+                ),
+              },
+            ] as const).map(({ mode, label, sub, preview }) => {
+              const active = (settings?.eventColorMode ?? 'channel') === mode;
+              return (
+                <button
+                  key={mode}
+                  onClick={() => updateSettings({ eventColorMode: mode })}
+                  className={`flex-1 text-left p-4 rounded-2xl border-2 transition-all ${
+                    active
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-card hover:border-border/80'
+                  }`}
+                >
+                  <div className={`text-[13px] font-bold ${active ? 'text-primary' : 'text-foreground'}`}>{label}</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{sub}</div>
+                  {preview}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* App Settings */}
@@ -469,12 +473,13 @@ const SettingsPage = () => {
         <p className="text-center type-label text-muted-foreground/50 mt-5 pb-5">Version 3.0.1 (Auth Enabled)</p>
       </div>
 
-      {editingProperty && (
+      {(editingProperty !== null || isAddingProperty) && (
         <PropertyDetailModal
-          isOpen={!!editingProperty}
+          isOpen={editingProperty !== null || isAddingProperty}
           property={editingProperty}
-          onClose={() => setEditingProperty(null)}
+          onClose={() => { setEditingProperty(null); setIsAddingProperty(false); }}
           onSave={handleSaveProperty}
+          onDelete={editingProperty ? () => { deleteProperty(editingProperty.id); setEditingProperty(null); } : undefined}
         />
       )}
     </div>
