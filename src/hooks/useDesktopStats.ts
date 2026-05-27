@@ -108,6 +108,8 @@ export const useDesktopStats = (
     if (lmMonth < 0) { lmYear--; lmMonth = 11; }
     const lastMonth = calcMonthStats(validBookings, lmYear, lmMonth);
 
+    const momBookingsChange = thisMonth.bookingCount - lastMonth.bookingCount;
+    const momOccNightsChange = thisMonth.occNights - lastMonth.occNights;
     const momNetChange = thisMonth.net - lastMonth.net;
     const momNetPct = lastMonth.net === 0
       ? (thisMonth.net > 0 ? 100 : 0)
@@ -139,18 +141,26 @@ export const useDesktopStats = (
     // 신뢰 가능한 데이터로 인정하는 최소 예약 건수 (1~2건은 우연일 수 있어 제외)
     const MIN_RELIABLE_BOOKINGS = 3;
 
-    // 오픈 첫 여름(6~9월, 4개월)만 초기 표본으로 제외.
-    // 10월부터는 시장 안착이 완료된 것으로 보고 STLY/hist2y 신호에 포함.
-    // 가장 빠른 예약의 체크인월을 오픈월로 간주
-    let openingMonthKey = Number.MAX_SAFE_INTEGER;
+    // 오픈 초기 4개월(오픈월~+3) 데이터는 신뢰성 부족으로 STLY/hist2y에서 제외.
+    // 오픈월 감지: 체크인 절대 최솟값 대신 MIN_RELIABLE_BOOKINGS 이상인 첫 번째 월로 판단.
+    // → 더미 데이터나 테스트 예약 1~2건이 있어도 오픈월이 오염되지 않음.
+    const monthCheckInCounts = new Map<number, number>();
     validBookings.forEach(b => {
-      const ci = new Date(b.checkIn + 'T12:00:00');
-      const k  = ci.getFullYear() * 12 + ci.getMonth();
-      if (k < openingMonthKey) openingMonthKey = k;
+      const k = new Date(b.checkIn + 'T12:00:00').getFullYear() * 12
+              + new Date(b.checkIn + 'T12:00:00').getMonth();
+      monthCheckInCounts.set(k, (monthCheckInCounts.get(k) || 0) + 1);
     });
+    const sortedMonthKeys = [...monthCheckInCounts.keys()].sort((a, b) => a - b);
+    let openingMonthKey = Number.MAX_SAFE_INTEGER;
+    for (const k of sortedMonthKeys) {
+      if ((monthCheckInCounts.get(k) || 0) >= MIN_RELIABLE_BOOKINGS) {
+        openingMonthKey = k;
+        break;
+      }
+    }
     const openingPeriodEndKey = openingMonthKey === Number.MAX_SAFE_INTEGER
       ? 0
-      : openingMonthKey + 3; // 오픈월 포함 4개월(6~9월)만 초기 기간으로 간주
+      : openingMonthKey + 3; // 오픈월 포함 4개월을 초기 기간으로 간주 (ex. 25년6월~9월)
 
     // 최근 N개월 평균 점유율 (과거 데이터가 부족할 때 대체값으로 사용)
     const computeRecentAvgOcc = (exceptYear: number, exceptMonth: number): number => {
@@ -231,14 +241,20 @@ export const useDesktopStats = (
       );
     })();
 
-    const computeForecast = (ty: number, tm: number, otb: MonthStats) => {
+    // ── 핵심 예측 계산 (편향 보정 전) ────────────────────────────────────
+    // overrideDaysUntilStart: 백테스트 시뮬레이션용 — 특정 D-N 시점을 강제 지정
+    // histOTBatSamePoint: 동일 D-N 시점의 과거 평균 OTB — 상대 페이스 보정에 사용
+    const computeForecastRaw = (
+      ty: number, tm: number, otb: MonthStats,
+      overrideDaysUntilStart?: number,
+      histOTBatSamePoint?: number,
+    ) => {
       const daysInMonth = new Date(ty, tm + 1, 0).getDate();
       const monthStartMs = new Date(ty, tm, 1).getTime();
 
       const stly   = calcMonthStats(validBookings, ty - 1, tm);
       const hist2y = calcMonthStats(validBookings, ty - 2, tm);
 
-      // 오픈 초기 12개월 데이터는 표본 신뢰성 부족으로 제외 (별도 건수 조건과 AND)
       const stlyIsRampUp   = ((ty - 1) * 12 + tm) <= openingPeriodEndKey;
       const hist2yIsRampUp = ((ty - 2) * 12 + tm) <= openingPeriodEndKey;
       const stlyReliable   = !stlyIsRampUp  && stly.bookingCount  >= MIN_RELIABLE_BOOKINGS;
@@ -249,7 +265,6 @@ export const useDesktopStats = (
       if (stlyReliable)   { historicalOccs.push(stly.occupancy);   historicalAdrs.push(stly.adr); }
       if (hist2yReliable) { historicalOccs.push(hist2y.occupancy); historicalAdrs.push(hist2y.adr); }
 
-      // 동월 과거 데이터가 없으면 최근 달들의 평균을 대체값으로 사용
       const histAvgOcc = historicalOccs.length > 0
         ? historicalOccs.reduce((s, v) => s + v, 0) / historicalOccs.length
         : computeRecentAvgOcc(ty, tm);
@@ -257,12 +272,14 @@ export const useDesktopStats = (
         ? historicalAdrs.reduce((s, v) => s + v, 0) / historicalAdrs.length
         : basePricePerNight;
 
-      // ── 부킹커브 ──────────────────────────────────────────────────────
-      // 미래월: 지수감쇠(τ=estimatedTau일, 실증 추정) → "τ일 전엔 약 37%만 예약 완료"
-      // 당월: 경과일 / 전체일수
       let curveCompletion: number;
       let daysUntilStart: number;
-      if (monthStartMs > todayMs) {
+      if (overrideDaysUntilStart !== undefined) {
+        daysUntilStart = overrideDaysUntilStart;
+        curveCompletion = overrideDaysUntilStart > 0
+          ? Math.exp(-overrideDaysUntilStart / estimatedTau)
+          : Math.min(daysInMonth, Math.max(1, Math.floor((todayMs - monthStartMs) / 86400000))) / daysInMonth;
+      } else if (monthStartMs > todayMs) {
         daysUntilStart = Math.floor((monthStartMs - todayMs) / 86400000);
         curveCompletion = Math.exp(-daysUntilStart / estimatedTau);
       } else {
@@ -271,28 +288,27 @@ export const useDesktopStats = (
         curveCompletion = elapsed / daysInMonth;
       }
 
-      // ── OTB 페이스 기반 예측 ─────────────────────────────────────────
-      // "지금쯤이면 역사적으로 이 정도 예약돼 있어야" vs 실제 OTB
       const expectedOtbOcc = histAvgOcc * curveCompletion;
-      const paceVariance   = otb.occupancy - expectedOtbOcc; // 양수 = 앞서고 있음
-      const remainingPickup = histAvgOcc * (1 - curveCompletion); // 남은 기간 동안 들어올 예상 예약
-      // 페이스가 앞서면 추가 상향, 뒤처지면 하향 (단, 과도한 조정 방지를 위해 dampening 0.5)
+      const paceVariance   = otb.occupancy - expectedOtbOcc;
+
+      // 상대 페이스 비율: 같은 D-N 시점에 현재 월이 과거 평균보다 얼마나 앞서있는지
+      // ex. 과거 D-5 평균 OTB=70%, 현재 OTB=84% → relPaceRatio=1.2 → 잔여 픽업 20% 상향
+      const relPaceRatio = (histOTBatSamePoint !== undefined && histOTBatSamePoint > 5)
+        ? Math.min(2.0, Math.max(0.6, otb.occupancy / histOTBatSamePoint))
+        : 1.0;
+
+      const remainingPickup = histAvgOcc * (1 - curveCompletion) * relPaceRatio;
       const cappedVariance = Math.max(-histAvgOcc * 0.5, Math.min(histAvgOcc * 0.5, paceVariance));
       const rawPace = otb.occupancy + remainingPickup + cappedVariance * 0.5 * (1 - curveCompletion);
       const paceForecast = Math.min(100, Math.max(otb.occupancy, rawPace));
 
-      // ── 3-신호 앙상블 ────────────────────────────────────────────────
-      // 신뢰 가능한 과거 동월 데이터가 있으면 포함, 없으면 OTB 페이스만으로 예측
       let weightedSum = 0, totalWeight = 0;
       if (stlyReliable)   { weightedSum += stly.occupancy   * 40; totalWeight += 40; }
       if (hist2yReliable) { weightedSum += hist2y.occupancy * 30; totalWeight += 30; }
       weightedSum += paceForecast * 30; totalWeight += 30;
 
-      // 예측값은 반드시 현재 OTB 이상 (이미 확정된 예약은 사라지지 않음)
       const predictedOcc = Math.max(otb.occupancy, Math.round(weightedSum / totalWeight));
 
-      // ── 예상 ADR 및 매출 ─────────────────────────────────────────────
-      // 우선순위: 신뢰 STLY ADR → 현재 OTB ADR → 과거 평균 ADR → 기준 단가
       const reliableStlyAdr = stlyReliable ? stly.adr : 0;
       const predictedAdr = reliableStlyAdr > 0 ? reliableStlyAdr
         : otb.adr > 0 ? otb.adr
@@ -304,12 +320,133 @@ export const useDesktopStats = (
       const commRate = otb.gross > 0 ? Math.max(0, Math.min(0.3, (otb.gross - otb.net) / otb.gross)) : 0.12;
       const predictedNet = Math.round(predictedGross * (1 - commRate));
 
-      // 신뢰도: 신뢰할 수 있는 과거 데이터 수(40%) + 리드타임 근접도(60%)
       const dataScore = Math.min(1, (stlyReliable ? 0.5 : 0) + (historicalOccs.length * 0.25));
       const timeScore = Math.exp(-daysUntilStart / estimatedTau);
       const forecastConfidence = Math.round((0.4 * dataScore + 0.6 * timeScore) * 100) / 100;
 
       return { predictedOcc, predictedGross, predictedNet, forecastConfidence };
+    };
+
+    // ── D=0~90 전체 백테스트 커브 (1회만 계산) ───────────────────────────
+    // 각 과거 완료 월에 대해 D=90 → D=0 을 순회하며 편향·histOTB를 누적.
+    // bookingDate 순으로 정렬된 예약을 한 번만 스캔(incremental sweep)하므로 효율적.
+    // 결과: biasCurve[D] = 평균(실제OCC - 예측OCC), histOTBCurve[D] = 평균 스냅샷OTB
+    const { biasCurve, histOTBCurve } = (() => {
+      const biasAccum   = new Map<number, number[]>();
+      const histOTBAccum = new Map<number, number[]>();
+
+      for (let offset = 1; offset <= 12; offset++) {
+        let by = actualTodayYear, bm = actualTodayMonth - offset;
+        while (bm < 0) { bm += 12; by--; }
+        if ((by * 12 + bm) <= openingPeriodEndKey) continue;
+
+        const actual = calcMonthStats(validBookings, by, bm);
+        if (actual.bookingCount < MIN_RELIABLE_BOOKINGS) continue;
+
+        // 이 과거 월의 STLY/hist2y·histAvgOcc를 한 번만 계산
+        const pstly   = calcMonthStats(validBookings, by - 1, bm);
+        const phist2y = calcMonthStats(validBookings, by - 2, bm);
+        const pstlyOk   = ((by-1)*12+bm) > openingPeriodEndKey && pstly.bookingCount   >= MIN_RELIABLE_BOOKINGS;
+        const phist2yOk = ((by-2)*12+bm) > openingPeriodEndKey && phist2y.bookingCount >= MIN_RELIABLE_BOOKINGS;
+        const poccs: number[] = [];
+        if (pstlyOk)   poccs.push(pstly.occupancy);
+        if (phist2yOk) poccs.push(phist2y.occupancy);
+        const histAvgOcc = poccs.length > 0
+          ? poccs.reduce((s, v) => s + v, 0) / poccs.length
+          : computeRecentAvgOcc(by, bm);
+
+        const daysInMonth      = new Date(by, bm + 1, 0).getDate();
+        const pastMonthStartMs = new Date(by, bm, 1).getTime();
+
+        // 이 월에 박수가 겹치며 bookingDate가 있는 예약을 날짜 오름차순 정렬
+        const rel = validBookings
+          .filter(b => b.bookingDate && getOverlapNights(b.checkIn, b.checkOut, by, bm) > 0)
+          .map(b => ({
+            bdMs:   new Date(b.bookingDate! + 'T12:00:00').getTime(),
+            nights: getOverlapNights(b.checkIn, b.checkOut, by, bm),
+          }))
+          .sort((a, b) => a.bdMs - b.bdMs);
+
+        // D=90 → D=0 incremental sweep
+        let ptr = 0, occNights = 0, bookingCt = 0;
+        for (let D = 90; D >= 0; D--) {
+          const cutoff = pastMonthStartMs - D * 86400000;
+          while (ptr < rel.length && rel[ptr].bdMs <= cutoff) {
+            occNights += rel[ptr].nights;
+            bookingCt++;
+            ptr++;
+          }
+          if (bookingCt < 1) continue;
+
+          const occPct = Math.round((occNights / daysInMonth) * 100);
+
+          // 페이스 예측 인라인 (computeForecastRaw와 동일한 공식)
+          const cc  = Math.exp(-D / estimatedTau);
+          const pv  = occPct - histAvgOcc * cc;
+          const cv  = Math.max(-histAvgOcc * 0.5, Math.min(histAvgOcc * 0.5, pv));
+          const pf  = Math.min(100, Math.max(occPct,
+            occPct + histAvgOcc * (1 - cc) + cv * 0.5 * (1 - cc),
+          ));
+          const ew  = (pstlyOk ? 40 : 0) + (phist2yOk ? 30 : 0) + 30;
+          const en  = (pstlyOk ? pstly.occupancy * 40 : 0)
+                    + (phist2yOk ? phist2y.occupancy * 30 : 0)
+                    + pf * 30;
+          const simPredicted = Math.max(occPct, Math.round(en / ew));
+
+          const d = D;
+          if (!biasAccum.has(d))   biasAccum.set(d, []);
+          if (!histOTBAccum.has(d)) histOTBAccum.set(d, []);
+          biasAccum.get(d)!.push(actual.occupancy - simPredicted);
+          histOTBAccum.get(d)!.push(occPct);
+        }
+      }
+
+      // 평균화
+      const bc  = new Map<number, number>();
+      const hc  = new Map<number, number>();
+      for (let D = 0; D <= 90; D++) {
+        const bs = biasAccum.get(D);
+        const hs = histOTBAccum.get(D);
+        if (bs && bs.length >= 1) {
+          bc.set(D, Math.round((bs.reduce((s, v) => s + v, 0) / bs.length) * 10) / 10);
+          hc.set(D, Math.round(hs!.reduce((s, v) => s + v, 0) / hs!.length));
+        }
+      }
+
+      // 샘플이 없는 D는 가장 가까운 이웃값으로 채움
+      for (let D = 0; D <= 90; D++) {
+        if (bc.has(D)) continue;
+        let nearest = -1, dist = 999;
+        bc.forEach((_, k) => { if (Math.abs(k - D) < dist) { dist = Math.abs(k - D); nearest = k; } });
+        if (nearest >= 0) { bc.set(D, bc.get(nearest)!); hc.set(D, hc.get(nearest) ?? 0); }
+      }
+
+      return { biasCurve: bc, histOTBCurve: hc };
+    })();
+
+    // ── 최종 예측 (커브 조회 → 편향 보정 + 상대 페이스) ──────────────────
+    const computeForecast = (ty: number, tm: number, otb: MonthStats) => {
+      const monthStartMs = new Date(ty, tm, 1).getTime();
+      const daysUntilStart = monthStartMs > todayMs
+        ? Math.floor((monthStartMs - todayMs) / 86400000)
+        : 0;
+      const D = Math.min(90, daysUntilStart);
+
+      const bias              = biasCurve.get(D)   ?? 0;
+      const histOTBatSamePoint = histOTBCurve.get(D) ?? 0;
+
+      const raw = computeForecastRaw(ty, tm, otb, undefined, histOTBatSamePoint || undefined);
+      const correctedOcc = Math.min(100, Math.max(otb.occupancy, Math.round(raw.predictedOcc + bias)));
+
+      if (correctedOcc === raw.predictedOcc) return raw;
+
+      const scale = raw.predictedOcc > 0 ? correctedOcc / raw.predictedOcc : 1;
+      return {
+        predictedOcc: correctedOcc,
+        predictedGross: Math.round(raw.predictedGross * scale),
+        predictedNet: Math.round(raw.predictedNet * scale),
+        forecastConfidence: raw.forecastConfidence,
+      };
     };
 
     const monthlyTrends: MonthlyTrend[] = [];
@@ -368,6 +505,43 @@ export const useDesktopStats = (
       }
     }
 
+    const annualCumulativeData: { name: string; nameKo: string; actual: number | null; predicted: number | null; lastYear: number | null }[] = [];
+    let runningGross = 0;
+    let runningLastYearGross = 0;
+    
+    for (let m = 0; m < 12; m++) {
+      const isFutureMo = currentYear > actualTodayYear || (currentYear === actualTodayYear && m > actualTodayMonth);
+      const isCurrentMo = (currentYear === actualTodayYear && m === actualTodayMonth);
+      
+      const ms = calcMonthStats(validBookings, currentYear, m);
+      const msLY = calcMonthStats(validBookings, currentYear - 1, m);
+      
+      let actualGross: number | null = null;
+      let predictedGross: number | null = null;
+      
+      if (isFutureMo) {
+        const fc = computeForecast(currentYear, m, ms);
+        runningGross += fc.predictedGross;
+        predictedGross = runningGross;
+      } else if (isCurrentMo) {
+        runningGross += ms.gross;
+        actualGross = runningGross;
+        predictedGross = runningGross; 
+      } else {
+        runningGross += ms.gross;
+        actualGross = runningGross;
+      }
+      
+      runningLastYearGross += msLY.gross;
+
+      annualCumulativeData.push({ 
+        name: MONTH_LABELS_EN[m], 
+        nameKo: MONTH_LABELS[m], 
+        actual: actualGross, 
+        predicted: predictedGross,
+        lastYear: runningLastYearGross
+      });
+    }
     const annualForecast = {
       confirmedGross:  afConfirmedGross,
       confirmedNet:    afConfirmedNet,
@@ -402,6 +576,27 @@ export const useDesktopStats = (
       .map((nat) => ({ name: nat, value: Math.round((natCounts[nat] / totalNatBookings) * 100), count: natCounts[nat], color: getNatColor(nat) }))
       .sort((a, b) => b.value - a.value);
     if (nationalityPieData.length === 0) nationalityPieData = [{ name: 'No Data', value: 100, count: 0, color: '#334155' }];
+
+    // 전체 기간 채널/국적 분포
+    const allTimeChanCounts: Record<string, number> = {};
+    const allTimeNatCts: Record<string, number> = {};
+    validBookings.forEach(b => {
+      allTimeChanCounts[b.channel] = (allTimeChanCounts[b.channel] || 0) + 1;
+      allTimeNatCts[b.nationality] = (allTimeNatCts[b.nationality] || 0) + 1;
+    });
+    const allTimeTotalCount = validBookings.length;
+
+    let allTimeChannelPieData: PieDataItem[] = Object.keys(allTimeChanCounts).length > 0
+      ? Object.keys(allTimeChanCounts)
+          .map(ch => ({ name: ch, value: Math.round((allTimeChanCounts[ch] / allTimeTotalCount) * 100), count: allTimeChanCounts[ch], color: CHANNEL_COLORS[ch] || '#94a3b8' }))
+          .sort((a, b) => b.value - a.value)
+      : [{ name: 'No Data', value: 100, count: 0, color: '#334155' }];
+
+    let allTimeNationalityPieData: PieDataItem[] = Object.keys(allTimeNatCts).length > 0
+      ? Object.keys(allTimeNatCts)
+          .map(nat => ({ name: nat, value: Math.round((allTimeNatCts[nat] / allTimeTotalCount) * 100), count: allTimeNatCts[nat], color: getNatColor(nat) }))
+          .sort((a, b) => b.value - a.value)
+      : [{ name: 'No Data', value: 100, count: 0, color: '#334155' }];
 
     const startX = new Date(currentYear, currentMonth - 2, 1).getTime();
     const endX = new Date(currentYear, currentMonth + 3, 0, 23, 59, 59).getTime();
@@ -513,13 +708,16 @@ export const useDesktopStats = (
       netIncome: thisMonth.net, grossRevenue: thisMonth.gross,
       momNetChange, momNetPct: Math.round(momNetPct * 10) / 10, momGrossChange,
       occupancyRate: thisMonth.occupancy, occupiedNights: thisMonth.occNights,
-      totalBookings: thisMonth.bookingCount, daysInMonth: thisMonth.daysInMonth,
+      totalBookings: thisMonth.bookingCount, momBookingsChange, momOccNightsChange,
+      daysInMonth: thisMonth.daysInMonth,
       adrThisMonth: thisMonth.adr, adrYearAvg,
       otaCommission: thisMonth.otaComm, otaCommPct: Math.round(otaCommPct * 10) / 10,
       ytdGross, ytdNet, ytdOtaCommission,
-      monthlyTrends, channelPieData, totalChannelBookings, nationalityPieData, totalNatBookings,
+      monthlyTrends, channelPieData, totalChannelBookings, allTimeChannelPieData,
+      nationalityPieData, totalNatBookings, allTimeNationalityPieData, allTimeTotal: allTimeTotalCount,
+      ytdOtaCommissionByChannel: {},
       leadTimeScatterData, leadTimeStartX: startX, leadTimeEndX: endX,
-      leadTimeNatKeys: [...allLeadTimeNats], monthlyTableData, currencySymbol, annualForecast,
+      leadTimeNatKeys: [...allLeadTimeNats], monthlyTableData, currencySymbol, annualForecast, annualCumulativeData,
     };
   }, [bookings, currentYear, currentMonth, settings?.currency, properties, tableChannelFilter, tableNatFilter, tableGuestFilter]);
 };

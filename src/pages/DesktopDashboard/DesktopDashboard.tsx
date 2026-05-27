@@ -7,7 +7,8 @@ import {
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
-  CartesianGrid, ScatterChart, Scatter, ZAxis, ReferenceLine,
+  CartesianGrid, ReferenceLine, ReferenceDot,
+  Area,
 } from 'recharts';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -16,8 +17,10 @@ import { useBookingPace } from '../../hooks/useBookingPace';
 import { supabase } from '../../services/supabaseClient';
 import { DUMMY_BOOKINGS, DUMMY_MAINTENANCE } from '../../utils/dummyData';
 import LeadTimeDetailModal from '../../components/Modals/LeadTimeDetailModal';
+import DistributionDetailModal from '../../components/Modals/DistributionDetailModal';
 import { getNatColor } from '../../utils/colors';
-import { CHANNEL_COLORS, GUEST_COLORS, TrendTooltip, LeadTimeTooltip, ScatterDot } from './chartComponents';
+import { CHANNEL_COLORS, TrendTooltip } from './chartComponents';
+import { useLeadTimeReport } from '../../hooks/useLeadTimeReport';
 import AnalyticsTable from './AnalyticsTable';
 import PaceChart from './PaceChart';
 import DesktopTabNav from '../../components/DesktopTabNav/DesktopTabNav';
@@ -41,8 +44,10 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
   const stats = useDesktopStats(tableChannelFilter, tableNatFilter, tableGuestFilter);
   const pace = useBookingPace();
 
-  const [leadTimeMode, setLeadTimeMode] = useState('channel');
   const [isLeadTimeModalOpen, setIsLeadTimeModalOpen] = useState(false);
+  const report = useLeadTimeReport();
+  const [isChannelDetailOpen, setIsChannelDetailOpen] = useState(false);
+  const [isNatDetailOpen, setIsNatDetailOpen] = useState(false);
 
   const sym = stats.currencySymbol;
   const ko = language === 'ko';
@@ -124,6 +129,23 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
   const toggleGroupCls = 'flex bg-muted rounded-lg overflow-hidden border border-border';
   const toggleBtnCls = 'py-1 px-2.5 text-[11px] font-semibold text-muted-foreground bg-transparent border-0 cursor-pointer tracking-wide whitespace-nowrap transition-all';
   const toggleBtnActiveCls = 'bg-primary/15 text-primary';
+
+  // 시각화 프로그레스 변수 계산
+  const today = new Date();
+  const startOfYear = new Date(actualYear, 0, 1);
+  const endOfYear = new Date(actualYear, 11, 31);
+  const dayOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / 86400000);
+  const totalDays = Math.floor((endOfYear.getTime() - startOfYear.getTime()) / 86400000) + 1;
+  const revProgressPct = stats.annualForecast.totalGross > 0 ? Math.min(100, Math.round((stats.ytdGross / stats.annualForecast.totalGross) * 100)) : 0;
+  const currentMonthGross = stats.monthlyTrends.find(m => m.isCurrent)?.gross || 0;
+  const currentMonthNet = stats.monthlyTrends.find(m => m.isCurrent)?.net || 0;
+  const currentTrend = stats.monthlyTrends.find(m => m.isCurrent);
+  const predictedNet = currentTrend?.predictedNet ?? null;
+  const predictedOcc = currentTrend?.predictedOcc ?? null;
+  const currentCumData = stats.annualCumulativeData.find(d => d.actual !== null && stats.annualCumulativeData[stats.annualCumulativeData.indexOf(d) + 1]?.actual === null) || stats.annualCumulativeData[stats.annualCumulativeData.length - 1];
+  const dotX = currentCumData ? (ko ? currentCumData.nameKo : currentCumData.name) : undefined;
+  const dotY = currentCumData?.actual;
+
   return (
     <div className={wrapCls}>
       {/* Header */}
@@ -201,13 +223,20 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
         <div className={`${cardCls} flex flex-col justify-between`}>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <div className={kpiLabelCls}>{ko ? '예상 순수익' : 'NET INCOME'}</div>
+              <div className={kpiLabelCls}>{ko ? '순수익' : 'NET INCOME'}</div>
               <span className={`type-micro font-bold py-0.5 px-2 rounded-full flex items-center gap-0.5 ${stats.momNetChange >= 0 ? badgeUpCls : badgeDownCls}`}>
                 {stats.momNetChange >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
                 {stats.momNetPct > 0 ? '+' : ''}{stats.momNetPct}%
               </span>
             </div>
-            <div className={kpiValueCls}>{fmt(stats.netIncome)}</div>
+            <div className="flex items-baseline gap-2 mb-6">
+              <span className="type-numeric text-slate-800 dark:text-slate-200 tracking-tight leading-none">{fmt(stats.netIncome)}</span>
+              {predictedNet !== null && (
+                <span className="type-micro text-muted-foreground whitespace-nowrap">
+                  {ko ? `월말 예상 ${fmt(predictedNet)}` : `Est. EOM ${fmt(predictedNet)}`}
+                </span>
+              )}
+            </div>
           </div>
           <div className={kpiSubGridCls}>
             <div className={kpiSubItemCls}>
@@ -232,16 +261,37 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
                 {stats.occupiedNights}/{stats.daysInMonth} {ko ? '박' : 'nights'}
               </span>
             </div>
-            <div className={kpiValueCls}>{stats.occupancyRate}%</div>
+            <div className="flex items-baseline gap-2 mb-6">
+              <span className="type-numeric text-slate-800 dark:text-slate-200 tracking-tight leading-none">{stats.occupancyRate}%</span>
+              {predictedOcc !== null && (
+                <span className="type-micro text-muted-foreground whitespace-nowrap">
+                  {ko ? `월말 예상 ${predictedOcc}%` : `Est. EOM ${predictedOcc}%`}
+                </span>
+              )}
+            </div>
           </div>
           <div className={kpiSubGridCls}>
             <div className={kpiSubItemCls}>
               <span className={kpiSubLabelCls}>{ko ? '예약 건수' : 'Bookings'}</span>
-              <strong className={kpiSubValCls}>{stats.totalBookings}{ko ? '건' : ''}</strong>
+              <strong className={kpiSubValCls}>
+                {stats.totalBookings}{ko ? '건' : ''}
+                {stats.momBookingsChange !== 0 && (
+                  <span className={`ml-1 text-[10px] font-semibold ${stats.momBookingsChange > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    ({stats.momBookingsChange > 0 ? '+' : ''}{stats.momBookingsChange})
+                  </span>
+                )}
+              </strong>
             </div>
             <div className={kpiSubItemCls}>
               <span className={kpiSubLabelCls}>{ko ? '예약 박수' : 'Occupied Nights'}</span>
-              <strong className={kpiSubValCls}>{stats.occupiedNights}{ko ? '박' : ' nights'}</strong>
+              <strong className={kpiSubValCls}>
+                {stats.occupiedNights}{ko ? '박' : ' nights'}
+                {stats.momOccNightsChange !== 0 && (
+                  <span className={`ml-1 text-[10px] font-semibold ${stats.momOccNightsChange > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    ({stats.momOccNightsChange > 0 ? '+' : ''}{stats.momOccNightsChange}{ko ? '박' : ''})
+                  </span>
+                )}
+              </strong>
             </div>
           </div>
         </div>
@@ -271,24 +321,116 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
           </div>
         </div>
 
-        {/* Box 4: Monthly Trends (Full Width) */}
-        <div className={`col-span-3 ${cardCls}`}>
+        {/* Box 4: Annual Key Metrics */}
+        <div className={`${cardCls} flex flex-col justify-between`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={chartTitleCls}>{ko ? '연간 주요지표' : 'Annual Key Metrics'}</span>
+            <span className="type-micro font-medium text-muted-foreground">{actualYear}{ko ? '년 ' : '-'}{actualMonthIdx + 1}{ko ? '월 ' : '-'}{today.getDate()}{ko ? '일' : ''}</span>
+          </div>
+          
+          <div className="flex-1 flex flex-col justify-center gap-2.5">
+            {/* 1. 누적 총 매출 */}
+            <div>
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="type-micro font-bold text-muted-foreground">{ko ? '누적 총 매출' : 'YTD GROSS'}</span>
+                {currentMonthGross > 0 && <span className={kpiSubLabelCls}>{ko ? '전월대비' : 'MoM'}</span>}
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-extrabold text-slate-800 dark:text-slate-200 tracking-tight leading-none tabular-nums">{fmt(stats.ytdGross)}</span>
+                {currentMonthGross > 0 && (
+                  <span className="text-[11px] font-bold text-emerald-500 tabular-nums">
+                    +{currentMonthGross.toLocaleString()}원
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-border/40"></div>
+
+            {/* 2. 누적 총 수익 */}
+            <div>
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="type-micro font-bold text-muted-foreground">{ko ? '누적 총 수익' : 'YTD NET'}</span>
+                {currentMonthNet > 0 && <span className={kpiSubLabelCls}>{ko ? '전월대비' : 'MoM'}</span>}
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-extrabold text-slate-800 dark:text-slate-200 tracking-tight leading-none tabular-nums">{fmt(stats.ytdNet)}</span>
+                {currentMonthNet > 0 && (
+                  <span className="text-[11px] font-bold text-emerald-500 tabular-nums">
+                    +{currentMonthNet.toLocaleString()}원
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t border-border/40"></div>
+
+            {/* 3. 예상 총 매출 */}
+            <div>
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="type-micro font-bold text-muted-foreground">{actualYear}{ko ? '년 예상' : ' FORECAST'}</span>
+                <span className={kpiSubLabelCls}>{ko ? '예상 총 수익' : 'Est. Net'}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-extrabold text-slate-800 dark:text-slate-200 tracking-tight leading-none tabular-nums">{fmt(stats.annualForecast.totalGross)}</span>
+                <span className="text-[11px] font-medium text-muted-foreground tabular-nums">{stats.annualForecast.totalNet.toLocaleString()}원</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2 mt-auto h-[90px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={stats.annualCumulativeData} margin={{ top: 10, right: 15, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey={ko ? 'nameKo' : 'name'} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))', opacity: 0.6 }} interval={0} />
+                <YAxis tickFormatter={fmtShort} axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))', opacity: 0.6 }} width={35} />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      const val = data.actual !== null ? data.actual : data.predicted;
+                      const isPred = data.actual === null;
+                      return (
+                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg p-2 rounded-lg">
+                          <p className="text-[11px] font-semibold mb-1 text-foreground">{label}</p>
+                          <div className="flex flex-col gap-0.5">
+                            <p className="text-[12px] font-bold text-primary">
+                              {ko ? (isPred ? '올해 (예상): ' : '올해: ') : (isPred ? 'Est: ' : 'YTD: ')}{(val ?? 0).toLocaleString()}{ko ? '원' : ''}
+                            </p>
+                            {data.lastYear !== null && (
+                              <p className="text-[11px] font-medium text-muted-foreground">
+                                {ko ? '작년: ' : 'Last Year: '}{data.lastYear.toLocaleString()}{ko ? '원' : ''}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Area type="monotone" dataKey="actual" stroke="var(--primary)" strokeWidth={2} fillOpacity={1} fill="url(#colorActual)" />
+                <Line type="monotone" dataKey="predicted" stroke="var(--primary)" strokeWidth={2} strokeDasharray="4 4" dot={false} activeDot={{ r: 4 }} />
+                <Line type="monotone" dataKey="lastYear" stroke="hsl(var(--muted-foreground))" strokeWidth={2} strokeDasharray="3 3" opacity={0.6} dot={false} isAnimationActive={false} />
+                {dotX && dotY != null && (
+                  <ReferenceDot x={dotX} y={dotY} r={3.5} fill="#fff" stroke="var(--primary)" strokeWidth={2.5} isFront={true} />
+                )}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Box 5: Monthly Trends */}
+        <div className={`col-span-2 ${cardCls}`}>
           <div className="flex items-center justify-between mb-4">
             <span className={chartTitleCls}>{ko ? '월별 추이 (11개월)' : 'Monthly Trends (11 Months)'}</span>
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <span className="type-micro font-bold text-muted-foreground mr-1">{ko ? '금년 누적(YTD)' : 'YTD'}</span>
-                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip">{ko ? '총매출' : 'Gross'} {fmt(stats.ytdGross)}</span>
-                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip">{ko ? '순이익' : 'Net'} {fmt(stats.ytdNet)}</span>
-                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip">OTA {fmt(stats.ytdOtaCommission)}</span>
-                <div className="w-px h-4 bg-border/60 mx-0.5" />
-                <span className="type-micro font-bold text-muted-foreground mr-1">{currentYear}{ko ? ' 연간 예상' : ' Annual'}</span>
-                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip">{ko ? '총매출' : 'Gross'} {fmtShort(stats.annualForecast.totalGross)}</span>
-                <span className="type-micro font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-chip inline-flex items-center gap-1">
-                  <span>{ko ? '순이익' : 'Net'} {fmtShort(stats.annualForecast.totalNet)}</span>
-                  <span className="font-normal text-muted-foreground/50">· {stats.annualForecast.avgConfidence}%</span>
-                </span>
-              </div>
+
               <div className="flex gap-4">
                 <div className={legendItemCls}><span className="w-2 h-2 rounded-full bg-primary/30" />{ko ? '총매출' : 'Gross'}</div>
                 <div className={legendItemCls}><span className="w-2 h-2 rounded-full bg-primary" />{ko ? '순이익' : 'Net'}</div>
@@ -365,111 +507,212 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
 
         {/* Box 5: Channel Donut */}
         <div className={cardCls}>
-          <div className={`text-sm font-bold mb-3 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{ko ? '예약 채널 분포' : 'Booking Channels'}</div>
-          <div className="relative flex justify-center mb-4">
-            <ResponsiveContainer width="100%" height={170}>
-              <PieChart><Pie data={stats.channelPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={72} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
-                {stats.channelPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Pie></PieChart>
-            </ResponsiveContainer>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5">
-              <span className={donutCenterValueCls}>{stats.occupancyRate}%</span>
-              <span className={donutCenterLabelCls}>{ko ? '가동률' : 'OCC'}</span>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{ko ? '예약 채널 분포' : 'Booking Channels'}</span>
+            <button
+              className="type-micro font-bold py-1 px-2.5 rounded-chip cursor-pointer transition-colors whitespace-nowrap bg-primary/10 text-primary hover:bg-primary/20"
+              onClick={() => setIsChannelDetailOpen(true)}
+            >{ko ? '자세히 보기 >' : 'Details >'}</button>
+          </div>
+          <div className="flex items-start">
+            <div className="flex-1 flex flex-col items-center">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1">{ko ? '이번 달' : 'This Month'}</span>
+              <div className="relative w-full">
+                <ResponsiveContainer width="100%" height={155}>
+                  <PieChart><Pie data={stats.channelPieData} cx="50%" cy="50%" innerRadius={46} outerRadius={64} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
+                    {stats.channelPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie></PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
+                  <span className="text-[20px] font-extrabold text-foreground leading-none">{stats.occupancyRate}%</span>
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{ko ? '가동률' : 'OCC'}</span>
+                </div>
+              </div>
+            </div>
+            <div className="w-px bg-border/40 self-stretch mx-1 mt-5" />
+            <div className="flex-1 flex flex-col items-center">
+              <span className="text-[10px] font-bold text-primary/70 uppercase tracking-wide mb-1">{ko ? '전체 평균' : 'All-time'}</span>
+              <div className="relative w-full">
+                <ResponsiveContainer width="100%" height={155}>
+                  <PieChart><Pie data={stats.allTimeChannelPieData} cx="50%" cy="50%" innerRadius={46} outerRadius={64} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
+                    {stats.allTimeChannelPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie></PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
+                  <span className="text-[17px] font-extrabold text-foreground leading-none">{stats.allTimeTotal}</span>
+                  <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{ko ? '전체' : 'TOTAL'}</span>
+                </div>
+              </div>
             </div>
           </div>
-          <ul className="m-0 p-0 list-none">
-            {stats.channelPieData.map(item => (
-              <li key={item.name} className={donutLegItemCls}>
-                <span className="w-2 h-2 rounded-full mr-2.5 flex-shrink-0" style={{ background: item.color }} />
-                <span className={donutLegNameCls}>{item.name}</span>
-                <span className={donutLegValCls}>{item.value}%</span>
-              </li>
-            ))}
+          <ul className="m-0 p-0 list-none mt-1">
+            <li className="flex items-center pb-1">
+              <span className="w-2 h-2 mr-2 flex-shrink-0" />
+              <span className="flex-1" />
+              <span className="text-[10px] font-bold text-muted-foreground w-9 text-right">{ko ? '이달' : 'Mo.'}</span>
+              <span className="text-[10px] font-bold text-primary/60 w-9 text-right">{ko ? '전체' : 'All'}</span>
+            </li>
+            {(() => {
+              const allTimeMap = new Map(stats.allTimeChannelPieData.map(d => [d.name, d]));
+              const currentMap = new Map(stats.channelPieData.map(d => [d.name, d]));
+              const allNames = [...new Set([...stats.channelPieData, ...stats.allTimeChannelPieData].map(d => d.name))];
+              return allNames.map(name => {
+                const item = (currentMap.get(name) || allTimeMap.get(name))!;
+                return (
+                  <li key={name} className="flex items-center py-1.5 text-xs border-b border-border last:border-0">
+                    <span className="w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: item.color }} />
+                    <span className="flex-1 text-muted-foreground truncate">{name}</span>
+                    <span className="font-bold text-foreground/90 w-9 text-right">{currentMap.get(name)?.value ?? '–'}%</span>
+                    <span className="font-medium text-muted-foreground w-9 text-right">{allTimeMap.get(name)?.value ?? '–'}%</span>
+                  </li>
+                );
+              });
+            })()}
           </ul>
         </div>
 
         {/* Box 6: Nationality Donut */}
         <div className={cardCls}>
-          <div className={`text-sm font-bold mb-3 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{ko ? '국적 분포' : 'Nationality Mix'}</div>
-          <div className="relative flex justify-center mb-4">
-            <ResponsiveContainer width="100%" height={170}>
-              <PieChart><Pie data={stats.nationalityPieData} cx="50%" cy="50%" innerRadius={52} outerRadius={72} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
-                {stats.nationalityPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Pie></PieChart>
-            </ResponsiveContainer>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5">
-              <span className={donutCenterValueCls}>{stats.totalNatBookings}</span>
-              <span className={donutCenterLabelCls}>{ko ? '예약' : 'BOOKINGS'}</span>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{ko ? '국적 분포' : 'Nationality Mix'}</span>
+            <button
+              className="type-micro font-bold py-1 px-2.5 rounded-chip cursor-pointer transition-colors whitespace-nowrap bg-primary/10 text-primary hover:bg-primary/20"
+              onClick={() => setIsNatDetailOpen(true)}
+            >{ko ? '자세히 보기 >' : 'Details >'}</button>
+          </div>
+          <div className="flex items-start">
+            <div className="flex-1 flex flex-col items-center">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1">{ko ? '이번 달' : 'This Month'}</span>
+              <div className="relative w-full">
+                <ResponsiveContainer width="100%" height={155}>
+                  <PieChart><Pie data={stats.nationalityPieData} cx="50%" cy="50%" innerRadius={46} outerRadius={64} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
+                    {stats.nationalityPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie></PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
+                  <span className="text-[17px] font-extrabold text-foreground leading-none">{stats.totalNatBookings}</span>
+                  <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{ko ? '예약' : 'BOOKINGS'}</span>
+                </div>
+              </div>
+            </div>
+            <div className="w-px bg-border/40 self-stretch mx-1 mt-5" />
+            <div className="flex-1 flex flex-col items-center">
+              <span className="text-[10px] font-bold text-primary/70 uppercase tracking-wide mb-1">{ko ? '전체 평균' : 'All-time'}</span>
+              <div className="relative w-full">
+                <ResponsiveContainer width="100%" height={155}>
+                  <PieChart><Pie data={stats.allTimeNationalityPieData} cx="50%" cy="50%" innerRadius={46} outerRadius={64} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
+                    {stats.allTimeNationalityPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie></PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
+                  <span className="text-[17px] font-extrabold text-foreground leading-none">{stats.allTimeTotal}</span>
+                  <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{ko ? '전체' : 'TOTAL'}</span>
+                </div>
+              </div>
             </div>
           </div>
-          <ul className="m-0 p-0 list-none">
-            {stats.nationalityPieData.map(item => (
-              <li key={item.name} className={donutLegItemCls}>
-                <span className="w-2 h-2 rounded-full mr-2.5 flex-shrink-0" style={{ background: item.color }} />
-                <span className={donutLegNameCls}>{item.name}</span>
-                <span className={donutLegValCls}>{item.value}%</span>
-              </li>
-            ))}
+          <ul className="m-0 p-0 list-none mt-1">
+            <li className="flex items-center pb-1">
+              <span className="w-2 h-2 mr-2 flex-shrink-0" />
+              <span className="flex-1" />
+              <span className="text-[10px] font-bold text-muted-foreground w-9 text-right">{ko ? '이달' : 'Mo.'}</span>
+              <span className="text-[10px] font-bold text-primary/60 w-9 text-right">{ko ? '전체' : 'All'}</span>
+            </li>
+            {(() => {
+              const allTimeMap = new Map(stats.allTimeNationalityPieData.map(d => [d.name, d]));
+              const currentMap = new Map(stats.nationalityPieData.map(d => [d.name, d]));
+              const allNames = [...new Set([...stats.nationalityPieData, ...stats.allTimeNationalityPieData].map(d => d.name))].slice(0, 4);
+              return allNames.map(name => {
+                const item = (currentMap.get(name) || allTimeMap.get(name))!;
+                return (
+                  <li key={name} className="flex items-center py-1.5 text-xs border-b border-border last:border-0">
+                    <span className="w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: item.color }} />
+                    <span className="flex-1 text-muted-foreground truncate">{name}</span>
+                    <span className="font-bold text-foreground/90 w-9 text-right">{currentMap.get(name)?.value ?? '–'}%</span>
+                    <span className="font-medium text-muted-foreground w-9 text-right">{allTimeMap.get(name)?.value ?? '–'}%</span>
+                  </li>
+                );
+              });
+            })()}
           </ul>
         </div>
 
         {/* Box 7: Lead Time */}
-        <div className={cardCls}>
-          <div className="flex items-center justify-between flex-nowrap gap-2 mb-4">
-            <div className="flex items-center gap-3">
-              <span className={chartTitleCls}>{ko ? '리드타임 분포' : 'Lead Time'}</span>
-              <button
-                className="type-micro font-bold py-1 px-2.5 rounded-chip cursor-pointer transition-colors whitespace-nowrap flex-shrink-0 bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20"
-                onClick={() => setIsLeadTimeModalOpen(true)}
-              >
-                {ko ? '자세히 보기 >' : 'Details >'}
-              </button>
-            </div>
-            <div className={toggleGroupCls}>
-              {(['channel', 'nationality', 'guests'] as const).map(m => (
-                <button key={m} className={`${toggleBtnCls} ${leadTimeMode === m ? toggleBtnActiveCls : ''}`} onClick={() => setLeadTimeMode(m)}>
-                  {m === 'channel' ? (ko ? '채널' : 'Channel') : m === 'nationality' ? (ko ? '국적' : 'Nationality') : (ko ? '인원' : 'Guests')}
-                </button>
-              ))}
-            </div>
+        <div className={`${cardCls} flex flex-col`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={chartTitleCls}>{ko ? '리드타임 분포' : 'Lead Time'}</span>
+            <button
+              className="type-micro font-bold py-1 px-2.5 rounded-chip cursor-pointer transition-colors whitespace-nowrap flex-shrink-0 bg-primary/10 text-primary hover:bg-primary/20"
+              onClick={() => setIsLeadTimeModalOpen(true)}
+            >
+              {ko ? '자세히 보기 >' : 'Details >'}
+            </button>
           </div>
-          <div className="-ml-3 -mr-2">
-            <ResponsiveContainer width="100%" height={220}>
-              <ScatterChart margin={{ top: 15, right: 10, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                <XAxis dataKey="x" type="number" domain={[stats.leadTimeStartX, stats.leadTimeEndX]}
-                  tickFormatter={v => { const d = new Date(v); return d.getDate() === 1 ? (ko ? `${d.getMonth() + 1}월` : d.toLocaleString(language, { month: 'short' })) : ''; }}
-                  ticks={(() => { const ticks: number[] = []; const start = new Date(stats.leadTimeStartX); const end = new Date(stats.leadTimeEndX); let cur = new Date(start.getFullYear(), start.getMonth(), 1); while (cur <= end) { ticks.push(cur.getTime()); cur.setMonth(cur.getMonth() + 1); } return ticks; })()}
-                  axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColor, fontWeight: 600 }} />
-                <YAxis dataKey="y" type="number" domain={[0, 150]} ticks={[0, 30, 60, 90, 120, 150]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: tickColorAlt }} />
-                <ZAxis dataKey="nights" range={[10, 100]} />
-                <Tooltip cursor={{ strokeDasharray: '3 3', stroke: gridColor }} content={<LeadTimeTooltip isDark={isDark} ko={ko} />} />
-                {leadTimeMode === 'channel' && Object.keys(CHANNEL_COLORS).map(ch => (
-                  <Scatter key={ch} name={ch} data={(stats.leadTimeScatterData || []).filter(d => d.channel === ch)} fill={CHANNEL_COLORS[ch]} shape={ScatterDot} />
-                ))}
-                {leadTimeMode === 'nationality' && stats.leadTimeNatKeys.map((nat) => (
-                  <Scatter key={nat} name={nat} data={(stats.leadTimeScatterData || []).filter(d => d.nationality === nat)} fill={getNatColor(nat)} shape={ScatterDot} />
-                ))}
-                {leadTimeMode === 'guests' && ['1', '2', '3', '4', '5+'].map(gKey => (
-                  <Scatter key={gKey} name={`${gKey}${ko ? '인' : ' Guests'}`} data={(stats.leadTimeScatterData || []).filter(d => { const g = d.guests || 2; return gKey === '5+' ? g >= 5 : g === parseInt(gKey); })} fill={GUEST_COLORS[gKey]} shape={ScatterDot} />
-                ))}
-              </ScatterChart>
-            </ResponsiveContainer>
+
+          {/* 평균 리드타임 */}
+          {report.currentMonthTotal > 0 ? (
+            <div className="flex items-baseline gap-1.5 mb-3">
+              <span className="text-[22px] font-extrabold text-foreground leading-none tabular-nums">{report.currentMonthAvgDays}</span>
+              <span className="text-[11px] text-muted-foreground">{ko ? '일 전 평균 예약' : 'days avg lead time'}</span>
+              <span className="text-[10px] text-muted-foreground/50 ml-auto">
+                {ko ? `이번 달 ${report.currentMonthTotal}건` : `${report.currentMonthTotal} this month`}
+              </span>
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground/50 mb-3">{ko ? '이번 달 예약 없음' : 'No bookings this month'}</p>
+          )}
+
+          {/* 구간별 가로 막대 */}
+          <div className="flex flex-col gap-2 flex-1">
+            {report.currentMonthBuckets.map((cm, i) => {
+              const overall = report.buckets[i];
+              return (
+                <div key={cm.key}>
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-foreground">{ko ? cm.label : cm.labelEn}</span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-[12px] font-bold text-foreground tabular-nums">{cm.pct}%</span>
+                      <span className="text-[9px] text-muted-foreground/50 tabular-nums">{overall.pct}%</span>
+                    </div>
+                  </div>
+                  {/* 전체 평균 바 (얇은) */}
+                  <div className="relative h-1 w-full rounded-full bg-muted/40 mb-0.5">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, overall.pct)}%`, background: 'var(--muted-foreground)', opacity: 0.3 }}
+                    />
+                  </div>
+                  {/* 이번 달 바 (굵은) */}
+                  <div className="relative h-2 w-full rounded-full bg-muted/30">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, cm.pct)}%`, background: cm.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div className="flex flex-wrap justify-center gap-3 mt-4">
-            {leadTimeMode === 'channel' && Object.keys(CHANNEL_COLORS).map(ch => (
-              <div key={ch} className={legendItemCls}><span className="w-2 h-2 rounded-full" style={{ background: CHANNEL_COLORS[ch] }} />{ch}</div>
-            ))}
-            {leadTimeMode === 'nationality' && stats.leadTimeNatKeys.map((nat) => (
-              <div key={nat} className={legendItemCls}><span className="w-2 h-2 rounded-full" style={{ background: getNatColor(nat) }} />{nat}</div>
-            ))}
-            {leadTimeMode === 'guests' && ['1', '2', '3', '4', '5+'].map(gKey => (
-              <div key={gKey} className={legendItemCls}><span className="w-2 h-2 rounded-full" style={{ background: GUEST_COLORS[gKey] }} />{gKey}{ko ? '인' : ' Guests'}</div>
-            ))}
+
+          {/* 범례 */}
+          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-1.5 rounded-full bg-primary" />
+              <span className="text-[10px] font-semibold text-muted-foreground">{ko ? '이번 달' : 'This month'}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-1 rounded-full bg-muted-foreground/30" />
+              <span className="text-[10px] font-semibold text-muted-foreground">{ko ? '전체 평균' : 'Overall avg'}</span>
+            </div>
           </div>
         </div>
 
-        {/* Box 8: Monthly Analytics Table */}
+        {/* Box 8: Booking Pace */}
+        <div className="col-span-3">
+          <PaceChart pace={pace} isDark={isDark} ko={ko} sym={sym} fmtShort={fmtShort} predictedOcc={stats.monthlyTrends.find(t => t.isCurrent)?.predictedOcc ?? null} />
+        </div>
+
+        {/* Box 9: Monthly Analytics Table */}
         <AnalyticsTable
           monthlyTableData={stats.monthlyTableData}
           isDark={isDark}
@@ -485,10 +728,9 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
         />
       </div>
 
-      {/* Box 9: Booking Pace */}
-      <PaceChart pace={pace} isDark={isDark} ko={ko} sym={sym} fmtShort={fmtShort} predictedOcc={stats.monthlyTrends.find(t => t.isCurrent)?.predictedOcc ?? null} />
-
       {isLeadTimeModalOpen && <LeadTimeDetailModal isDark={isDark} onClose={() => setIsLeadTimeModalOpen(false)} />}
+      {isChannelDetailOpen && <DistributionDetailModal mode="channel" isDark={isDark} onClose={() => setIsChannelDetailOpen(false)} />}
+      {isNatDetailOpen && <DistributionDetailModal mode="nationality" isDark={isDark} onClose={() => setIsNatDetailOpen(false)} />}
     </div>
   );
 };

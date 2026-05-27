@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   Bell, ChevronLeft, ChevronRight, TrendingUp,
   ArrowUpRight, ArrowDownRight, Database, Menu,
@@ -16,6 +16,7 @@ import { useBookingPace } from '../../hooks/useBookingPace';
 import { supabase } from '../../services/supabaseClient';
 import { DUMMY_BOOKINGS, DUMMY_MAINTENANCE } from '../../utils/dummyData';
 import LeadTimeDetailModal from '../../components/Modals/LeadTimeDetailModal';
+import DistributionDetailModal from '../../components/Modals/DistributionDetailModal';
 import { TrendTooltip } from '../DesktopDashboard/chartComponents';
 import { useLeadTimeReport } from '../../hooks/useLeadTimeReport';
 import PaceChart from '../DesktopDashboard/PaceChart';
@@ -29,6 +30,8 @@ const DashboardPage = () => {
 
   const [tableChannel, setTableChannel] = useState('All');
   const [isLeadTimeModalOpen, setIsLeadTimeModalOpen] = useState(false);
+  const [isChannelDetailOpen, setIsChannelDetailOpen] = useState(false);
+  const [isNatDetailOpen, setIsNatDetailOpen] = useState(false);
   const [tableRange, setTableRange]   = useState('12');
   const [sortCol, setSortCol]         = useState<'sortKey' | 'occupancy' | 'gross' | 'adr' | 'otaComm'>('sortKey');
   const [sortDir, setSortDir]         = useState<'desc' | 'asc'>('desc');
@@ -77,6 +80,7 @@ const DashboardPage = () => {
   // 현재 선택 월의 예측 데이터
   const currentTrend     = stats.monthlyTrends.find(t => t.isCurrent);
   const predictedOcc     = currentTrend?.predictedOcc ?? null;
+  const predictedNet     = currentTrend?.predictedNet ?? null;
   const forecastConf     = currentTrend != null ? Math.round(currentTrend.forecastConfidence * 100) : null;
   const daysInMonth      = new Date(currentYear, currentMonth + 1, 0).getDate();
   const predictedNights  = predictedOcc != null ? Math.round(predictedOcc / 100 * daysInMonth) : null;
@@ -156,8 +160,25 @@ const DashboardPage = () => {
   const toggleBtn    = 'flex-1 py-1.5 text-[10px] font-bold text-muted-foreground bg-transparent border-0 cursor-pointer rounded-md text-center transition-all whitespace-nowrap';
   const toggleBtnActive = 'bg-background text-primary shadow-sm';
 
+  const swipeStartX = useRef<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    swipeStartX.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (swipeStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - swipeStartX.current;
+    swipeStartX.current = null;
+    if (Math.abs(dx) < 50) return;
+    if (dx < 0) nextMonth();
+    else prevMonth();
+  };
+
   return (
-    <div className="bg-background min-h-screen pb-24 overflow-x-hidden w-full">
+    <div
+      className="bg-background min-h-screen pb-24 overflow-x-hidden w-full"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
 
       {/* ── 헤더 ── */}
       <header className="flex items-center px-4 py-5 gap-3">
@@ -222,13 +243,20 @@ const DashboardPage = () => {
         {/* ── KPI 1: 예상 순수익 ── */}
         <div className={card}>
           <div className="flex items-center justify-between mb-2">
-            <span className={sectionLabel}>{ko ? '예상 순수익' : 'NET INCOME'}</span>
+            <span className={sectionLabel}>{ko ? '순수익' : 'NET INCOME'}</span>
             <span className={`text-[10px] font-bold py-0.5 px-2 rounded-full flex items-center gap-0.5 ${stats.momNetChange >= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
               {stats.momNetChange >= 0 ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
               {stats.momNetPct > 0 ? '+' : ''}{stats.momNetPct}%
             </span>
           </div>
-          <div className={`text-[26px] font-extrabold ${kpiValueCls} mb-3`}>{fmt(stats.netIncome)}</div>
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className={`text-[26px] font-extrabold ${kpiValueCls}`}>{fmt(stats.netIncome)}</span>
+            {predictedNet !== null && (
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                {ko ? `월말 예상 ${fmt(predictedNet)}` : `Est. EOM ${fmt(predictedNet)}`}
+              </span>
+            )}
+          </div>
           {/* 구분선 없이 바로 서브 정보 */}
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-0.5">
@@ -253,8 +281,19 @@ const DashboardPage = () => {
               <div className={`${sectionLabel} mb-1`}>{ko ? '점유율' : 'OCC'}</div>
               <div className="flex items-baseline gap-1.5 overflow-hidden">
                 <span className={`text-[15px] font-semibold ${kpiValueCls} whitespace-nowrap`}>{stats.occupancyRate}%</span>
-                <span className="text-[10px] text-muted-foreground leading-none whitespace-nowrap shrink-0">
-                  {stats.totalBookings}{ko ? '건' : ''}&nbsp;{stats.occupiedNights}{ko ? '박' : 'n'}
+                <span className="text-[10px] text-muted-foreground leading-none whitespace-nowrap shrink-0 flex items-baseline gap-0.5">
+                  <span>{stats.totalBookings}{ko ? '건' : ''}</span>
+                  {stats.momBookingsChange !== 0 && (
+                    <span className={`text-[9px] font-semibold ${stats.momBookingsChange > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      ({stats.momBookingsChange > 0 ? '+' : ''}{stats.momBookingsChange})
+                    </span>
+                  )}
+                  <span>&nbsp;{stats.occupiedNights}{ko ? '박' : 'n'}</span>
+                  {stats.momOccNightsChange !== 0 && (
+                    <span className={`text-[9px] font-semibold ${stats.momOccNightsChange > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      ({stats.momOccNightsChange > 0 ? '+' : ''}{stats.momOccNightsChange}{ko ? '박' : 'n'})
+                    </span>
+                  )}
                 </span>
               </div>
             </div>
@@ -404,31 +443,134 @@ const DashboardPage = () => {
 
         {/* ── 채널 분포 도넛 ── */}
         <div className={card}>
-          <span className={chartTitle}>{ko ? '예약 채널 분포' : 'Booking Channels'}</span>
-          <div className="flex gap-4 items-center">
-            <div className="relative shrink-0" style={{ width: 140, height: 140 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={stats.channelPieData} cx="50%" cy="50%" innerRadius={42} outerRadius={62} paddingAngle={2} dataKey="value" stroke="none" cornerRadius={3}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={chartTitle} style={{ marginBottom: 0 }}>{ko ? '예약 채널 분포' : 'Booking Channels'}</span>
+            <button
+              className="text-[10px] font-bold py-1 px-2.5 rounded-lg bg-primary/10 text-primary whitespace-nowrap"
+              onClick={() => setIsChannelDetailOpen(true)}
+            >{ko ? '자세히 보기 >' : 'Details >'}</button>
+          </div>
+          <div className="flex items-start">
+            <div className="flex-1 flex flex-col items-center">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1">{ko ? '이번 달' : 'This Month'}</span>
+              <div className="relative w-full">
+                <ResponsiveContainer width="100%" height={140}>
+                  <PieChart><Pie data={stats.channelPieData} cx="50%" cy="50%" innerRadius={40} outerRadius={56} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
                     {stats.channelPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className={`text-[18px] font-extrabold ${kpiValueCls} leading-none`}>{stats.occupancyRate}%</span>
-                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">{ko ? '가동률' : 'OCC'}</span>
+                  </Pie></PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
+                  <span className="text-[18px] font-extrabold text-foreground leading-none">{stats.occupancyRate}%</span>
+                  <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{ko ? '가동률' : 'OCC'}</span>
+                </div>
               </div>
             </div>
-            <ul className="flex-1 m-0 p-0 list-none min-w-0">
-              {stats.channelPieData.map(item => (
-                <li key={item.name} className={donutLegRow}>
-                  <span className="w-2.5 h-2.5 rounded-full mr-2 shrink-0" style={{ background: item.color }} />
-                  <span className="flex-1 text-muted-foreground text-[11px] truncate">{item.name}</span>
-                  <span className={`font-bold text-[11px] ${kpiValueCls}`}>{item.value}%</span>
-                </li>
-              ))}
-            </ul>
+            <div className="w-px bg-border/40 self-stretch mx-1 mt-5" />
+            <div className="flex-1 flex flex-col items-center">
+              <span className="text-[10px] font-bold text-primary/70 uppercase tracking-wide mb-1">{ko ? '전체 평균' : 'All-time'}</span>
+              <div className="relative w-full">
+                <ResponsiveContainer width="100%" height={140}>
+                  <PieChart><Pie data={stats.allTimeChannelPieData} cx="50%" cy="50%" innerRadius={40} outerRadius={56} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
+                    {stats.allTimeChannelPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie></PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
+                  <span className="text-[17px] font-extrabold text-foreground leading-none">{stats.allTimeTotal}</span>
+                  <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{ko ? '전체' : 'TOTAL'}</span>
+                </div>
+              </div>
+            </div>
           </div>
+          <ul className="m-0 p-0 list-none mt-1">
+            <li className="flex items-center pb-1">
+              <span className="w-2 h-2 mr-2 flex-shrink-0" />
+              <span className="flex-1" />
+              <span className="text-[10px] font-bold text-muted-foreground w-9 text-right">{ko ? '이달' : 'Mo.'}</span>
+              <span className="text-[10px] font-bold text-primary/60 w-9 text-right">{ko ? '전체' : 'All'}</span>
+            </li>
+            {(() => {
+              const allTimeMap = new Map(stats.allTimeChannelPieData.map(d => [d.name, d]));
+              const currentMap = new Map(stats.channelPieData.map(d => [d.name, d]));
+              const allNames = [...new Set([...stats.channelPieData, ...stats.allTimeChannelPieData].map(d => d.name))];
+              return allNames.map(name => {
+                const item = (currentMap.get(name) || allTimeMap.get(name))!;
+                return (
+                  <li key={name} className={`${donutLegRow} text-xs`}>
+                    <span className="w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: item.color }} />
+                    <span className="flex-1 text-muted-foreground truncate">{name}</span>
+                    <span className="font-bold text-foreground/90 w-9 text-right">{currentMap.get(name)?.value ?? '–'}%</span>
+                    <span className="font-medium text-muted-foreground w-9 text-right">{allTimeMap.get(name)?.value ?? '–'}%</span>
+                  </li>
+                );
+              });
+            })()}
+          </ul>
+        </div>
+
+        {/* ── 국적 분포 도넛 ── */}
+        <div className={card}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={chartTitle} style={{ marginBottom: 0 }}>{ko ? '국적 분포' : 'Nationality Mix'}</span>
+            <button
+              className="text-[10px] font-bold py-1 px-2.5 rounded-lg bg-primary/10 text-primary whitespace-nowrap"
+              onClick={() => setIsNatDetailOpen(true)}
+            >{ko ? '자세히 보기 >' : 'Details >'}</button>
+          </div>
+          <div className="flex items-start">
+            <div className="flex-1 flex flex-col items-center">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1">{ko ? '이번 달' : 'This Month'}</span>
+              <div className="relative w-full">
+                <ResponsiveContainer width="100%" height={140}>
+                  <PieChart><Pie data={stats.nationalityPieData} cx="50%" cy="50%" innerRadius={40} outerRadius={56} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
+                    {stats.nationalityPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie></PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
+                  <span className="text-[18px] font-extrabold text-foreground leading-none">{stats.totalNatBookings}</span>
+                  <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{ko ? '예약' : 'BOOKINGS'}</span>
+                </div>
+              </div>
+            </div>
+            <div className="w-px bg-border/40 self-stretch mx-1 mt-5" />
+            <div className="flex-1 flex flex-col items-center">
+              <span className="text-[10px] font-bold text-primary/70 uppercase tracking-wide mb-1">{ko ? '전체 평균' : 'All-time'}</span>
+              <div className="relative w-full">
+                <ResponsiveContainer width="100%" height={140}>
+                  <PieChart><Pie data={stats.allTimeNationalityPieData} cx="50%" cy="50%" innerRadius={40} outerRadius={56} paddingAngle={3} dataKey="value" stroke="none" cornerRadius={4}>
+                    {stats.allTimeNationalityPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie></PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
+                  <span className="text-[17px] font-extrabold text-foreground leading-none">{stats.allTimeTotal}</span>
+                  <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">{ko ? '전체' : 'TOTAL'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <ul className="m-0 p-0 list-none mt-1">
+            <li className="flex items-center pb-1">
+              <span className="w-2 h-2 mr-2 flex-shrink-0" />
+              <span className="flex-1" />
+              <span className="text-[10px] font-bold text-muted-foreground w-9 text-right">{ko ? '이달' : 'Mo.'}</span>
+              <span className="text-[10px] font-bold text-primary/60 w-9 text-right">{ko ? '전체' : 'All'}</span>
+            </li>
+            {(() => {
+              const allTimeMap = new Map(stats.allTimeNationalityPieData.map(d => [d.name, d]));
+              const currentMap = new Map(stats.nationalityPieData.map(d => [d.name, d]));
+              const allNames = [...new Set([...stats.nationalityPieData, ...stats.allTimeNationalityPieData].map(d => d.name))].slice(0, 4);
+              return allNames.map(name => {
+                const item = (currentMap.get(name) || allTimeMap.get(name))!;
+                return (
+                  <li key={name} className={`${donutLegRow} text-xs`}>
+                    <span className="w-2 h-2 rounded-full mr-2 flex-shrink-0" style={{ background: item.color }} />
+                    <span className="flex-1 text-muted-foreground truncate">{name}</span>
+                    <span className="font-bold text-foreground/90 w-9 text-right">{currentMap.get(name)?.value ?? '–'}%</span>
+                    <span className="font-medium text-muted-foreground w-9 text-right">{allTimeMap.get(name)?.value ?? '–'}%</span>
+                  </li>
+                );
+              });
+            })()}
+          </ul>
         </div>
 
         {/* ── 예약 속도 추이 (채널분포 바로 아래) ── */}
@@ -687,6 +829,8 @@ const DashboardPage = () => {
       </div>
 
       {isLeadTimeModalOpen && <LeadTimeDetailModal isDark={isDark} onClose={() => setIsLeadTimeModalOpen(false)} />}
+      {isChannelDetailOpen && <DistributionDetailModal mode="channel" isDark={isDark} onClose={() => setIsChannelDetailOpen(false)} />}
+      {isNatDetailOpen && <DistributionDetailModal mode="nationality" isDark={isDark} onClose={() => setIsNatDetailOpen(false)} />}
     </div>
   );
 };

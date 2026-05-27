@@ -304,6 +304,8 @@ export interface DesktopStats {
   occupancyRate: number;
   occupiedNights: number;
   totalBookings: number;
+  momBookingsChange: number;
+  momOccNightsChange: number;
   daysInMonth: number;
   adrThisMonth: number;
   adrYearAvg: number;
@@ -312,11 +314,15 @@ export interface DesktopStats {
   ytdGross: number;
   ytdNet: number;
   ytdOtaCommission: number;
+  ytdOtaCommissionByChannel: Record<string, number>;
   monthlyTrends: MonthlyTrend[];
   channelPieData: PieDataItem[];
   totalChannelBookings: number;
+  allTimeChannelPieData: PieDataItem[];
   nationalityPieData: PieDataItem[];
   totalNatBookings: number;
+  allTimeNationalityPieData: PieDataItem[];
+  allTimeTotal: number;
   leadTimeScatterData: LeadTimeDataPoint[];
   leadTimeStartX: number;
   leadTimeEndX: number;
@@ -324,6 +330,13 @@ export interface DesktopStats {
   monthlyTableData: MonthlyTableRow[];
   currencySymbol: string;
   annualForecast: AnnualForecast;
+  annualCumulativeData: {
+    name: string;
+    nameKo: string;
+    actual: number | null;
+    predicted: number | null;
+    lastYear: number | null;
+  }[];
 }
 
 export interface PaceTarget {
