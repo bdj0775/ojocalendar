@@ -376,11 +376,29 @@ const CalendarPage = () => {
     return bars;
   }, [previewDates, currentGrid, visibleProperties]);
 
+  // ── preview와 겹치는 기존 bar 제거 후 합침 ────────────────────────────────
+  // 동일 propertyId에서 preview 날짜 범위와 겹치는 기존 bar를 숨기고 preview로 대체
+  const mergedCurrentBars = useMemo(() => {
+    if (!previewDates || previewBars.length === 0) return currentBars;
+    const { checkIn: ci, checkOut: co, propertyId } = previewDates;
+    const pStart = currentGrid.findIndex(c => c.dateStr === ci);
+    const pEnd   = currentGrid.findIndex(c => c.dateStr === addDays(co, -1));
+    const ps = pStart >= 0 ? pStart : 0;
+    const pe = pEnd   >= 0 ? pEnd   : currentGrid.length - 1;
+    const filtered = currentBars.filter(bar => {
+      if (bar.propertyId !== propertyId) return true;
+      const barStart = bar.rowIndex * 7 + bar.colStart;
+      const barEnd   = barStart + bar.span - 1;
+      return barEnd < ps || barStart > pe;
+    });
+    return [...filtered, ...previewBars];
+  }, [currentBars, previewBars, previewDates, currentGrid]);
+
   const panels = useMemo(() => ({
     prev:    { grid: prevGrid,    bars: prevBars    },
-    current: { grid: currentGrid, bars: [...currentBars, ...previewBars] },
+    current: { grid: currentGrid, bars: mergedCurrentBars },
     next:    { grid: nextGrid,    bars: nextBars    },
-  }), [prevGrid, currentGrid, nextGrid, prevBars, currentBars, nextBars, previewBars]);
+  }), [prevGrid, currentGrid, nextGrid, prevBars, mergedCurrentBars, nextBars]);
 
   const upcomingStays = useMemo(() =>
     visibleBookings

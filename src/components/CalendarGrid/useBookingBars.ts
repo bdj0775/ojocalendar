@@ -105,12 +105,18 @@ export function useBookingBars(
       return properties[idx].color || PROP_COLORS[idx % PROP_COLORS.length];
     };
 
-    // 슬롯별로 아이템 분류 후 체크인 순 정렬
-    const rawBuckets: CalItem[][] = Array.from({ length: MAX_SLOTS }, () => []);
-    allItems.forEach(item => rawBuckets[getSlot(item.propertyId)].push(item));
+    // propertyId → 슬롯, propertyId별로 독립적으로 dedup (같은 슬롯의 다른 숙소끼리 날짜 겹침 허용)
+    // 1단계: propertyId별 버킷으로 분류
+    const propBuckets = new Map<string, CalItem[]>();
+    allItems.forEach(item => {
+      const key = item.propertyId ?? '__none__';
+      if (!propBuckets.has(key)) propBuckets.set(key, []);
+      propBuckets.get(key)!.push(item);
+    });
 
-    // 슬롯 내부에서만 dedup — 서로 다른 슬롯 간에는 날짜 겹침 허용
-    const slotBuckets = rawBuckets.map(bucket => {
+    // 2단계: propertyId별 dedup (같은 숙소 내 중복 예약 제거)
+    const dedupedByProp = new Map<string, CalItem[]>();
+    propBuckets.forEach((bucket, key) => {
       bucket.sort((a, b) =>
         parseLocalStr(a.checkIn).getTime() - parseLocalStr(b.checkIn).getTime()
       );
@@ -121,7 +127,13 @@ export function useBookingBars(
         const eEnd   = parseLocalStr(item.checkOut);
         if (eStart >= lastEnd) { valid.push(item); lastEnd = eEnd; }
       }
-      return valid;
+      dedupedByProp.set(key, valid);
+    });
+
+    // 3단계: 슬롯 버킷으로 재조립
+    const slotBuckets: CalItem[][] = Array.from({ length: MAX_SLOTS }, () => []);
+    dedupedByProp.forEach((items, _key) => {
+      items.forEach(item => slotBuckets[getSlot(item.propertyId)].push(item));
     });
 
     const msPerDay = 1000 * 60 * 60 * 24;
