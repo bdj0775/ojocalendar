@@ -129,7 +129,7 @@ const CalendarPage = () => {
   }, []);
 
   // ── 바텀시트 상태 ──────────────────────────────────────────────
-  const [snap, setSnap] = useState<SnapPoint>('hidden');
+  const [snap, setSnap] = useState<SnapState>('hidden');
   const dragStartY  = useRef<number | null>(null);
   const [dragDy, setDragDy] = useState(0);
   const outerDrag = useRef<{ y: number; x: number; dir: 'h' | 'v' | null } | null>(null);
@@ -149,8 +149,7 @@ const CalendarPage = () => {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // 가용 높이를 CELL_HEIGHT 배수로 스냅 → 마지막 행이 절반만 보이는 일 없음
-  const clipH = calAreaH > 0 ? Math.floor(calAreaH / CELL_HEIGHT) * CELL_HEIGHT : undefined;
+  // clipH: full mode → row-snap, compact mode → 가용 전체 높이(compact cal=312px이 들어가도록)
 
   // ── 달력 전환 계산 — 3-레이어 슬라이드 + 페이드 ──────────────────
   // 바 레이어(hideNumbers): 0→0.65 페이드아웃 + 슬라이드업
@@ -170,6 +169,14 @@ const CalendarPage = () => {
 
   // 숫자 레이어: calProgress 0.5 기준으로 compact 전환 (instant, no fade)
   const numCompact = calProgress >= 0.5;
+  const clipH = calAreaH > 0
+    ? (calProgress >= 0.5 ? calAreaH : Math.floor(calAreaH / CELL_HEIGHT) * CELL_HEIGHT)
+    : undefined;
+  // 숫자 레이어: phase1=풀 바와 동일 슬라이드, phase2=스위치 지점에서 0으로 안착 (바톤터치)
+  const NUM_SWITCH_OFFSET = -(Math.min(1, 0.5 / 0.65)) * SLIDE_PX;
+  const numTranslateY = !numCompact
+    ? fullTranslateY
+    : NUM_SWITCH_OFFSET * (1 - Math.min(1, (calProgress - 0.5) / 0.5));
 
   const calTransition = dragDy === 0 ? 'opacity 260ms ease, transform 260ms ease' : 'none';
 
@@ -497,7 +504,7 @@ const CalendarPage = () => {
 
   return (
     <div
-      className="relative w-full overflow-hidden flex flex-col pt-2"
+      className="relative w-full overflow-hidden overscroll-none flex flex-col pt-2"
       style={{ height: '100dvh' }}
       onTouchStart={onOuterTouchStart}
       onTouchMove={onOuterTouchMove}
@@ -579,7 +586,7 @@ const CalendarPage = () => {
       </div>
 
       {/* ── 요일 고정 헤더 ── */}
-      <div className="grid grid-cols-7 w-full border-b border-border/60 pb-1 pt-2 bg-card z-10 shrink-0 px-0">
+      <div className="grid grid-cols-7 w-full py-0.5 bg-card z-10 shrink-0 px-0">
         {DOW_LABELS[language].map((label, dow) => {
           const isRed = dow === 0;
           const isBlue = dow === 6;
@@ -592,7 +599,7 @@ const CalendarPage = () => {
       </div>
 
       {/* ── 달력 영역 — 행 경계 클립 ── */}
-      <div ref={calAreaRef} className="relative flex-1 min-h-0 overflow-hidden">
+      <div ref={calAreaRef} className="relative flex-1 min-h-0 overflow-hidden" style={{ touchAction: 'none' }}>
         <div style={{ height: clipH ?? '100%', overflow: 'hidden', position: 'relative' }}>
 
           {/* 레이어 1: 바+그리드 (숫자 없음) — 위로 슬라이드하며 페이드아웃 */}
@@ -644,11 +651,12 @@ const CalendarPage = () => {
             />
           </div>
 
-          {/* 레이어 2: 숫자만 (항상 opacity 1, 최상단 페인트) — calProgress 0.5에서 compact 전환 */}
-          {/* DOM 마지막 → 도트 레이어의 bg-card 위에 페인트되어 숫자가 항상 보임 */}
+          {/* 레이어 2: 숫자만 — phase1: 풀 바와 동일 슬라이드업, phase2: 바톤터치 후 0으로 안착 */}
           <div
             style={{
               position: 'absolute', top: 0, left: 0, right: 0,
+              transform: `translateY(${numTranslateY}px)`,
+              transition: calTransition,
               pointerEvents: 'none',
             }}
           >

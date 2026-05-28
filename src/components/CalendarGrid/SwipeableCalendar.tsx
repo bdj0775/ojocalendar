@@ -97,7 +97,7 @@ const SwipeableCalendar = ({
   return (
     <div
       ref={containerRef}
-      className="overflow-hidden w-full touch-pan-y"
+      className="overflow-hidden w-full"
     >
       <div
         style={{
