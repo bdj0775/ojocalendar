@@ -436,9 +436,19 @@ const CalendarPage = () => {
       return;
     }
 
-    // 셀에 붙여서 컴팩트 모달 표시 + 프리뷰 바 초기화
+    // 셀에 붙여서 컴팩트 모달 표시 + 프리뷰 바 즉시 표시
     const rect = e.currentTarget.getBoundingClientRect();
-    setPreviewDates({ checkIn: cell.dateStr, checkOut: addDays(cell.dateStr, 1) });
+    // 모달과 동일한 로직: 점유되지 않은 첫 번째 숙소 선택
+    const occSet = new Set<string>();
+    bookings.forEach(b => { if (b.checkIn <= cell.dateStr && b.checkOut > cell.dateStr && b.propertyId) occSet.add(b.propertyId); });
+    maintenance.forEach(m => { if (m.startDate <= cell.dateStr && m.endDate > cell.dateStr && m.propertyId) occSet.add(m.propertyId); });
+    const initProp = (properties.find(p => !occSet.has(p.id)) ?? properties[0]);
+    setPreviewDates({
+      checkIn: cell.dateStr,
+      checkOut: addDays(cell.dateStr, 1),
+      channel: 'Airbnb',
+      propertyId: initProp?.id ?? '',
+    });
     setQuickBookingAnchor({ date: cell.dateStr, rect });
   };
 

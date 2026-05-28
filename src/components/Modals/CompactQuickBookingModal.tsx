@@ -145,7 +145,7 @@ const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }
   const ciDim = new Date(ciY, ciM, 0).getDate();
   const coDim = new Date(coY, coM, 0).getDate();
 
-  useEffect(() => { onPreviewChange?.(checkIn, checkOut, channel, selectedPropertyId); }, [checkIn, checkOut, channel, selectedPropertyId, onPreviewChange]);
+  useLayoutEffect(() => { onPreviewChange?.(checkIn, checkOut, channel, selectedPropertyId); }, [checkIn, checkOut, channel, selectedPropertyId, onPreviewChange]);
   useEffect(() => {
     if (!amountCustom) syncAmount((selectedProp?.basePrice ?? 0) * nights);
   // eslint-disable-next-line react-hooks/exhaustive-deps
