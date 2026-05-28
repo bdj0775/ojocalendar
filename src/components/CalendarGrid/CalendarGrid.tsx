@@ -114,8 +114,12 @@ const CalendarGrid = ({
         !compact && !numbersOnly ? 'border-t border-border' : '',
       ].join(' ')}
       style={{
-        gridTemplateRows: `repeat(${totalRows}, ${cellH}px)`,
-        height: `${totalRows * cellH}px`,
+        gridTemplateRows: (!compact && !numbersOnly) 
+          ? `${cellH + 14}px repeat(${totalRows - 1}, ${cellH}px)` 
+          : `repeat(${totalRows}, ${cellH}px)`,
+        height: (!compact && !numbersOnly) 
+          ? `${totalRows * cellH + 14}px` 
+          : `${totalRows * cellH}px`,
       }}
     >
 
@@ -150,7 +154,7 @@ const CalendarGrid = ({
               !numbersOnly ? 'cursor-pointer transition-colors hover:bg-accent/20' : '',
               isToday && !numbersOnly ? 'bg-accent/20' : '',
             ].join(' ')}
-            style={{ height: `${cellH}px` }}
+            style={{ height: `${(!compact && !numbersOnly && index < 7) ? cellH + 14 : cellH}px` }}
             onClick={e => !numbersOnly && onDateClick(cell, e)}
           >
             {/* DOW 레이블 — 비compact 모드의 첫 행에만 */}

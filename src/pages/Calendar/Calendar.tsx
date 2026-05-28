@@ -109,8 +109,13 @@ const CalendarPage = () => {
 
   // 안정적인 콜백 참조 (모달의 useLayoutEffect dep에 들어가므로 참조 안정성 필수)
   const handlePreviewChange = useCallback(
-    (ci: string, co: string, ch: string, pid: string) =>
-      setPreviewDates({ checkIn: ci, checkOut: co, channel: ch, propertyId: pid }),
+    (ci: string, co: string, ch: string, pid: string) => {
+      setPreviewDates({ checkIn: ci, checkOut: co, channel: ch, propertyId: pid });
+      const { visiblePropertyIds, setVisiblePropertyIds } = useStore.getState();
+      if (visiblePropertyIds !== null && pid && !visiblePropertyIds.includes(pid)) {
+        setVisiblePropertyIds([...visiblePropertyIds, pid]);
+      }
+    },
     [],
   );
   const handleQuickBookingClose = useCallback(() => {
@@ -366,8 +371,8 @@ const CalendarPage = () => {
       const span   = segEnd - cur + 1;
       // 기존 useBookingBars와 동일한 topPx 계산 (slotIndex 반영)
       const topPx  = row * CELL_HEIGHT
+        + 14
         + BAR_OFFSET_Y
-        + (row === 0 ? 14 : 0)
         + slotIndex * (BAR_H + BAR_GAP);
 
       bars.push({
@@ -464,6 +469,11 @@ const CalendarPage = () => {
       if (m.startDate <= cell.dateStr && m.endDate > cell.dateStr && pid) occSet.add(pid); 
     });
     const initProp = (properties.find(p => !occSet.has(p.id)) ?? properties[0]);
+
+    if (initProp && visiblePropertyIds !== null && !visiblePropertyIds.includes(initProp.id)) {
+      setVisiblePropertyIds([...visiblePropertyIds, initProp.id]);
+    }
+
     setPreviewDates({
       checkIn: cell.dateStr,
       checkOut: addDays(cell.dateStr, 1),
