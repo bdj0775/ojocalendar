@@ -69,10 +69,15 @@ function buildCalendarGrid(year: number, month: number) {
 
 // ── 바텀시트 스냅 ─────────────────────────────────────────────────
 
-type SnapPoint = 'hidden' | 'half' | 'full';
-const SNAP_SEQ: SnapPoint[] = ['hidden', 'half', 'full'];
+const SNAP_SEQ = ['hidden', 'half', 'full'] as const;
+type SnapState = typeof SNAP_SEQ[number];
 
-function getSnapY(snap: SnapPoint, sheetH: number): number {
+const DOW_LABELS: Record<string, string[]> = {
+  en: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
+  ko: ['일', '월', '화', '수', '목', '금', '토'],
+};
+
+function getSnapY(snap: SnapState, sheetH: number): number {
   if (snap === 'hidden') return sheetH;          // 완전히 화면 밖
   if (snap === 'half')   return sheetH * 0.5;
   return 0;
@@ -371,7 +376,6 @@ const CalendarPage = () => {
       const span   = segEnd - cur + 1;
       // 기존 useBookingBars와 동일한 topPx 계산 (slotIndex 반영)
       const topPx  = row * CELL_HEIGHT
-        + 14
         + BAR_OFFSET_Y
         + slotIndex * (BAR_H + BAR_GAP);
 
@@ -572,6 +576,19 @@ const CalendarPage = () => {
             );
           })}
         </div>
+      </div>
+
+      {/* ── 요일 고정 헤더 ── */}
+      <div className="grid grid-cols-7 w-full border-b border-border/60 pb-1 pt-2 bg-card z-10 shrink-0 px-0">
+        {DOW_LABELS[language].map((label, dow) => {
+          const isRed = dow === 0;
+          const isBlue = dow === 6;
+          return (
+            <div key={dow} className={`text-center text-[10px] uppercase font-semibold ${isRed ? 'text-calendar-sun/80' : isBlue ? 'text-calendar-sat/80' : 'text-muted-foreground/60'}`}>
+              {label}
+            </div>
+          );
+        })}
       </div>
 
       {/* ── 달력 영역 — 행 경계 클립 ── */}

@@ -171,7 +171,6 @@ export function useBookingBars(
 
           // 슬롯 0이 최상단, 슬롯 1·2가 아래로 쌓임
           const topPx = row * CELL_HEIGHT
-            + 14                            // CalendarGrid 첫 행 높이 14px 증가분 누적 반영
             + BAR_OFFSET_Y
             + slotIndex * (BAR_H + BAR_GAP);
 

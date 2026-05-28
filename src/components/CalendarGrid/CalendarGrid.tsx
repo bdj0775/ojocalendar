@@ -114,12 +114,8 @@ const CalendarGrid = ({
         !compact && !numbersOnly ? 'border-t border-border' : '',
       ].join(' ')}
       style={{
-        gridTemplateRows: (!compact) 
-          ? `${cellH + 14}px repeat(${totalRows - 1}, ${cellH}px)` 
-          : `repeat(${totalRows}, ${cellH}px)`,
-        height: (!compact) 
-          ? `${totalRows * cellH + 14}px` 
-          : `${totalRows * cellH}px`,
+        gridTemplateRows: `repeat(${totalRows}, ${cellH}px)`,
+        height: `${totalRows * cellH}px`,
       }}
     >
 
@@ -154,18 +150,11 @@ const CalendarGrid = ({
               !numbersOnly ? 'cursor-pointer transition-colors hover:bg-accent/20' : '',
               isToday && !numbersOnly ? 'bg-accent/20' : '',
             ].join(' ')}
-            style={{ height: `${(!compact && index < 7) ? cellH + 14 : cellH}px` }}
+            style={{ height: `${cellH}px` }}
             onClick={e => !numbersOnly && onDateClick(cell, e)}
           >
-            {/* DOW 레이블 — 비compact 모드의 첫 행에만 */}
-            {!hideNumbers && !compact && index < 7 && (
-              <div className={`absolute top-1 left-0 right-0 text-center text-[9px] uppercase font-semibold ${isRed ? 'text-calendar-sun/80' : isBlue ? 'text-calendar-sat/80' : 'text-muted-foreground/60'}`}>
-                {dowLabels[dow]}
-              </div>
-            )}
-
             {/* 날짜 숫자 */}
-            <div className={`flex items-center gap-1 ${!compact && !numbersOnly && index < 7 ? 'mt-3.5' : ''}`}>
+            <div className={`flex items-center gap-1`}>
               {!hideNumbers && (
                 <span className={numCls}>{cell.day}</span>
               )}
