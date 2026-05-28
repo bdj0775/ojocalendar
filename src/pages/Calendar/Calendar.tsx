@@ -1,4 +1,5 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { CELL_HEIGHT } from '../../components/CalendarGrid/CalendarGrid';
 import { Plus, ChevronLeft, ChevronRight, Menu, ChevronDown } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
 import { ICON_SIZES } from '../../lib/iconSizes';
@@ -7,15 +8,24 @@ import { useStore } from '../../store/useStore';
 import NotificationBell from '../../components/Notifications/NotificationBell';
 import { useTranslation } from '../../hooks/useTranslation';
 import BookingEditModal from '../../components/Modals/BookingEditModal';
-import QuickBookingModal from '../../components/Modals/QuickBookingModal';
+import CompactQuickBookingModal from '../../components/Modals/CompactQuickBookingModal';
 import MaintenanceModal from '../../components/Modals/MaintenanceModal';
 import YearMonthPickerModal from '../../components/Modals/YearMonthPickerModal';
 import SwipeableCalendar from '../../components/CalendarGrid/SwipeableCalendar';
-import { useBookingBars, PROP_COLORS } from '../../components/CalendarGrid/useBookingBars';
+import { useBookingBars, PROP_COLORS, BAR_OFFSET_Y, type BookingBar } from '../../components/CalendarGrid/useBookingBars';
 import { Body } from '../../components/ui/Typography';
 import UpcomingBookingCard from '../../components/Calendar/UpcomingBookingCard';
 
 // ── 순수 헬퍼 ────────────────────────────────────────────────────
+
+const addDays = (ds: string, n: number) => {
+  const [y, m, d] = ds.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + n);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+
+const diffDays = (from: string, to: string) =>
+  Math.max(0, Math.round((new Date(to + 'T00:00:00').getTime() - new Date(from + 'T00:00:00').getTime()) / 86400000));
 
 function offsetMonth(year: number, month: number, delta: number): [number, number] {
   let m = month + delta;
@@ -82,27 +92,60 @@ const CalendarPage = () => {
 
   const { open: openSidebar } = useSidebar();
 
-  const [quickBookingDate, setQuickBookingDate] = useState<string | null>(null);
+  const [quickBookingAnchor, setQuickBookingAnchor] = useState<{ date: string; rect: DOMRect } | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // ── 프리뷰 바: 모달이 열린 동안 입력 중인 날짜를 달력에 미리 표시 ──────
+  const [previewDates, setPreviewDates] = useState<{ checkIn: string; checkOut: string } | null>(null);
 
   // ── 바텀시트 상태 ──────────────────────────────────────────────
   const [snap, setSnap] = useState<SnapPoint>('hidden');
   const dragStartY  = useRef<number | null>(null);
   const [dragDy, setDragDy] = useState(0);
-  // 화면 전체 터치로 시트 열기 (hidden 상태일 때만)
   const outerDrag = useRef<{ y: number; x: number; dir: 'h' | 'v' | null } | null>(null);
 
-  const sheetH = () => window.innerHeight - 56; // 56 = 헤더 근사값
+  const sheetH = () => window.innerHeight - 56;
 
   const baseY    = getSnapY(snap, sheetH());
   const clampedY = Math.max(0, Math.min(sheetH(), baseY + dragDy));
 
-  // 달력 축소 계산
-  const sheetVisible  = Math.max(0, sheetH() - clampedY);
-  const calProgress   = Math.min(1, sheetVisible / (sheetH() * 0.5));
-  const calScale      = 1 - calProgress * 0.4;   // 1.0 → 0.6
-  const dotMode       = calProgress > 0.5;
-  const calTransition = dragDy === 0 ? 'transform 380ms cubic-bezier(0.32,0.72,0,1)' : 'none';
+  // ── 달력 영역 높이 측정 → 행 경계에서 정확히 클립 ──────────────
+  const calAreaRef = useRef<HTMLDivElement>(null);
+  const [calAreaH, setCalAreaH] = useState(0);
+  useEffect(() => {
+    const el = calAreaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setCalAreaH(entry.contentRect.height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // 가용 높이를 CELL_HEIGHT 배수로 스냅 → 마지막 행이 절반만 보이는 일 없음
+  const clipH = calAreaH > 0 ? Math.floor(calAreaH / CELL_HEIGHT) * CELL_HEIGHT : undefined;
+
+  // ── 달력 전환 계산 — 3-레이어 슬라이드 + 페이드 ──────────────────
+  // 바 레이어(hideNumbers): 0→0.65 페이드아웃 + 슬라이드업
+  // 숫자 레이어(numbersOnly): 항상 opacity 1, calProgress 0.5에서 compact 전환
+  // 도트 레이어(hideNumbers+compact): 0.35→1 페이드인 + 슬라이드업 (바와 0.35-0.65 구간 중첩)
+  const sheetVisible = Math.max(0, sheetH() - clampedY);
+  const calProgress  = Math.min(1, sheetVisible / (sheetH() * 0.5));
+  const SLIDE_PX = 26;
+
+  const fullPhase       = Math.max(0, Math.min(1, calProgress / 0.65));
+  const fullOpacity     = 1 - fullPhase;
+  const fullTranslateY  = -fullPhase * SLIDE_PX;
+
+  const compactPhase      = Math.max(0, Math.min(1, (calProgress - 0.35) / 0.65));
+  const compactOpacity    = compactPhase;
+  const compactTranslateY = (1 - compactPhase) * SLIDE_PX;
+
+  // 숫자 레이어: calProgress 0.5 기준으로 compact 전환 (instant, no fade)
+  const numCompact = calProgress >= 0.5;
+
+  const calTransition = dragDy === 0 ? 'opacity 260ms ease, transform 260ms ease' : 'none';
 
   // 시트 자체 드래그 (시트가 보일 때)
   const onTouchStart = (e: React.TouchEvent) => {
@@ -123,9 +166,8 @@ const CalendarPage = () => {
     else if (dy > 0 && i > 0) setSnap(SNAP_SEQ[i - 1]);
   };
 
-  // 화면 어디서든 위로 스와이프 → 시트 열기 (hidden 상태일 때만)
+  // 달력 영역 터치: 위로 스와이프 → 시트 열기, 아래로 스와이프 → 시트 닫기
   const onOuterTouchStart = (e: React.TouchEvent) => {
-    if (snap !== 'hidden') return;
     outerDrag.current = { y: e.touches[0].clientY, x: e.touches[0].clientX, dir: null };
   };
   const onOuterTouchMove = (e: React.TouchEvent) => {
@@ -137,8 +179,9 @@ const CalendarPage = () => {
       if (Math.abs(dy) < 6 && dx < 6) return;
       s.dir = Math.abs(dy) >= dx ? 'v' : 'h';
     }
-    if (s.dir !== 'v' || dy > 0) return; // 위로만
-    setDragDy(dy);
+    if (s.dir !== 'v') return;
+    if (snap === 'hidden' && dy < 0) setDragDy(dy);       // 위로 → 열기 예비 드래그
+    else if (snap !== 'hidden' && dy > 0) setDragDy(dy);  // 아래로 → 닫기 예비 드래그
   };
   const onOuterTouchEnd = (e: React.TouchEvent) => {
     if (!outerDrag.current) return;
@@ -147,7 +190,8 @@ const CalendarPage = () => {
     if (s.dir !== 'v') { setDragDy(0); return; }
     const finalDy = e.changedTouches[0].clientY - s.y;
     setDragDy(0);
-    if (finalDy < -50) setSnap('half');
+    if (snap === 'hidden' && finalDy < -50) setSnap('half');
+    else if (snap !== 'hidden' && finalDy > 50) setSnap('hidden');
   };
 
   // ── 숙소 정렬 순서 ─────────────────────────────────────────────
@@ -253,22 +297,97 @@ const CalendarPage = () => {
   const currentBars = useBookingBars(visibleBookings, visibleMaintenance, currentGrid, visibleProperties);
   const nextBars    = useBookingBars(visibleBookings, visibleMaintenance, nextGrid,    visibleProperties);
 
+  // ── 프리뷰 바 계산 — 현재 월 그리드에만 적용 ────────────────────────────
+  const previewBars = useMemo<BookingBar[]>(() => {
+    if (!previewDates || !currentGrid.length) return [];
+    const { checkIn: ci, checkOut: co } = previewDates;
+    if (ci >= co) return [];
+
+    // checkOut은 exclusive → 마지막 포함 날짜 = checkOut - 1
+    const lastDay = addDays(co, -1);
+
+    // findIndex로 정확한 그리드 인덱스 탐색
+    let startIdx = currentGrid.findIndex(c => c.dateStr === ci);
+    let endIdx   = currentGrid.findIndex(c => c.dateStr === lastDay);
+
+    // 범위 밖이면 그리드 끝/시작으로 클램프
+    if (startIdx < 0) startIdx = 0;
+    if (endIdx   < 0) endIdx   = currentGrid.length - 1;
+    if (endIdx < startIdx) return [];
+
+    const nights = diffDays(ci, co);
+    const bars: BookingBar[] = [];
+    let cur = startIdx;
+    while (cur <= endIdx) {
+      const row    = Math.floor(cur / 7);
+      const segEnd = Math.min(endIdx, (row + 1) * 7 - 1);
+      const col    = cur % 7;
+      const span   = segEnd - cur + 1;
+      const topPx  = row * CELL_HEIGHT + BAR_OFFSET_Y + (row === 0 ? 14 : 0);
+
+      bars.push({
+        id: '__preview__', type: 'booking',
+        guestName: '', channel: undefined, nationality: undefined,
+        guests: 0, nights, span,
+        channelClass: 'airbnb', propColor: '#6366F1',
+        left: `calc(${(col / 7) * 100}% + 2px)`,
+        width: `calc(${(span / 7) * 100}% - 4px)`,
+        top: `${topPx}px`,
+        rowIndex: row, colStart: col,
+        isFirst: cur === startIdx, isLast: segEnd === endIdx,
+        isPast: false, isPreview: true,
+      });
+      cur = segEnd + 1;
+    }
+    return bars;
+  }, [previewDates, currentGrid]);
+
   const panels = useMemo(() => ({
     prev:    { grid: prevGrid,    bars: prevBars    },
-    current: { grid: currentGrid, bars: currentBars },
+    current: { grid: currentGrid, bars: [...currentBars, ...previewBars] },
     next:    { grid: nextGrid,    bars: nextBars    },
-  }), [prevGrid, currentGrid, nextGrid, prevBars, currentBars, nextBars]);
+  }), [prevGrid, currentGrid, nextGrid, prevBars, currentBars, nextBars, previewBars]);
 
   const upcomingStays = useMemo(() =>
     visibleBookings
-      .filter(b => new Date(b.checkIn) >= new Date(todayStr))
-      .sort((a, b) => new Date(a.checkIn).getTime() - new Date(b.checkIn).getTime()),
+      .filter(b => b.checkOut > todayStr)   // 체크아웃이 오늘 이후인 예약 (체류 중 포함)
+      .sort((a, b) => new Date(a.checkIn + 'T12:00:00').getTime() - new Date(b.checkIn + 'T12:00:00').getTime()),
     [visibleBookings, todayStr],
   );
 
-  const handleDateClick = (cell: { isCurrentMonth: boolean; dateStr: string }) => {
+  const handleDateClick = (
+    cell: { isCurrentMonth: boolean; dateStr: string },
+    e: React.MouseEvent<HTMLDivElement>,
+  ) => {
     if (!cell.isCurrentMonth || !cell.dateStr) return;
-    setQuickBookingDate(cell.dateStr);
+
+    // 바텀시트가 열린 상태: 선택 표시 + 해당 날짜 카드로 스무스 스크롤
+    if (snap !== 'hidden') {
+      setSelectedDateStr(cell.dateStr);
+      const match = upcomingStays.find(s =>
+        s.checkIn === cell.dateStr ||
+        (s.checkIn <= cell.dateStr && s.checkOut > cell.dateStr)
+      );
+      if (match) {
+        const stayId = String(match.id);
+        requestAnimationFrame(() => {
+          const el = cardRefs.current.get(stayId);
+          const container = scrollContainerRef.current;
+          if (!el || !container) return;
+          const scrollTop = container.scrollTop
+            + el.getBoundingClientRect().top
+            - container.getBoundingClientRect().top
+            - 12;
+          container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' });
+        });
+      }
+      return;
+    }
+
+    // 셀에 붙여서 컴팩트 모달 표시 + 프리뷰 바 초기화
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPreviewDates({ checkIn: cell.dateStr, checkOut: addDays(cell.dateStr, 1) });
+    setQuickBookingAnchor({ date: cell.dateStr, rect });
   };
 
   const handleBarClick = (e: React.MouseEvent, bar: { type: string; id: string | number }) => {
@@ -281,7 +400,7 @@ const CalendarPage = () => {
 
   return (
     <div
-      className="relative w-full overflow-hidden pt-2"
+      className="relative w-full overflow-hidden flex flex-col pt-2"
       style={{ height: '100dvh' }}
       onTouchStart={onOuterTouchStart}
       onTouchMove={onOuterTouchMove}
@@ -289,7 +408,7 @@ const CalendarPage = () => {
     >
 
       {/* ── 헤더 ── */}
-      <div className="px-3 mb-2">
+      <div className="px-3 mb-2 flex-shrink-0">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-2">
             <button className="p-1 -ml-1 text-foreground lg:hidden" onClick={openSidebar}>
@@ -362,38 +481,96 @@ const CalendarPage = () => {
         </div>
       </div>
 
-      {/* ── 달력 (바텀시트 올라올수록 scaleY 축소) ── */}
-      <div
-        style={{
-          transform: `scaleY(${calScale})`,
-          transformOrigin: 'top center',
-          transition: calTransition,
-        }}
-      >
-        <SwipeableCalendar
-          prev={panels.prev}
-          current={panels.current}
-          next={panels.next}
-          todayStr={todayStr}
-          onDateClick={handleDateClick}
-          onBarClick={handleBarClick}
-          onPrev={prevMonth}
-          onNext={nextMonth}
-          eventColorMode={settings?.eventColorMode ?? 'channel'}
-          compact={dotMode}
-        />
+      {/* ── 달력 영역 — 행 경계 클립 ── */}
+      <div ref={calAreaRef} className="relative flex-1 min-h-0 overflow-hidden">
+        <div style={{ height: clipH ?? '100%', overflow: 'hidden', position: 'relative' }}>
+
+          {/* 레이어 1: 바+그리드 (숫자 없음) — 위로 슬라이드하며 페이드아웃 */}
+          <div
+            style={{
+              opacity: fullOpacity,
+              transform: `translateY(${fullTranslateY}px)`,
+              transition: calTransition,
+              pointerEvents: fullOpacity < 0.05 ? 'none' : 'auto',
+            }}
+          >
+            <SwipeableCalendar
+              prev={panels.prev}
+              current={panels.current}
+              next={panels.next}
+              todayStr={todayStr}
+              onDateClick={handleDateClick}
+              onBarClick={handleBarClick}
+              onPrev={prevMonth}
+              onNext={nextMonth}
+              eventColorMode={settings?.eventColorMode ?? 'channel'}
+              compact={false}
+              hideNumbers={true}
+            />
+          </div>
+
+          {/* 레이어 3: 도트만 (숫자 없음) — 아래에서 슬라이드되며 페이드인 */}
+          <div
+            style={{
+              position: 'absolute', top: 0, left: 0, right: 0,
+              opacity: compactOpacity,
+              transform: `translateY(${compactTranslateY}px)`,
+              transition: calTransition,
+              pointerEvents: compactOpacity < 0.05 ? 'none' : 'auto',
+            }}
+          >
+            <SwipeableCalendar
+              prev={panels.prev}
+              current={panels.current}
+              next={panels.next}
+              todayStr={todayStr}
+              onDateClick={handleDateClick}
+              onBarClick={() => {}}
+              onPrev={prevMonth}
+              onNext={nextMonth}
+              eventColorMode={settings?.eventColorMode ?? 'channel'}
+              compact={true}
+              hideNumbers={true}
+            />
+          </div>
+
+          {/* 레이어 2: 숫자만 (항상 opacity 1, 최상단 페인트) — calProgress 0.5에서 compact 전환 */}
+          {/* DOM 마지막 → 도트 레이어의 bg-card 위에 페인트되어 숫자가 항상 보임 */}
+          <div
+            style={{
+              position: 'absolute', top: 0, left: 0, right: 0,
+              pointerEvents: 'none',
+            }}
+          >
+            <SwipeableCalendar
+              prev={panels.prev}
+              current={panels.current}
+              next={panels.next}
+              todayStr={todayStr}
+              onDateClick={handleDateClick}
+              onBarClick={() => {}}
+              onPrev={prevMonth}
+              onNext={nextMonth}
+              eventColorMode={settings?.eventColorMode ?? 'channel'}
+              compact={numCompact}
+              numbersOnly={true}
+              selectedDateStr={selectedDateStr ?? undefined}
+            />
+          </div>
+
+        </div>
       </div>
 
       {/* ── 바텀시트 ── */}
       <div
-        className="absolute inset-x-0 bottom-0 bg-card rounded-t-3xl shadow-[0_-4px_24px_rgba(0,0,0,0.10)] flex flex-col"
+        className="absolute inset-x-0 bottom-0 bg-card shadow-[0_-1px_4px_rgba(0,0,0,0.06)] flex flex-col"
         style={{
           height: sheetH(),
           transform: `translateY(${clampedY}px)`,
           transition: dragDy === 0 ? 'transform 380ms cubic-bezier(0.32,0.72,0,1)' : 'none',
           zIndex: 20,
         }}
-        onTouchStart={onTouchStart}
+        onTouchStart={(e) => { e.stopPropagation(); onTouchStart(e); }}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
@@ -413,7 +590,7 @@ const CalendarPage = () => {
         </div>
 
         {/* 카드 목록 */}
-        <div className="flex-1 overflow-y-auto px-5 pb-24">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-5 pb-24">
           {upcomingStays.length === 0 && (
             <Body className="text-center py-8 text-muted-foreground">
               {t('calendar.noUpcomingStays')}
@@ -421,18 +598,22 @@ const CalendarPage = () => {
           )}
           {upcomingStays.map(stay => {
             const pIdx = properties.findIndex(p => p.id === stay.propertyId);
-            const propColor = pIdx >= 0 
-              ? (properties[pIdx].color || PROP_COLORS[pIdx % PROP_COLORS.length]) 
+            const propColor = pIdx >= 0
+              ? (properties[pIdx].color || PROP_COLORS[pIdx % PROP_COLORS.length])
               : PROP_COLORS[0];
-              
+
             return (
-              <UpcomingBookingCard
+              <div
                 key={stay.id}
-                booking={stay}
-                propColor={propColor}
-                propName={pIdx >= 0 ? properties[pIdx].name : undefined}
-                onClick={() => openBookingModal(stay.id)}
-              />
+                ref={el => { if (el) cardRefs.current.set(String(stay.id), el); else cardRefs.current.delete(String(stay.id)); }}
+              >
+                <UpcomingBookingCard
+                  booking={stay}
+                  propColor={propColor}
+                  propName={pIdx >= 0 ? properties[pIdx].name : undefined}
+                  onClick={() => openBookingModal(stay.id)}
+                />
+              </div>
             );
           })}
         </div>
@@ -449,8 +630,13 @@ const CalendarPage = () => {
 
       <MaintenanceModal />
       <BookingEditModal />
-      {quickBookingDate && (
-        <QuickBookingModal date={quickBookingDate} onClose={() => setQuickBookingDate(null)} />
+      {quickBookingAnchor && (
+        <CompactQuickBookingModal
+          date={quickBookingAnchor.date}
+          anchorRect={quickBookingAnchor.rect}
+          onDatesChange={(ci, co) => setPreviewDates({ checkIn: ci, checkOut: co })}
+          onClose={() => { setQuickBookingAnchor(null); setPreviewDates(null); }}
+        />
       )}
       {datePickerOpen && (
         <YearMonthPickerModal

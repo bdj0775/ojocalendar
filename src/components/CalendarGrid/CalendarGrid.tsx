@@ -19,18 +19,26 @@ const BAR_CHANNEL_CLS: Record<string, string> = {
 };
 
 // JS 상수 — CSS 토큰 (layout.css) 과 동기화 유지
-const CELL_HEIGHT = 100; // --calendar-cell-h
+export const CELL_HEIGHT   = 100; // --calendar-cell-h
+export const COMPACT_CELL_H = 52; // compact 모드 셀 높이 (scaleY 없이 별도 레이어)
 
-// 좌우 동일한 4px 라운딩 — 모든 세그먼트에 균일 적용
-const getBarCls = (ch: string, isPast: boolean) =>
-  [
-    'absolute flex items-center overflow-hidden rounded-[4px]',
-    'z-raise cursor-pointer shadow-sm',
-    'transition-all hover:brightness-95 hover:-translate-y-px hover:z-fab',
-    'h-[var(--calendar-bar-h)] px-1',
-    BAR_CHANNEL_CLS[ch] ?? BAR_CHANNEL_CLS.airbnb,
-    isPast ? 'opacity-50' : '',
-  ].join(' ');
+const getBarCls = (ch: string, isPast: boolean, isPreview?: boolean) =>
+  isPreview
+    ? [
+        'absolute flex items-center overflow-hidden rounded-[4px]',
+        'z-raise pointer-events-none',
+        'h-[var(--calendar-bar-h)] px-1',
+        'border border-dashed border-primary/50 bg-primary/10 text-primary',
+        'animate-fade-in',
+      ].join(' ')
+    : [
+        'absolute flex items-center overflow-hidden rounded-[4px]',
+        'z-raise cursor-pointer shadow-sm',
+        'transition-all hover:brightness-95 hover:-translate-y-px hover:z-fab',
+        'h-[var(--calendar-bar-h)] px-1',
+        BAR_CHANNEL_CLS[ch] ?? BAR_CHANNEL_CLS.airbnb,
+        isPast ? 'opacity-50' : '',
+      ].join(' ');
 
 const CHANNEL_DOT_COLOR: Record<string, string> = {
   airbnb:      '#FF5A5F',
@@ -48,13 +56,16 @@ export interface GridCell {
 }
 
 interface CalendarGridProps {
-  calendarGrid:    GridCell[];
-  bookingBars:     BookingBar[];
-  todayStr:        string;
-  onDateClick:     (cell: GridCell) => void;
-  onBarClick:      (e: React.MouseEvent, bar: BookingBar) => void;
-  eventColorMode?: 'channel' | 'property';
-  compact?:        boolean;
+  calendarGrid:     GridCell[];
+  bookingBars:      BookingBar[];
+  todayStr:         string;
+  onDateClick:      (cell: GridCell, e: React.MouseEvent<HTMLDivElement>) => void;
+  onBarClick:       (e: React.MouseEvent, bar: BookingBar) => void;
+  eventColorMode?:  'channel' | 'property';
+  compact?:         boolean;
+  hideNumbers?:     boolean; // 숫자·요일 레이블 숨김 (바/그리드 레이어용)
+  numbersOnly?:     boolean; // 숫자·요일만 렌더 (투명 bg, 바/도트 없음, 항상 100% opacity)
+  selectedDateStr?: string;  // compact numbersOnly 레이어에서 연한 primary 원 표시
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -66,15 +77,19 @@ const CalendarGrid = ({
   onBarClick,
   eventColorMode = 'channel',
   compact = false,
+  hideNumbers = false,
+  numbersOnly = false,
+  selectedDateStr,
 }: CalendarGridProps) => {
   const { language } = useTranslation();
   const dowLabels = DOW_LABELS[language] ?? DOW_LABELS.en;
   const totalRows = Math.ceil(calendarGrid.length / 7);
   const ko = language === 'ko';
+  const cellH = compact ? COMPACT_CELL_H : CELL_HEIGHT;
 
-  // compact 모드: 셀별 dot 색상 맵
+  // compact 모드: 셀별 dot 색상 맵 (numbersOnly 레이어에는 불필요)
   const cellDotMap = useMemo(() => {
-    if (!compact) return null;
+    if (!compact || numbersOnly) return null;
     const map = new Map<number, string[]>();
     bookingBars.forEach(bar => {
       for (let c = 0; c < bar.span; c++) {
@@ -89,14 +104,18 @@ const CalendarGrid = ({
       }
     });
     return map;
-  }, [compact, bookingBars, calendarGrid.length, eventColorMode]);
+  }, [compact, numbersOnly, bookingBars, calendarGrid.length, eventColorMode]);
 
   return (
     <div
-      className="grid grid-cols-7 relative border-t border-border bg-card"
+      className={[
+        'grid grid-cols-7 relative',
+        numbersOnly ? 'bg-transparent pointer-events-none' : 'bg-card',
+        !compact && !numbersOnly ? 'border-t border-border' : '',
+      ].join(' ')}
       style={{
-        gridTemplateRows: `repeat(${totalRows}, ${CELL_HEIGHT}px)`,
-        height: `${totalRows * CELL_HEIGHT}px`,
+        gridTemplateRows: `repeat(${totalRows}, ${cellH}px)`,
+        height: `${totalRows * cellH}px`,
       }}
     >
 
@@ -108,8 +127,12 @@ const CalendarGrid = ({
         const isRed    = dow === 0 || !!holiName;
         const isBlue   = dow === 6 && !holiName;
 
+        const isSelected = numbersOnly && compact && !!selectedDateStr && cell.dateStr === selectedDateStr;
+
         const numCls = isToday
           ? 'bg-primary text-primary-foreground font-bold w-5 h-5 text-[11px] inline-flex items-center justify-center rounded-full -mt-0.5 -ml-1'
+          : isSelected
+          ? 'bg-primary/20 text-primary font-semibold w-5 h-5 text-[11px] inline-flex items-center justify-center rounded-full -mt-0.5 -ml-1'
           : [
               'text-[11px] font-medium inline-block',
               isRed  ? 'text-calendar-sun' : isBlue ? 'text-calendar-sat' : 'text-muted-foreground',
@@ -120,35 +143,43 @@ const CalendarGrid = ({
           <div
             key={index}
             className={[
-              'h-[var(--calendar-cell-h)] p-1.5 box-border relative',
-              dow < 6 ? 'border-r' : '',
-              'border-b border-border/60',
-              'cursor-pointer transition-colors hover:bg-accent/20',
-              isToday ? 'bg-accent/20' : '',
+              'p-1.5 box-border',
+              (compact && !numbersOnly) ? 'flex flex-col' : 'relative',
+              !compact && !numbersOnly && dow < 6 ? 'border-r' : '',
+              !compact && !numbersOnly ? 'border-b border-border/60' : '',
+              !numbersOnly ? 'cursor-pointer transition-colors hover:bg-accent/20' : '',
+              isToday && !numbersOnly ? 'bg-accent/20' : '',
             ].join(' ')}
-            onClick={() => onDateClick(cell)}
+            style={{ height: `${cellH}px` }}
+            onClick={e => !numbersOnly && onDateClick(cell, e)}
           >
-            {index < 7 && (
+            {/* DOW 레이블 — 비compact 모드의 첫 행에만 */}
+            {!hideNumbers && !compact && index < 7 && (
               <div className={`absolute top-1 left-0 right-0 text-center text-[9px] uppercase font-semibold ${isRed ? 'text-calendar-sun/80' : isBlue ? 'text-calendar-sat/80' : 'text-muted-foreground/60'}`}>
                 {dowLabels[dow]}
               </div>
             )}
-            <div className={`flex items-center gap-1 ${index < 7 ? 'mt-3.5' : ''}`}>
-              <span className={numCls}>{cell.day}</span>
-              {!compact && holiName && cell.isCurrentMonth && (
+
+            {/* 날짜 숫자 */}
+            <div className={`flex items-center gap-1 ${!compact && !numbersOnly && index < 7 ? 'mt-3.5' : ''}`}>
+              {!hideNumbers && (
+                <span className={numCls}>{cell.day}</span>
+              )}
+              {!compact && !hideNumbers && !numbersOnly && holiName && cell.isCurrentMonth && (
                 <span className="text-[9px] leading-none font-semibold text-calendar-sun opacity-85 whitespace-nowrap overflow-hidden text-ellipsis">
                   {holiName}
                 </span>
               )}
             </div>
-            {/* compact dot 표시 */}
-            {compact && cellDotMap?.get(index) && (
-              <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-[3px]">
+
+            {/* compact dot — 숫자 아래 왼쪽 정렬 */}
+            {compact && !numbersOnly && cellDotMap?.get(index) && (
+              <div className="flex-1 flex items-center gap-[3px]">
                 {cellDotMap.get(index)!.map((color, di) => (
                   <span
                     key={di}
                     className="rounded-full flex-shrink-0"
-                    style={{ width: 4, height: 4, background: color }}
+                    style={{ width: 5, height: 5, background: color }}
                   />
                 ))}
               </div>
@@ -157,18 +188,17 @@ const CalendarGrid = ({
         );
       })}
 
-      {/* ── 예약 바 (compact 모드에서는 숨김) ── */}
-      {!compact && bookingBars.map((bar, i) => (
+      {/* ── 예약 바 (compact·numbersOnly 모드에서는 숨김) ── */}
+      {!compact && !numbersOnly && bookingBars.map((bar, i) => (
         <div
           key={`${bar.id}-${i}`}
-          className={getBarCls(bar.channelClass, bar.isPast)}
+          className={getBarCls(bar.channelClass, bar.isPast, bar.isPreview)}
           style={{
             top: bar.top, left: bar.left, width: bar.width,
-            ...(eventColorMode === 'property' && { backgroundColor: bar.propColor }),
+            ...(!bar.isPreview && eventColorMode === 'property' && { backgroundColor: bar.propColor }),
           }}
-          onClick={e => onBarClick(e, bar)}
+          onClick={bar.isPreview ? undefined : e => onBarClick(e, bar)}
         >
-          {/* items-baseline 으로 서로 다른 폰트 크기의 베이스라인 통일 */}
           <div className="flex items-baseline w-full overflow-hidden min-w-0">
             <span className="text-[9px] font-medium truncate leading-none min-w-0 shrink">
               {bar.guestName}

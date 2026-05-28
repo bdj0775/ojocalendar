@@ -24,6 +24,7 @@ export interface BookingBar {
   isFirst: boolean;
   isLast: boolean;
   isPast: boolean;
+  isPreview?: boolean;
 }
 
 interface CalItem {
@@ -59,7 +60,7 @@ interface GridCell {
 
 // JS 상수 — CSS 토큰 (layout.css) 과 동기화 유지
 const CELL_HEIGHT  = 100; // --calendar-cell-h
-const BAR_OFFSET_Y =  26; // --calendar-bar-offset
+export const BAR_OFFSET_Y =  26; // --calendar-bar-offset
 const BAR_H        =  22; // --calendar-bar-h
 const BAR_GAP      =   2; // 슬롯 간 간격
 

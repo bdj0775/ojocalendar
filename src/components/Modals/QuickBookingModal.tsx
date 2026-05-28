@@ -267,7 +267,6 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
 
           <div className="flex items-center gap-3">
             <input
-              autoFocus
               type="text"
               placeholder="예약자명"
               value={guestName}

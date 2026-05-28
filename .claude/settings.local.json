@@ -4,7 +4,9 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(git commit -m 'docs: B2B SaaS 배포 로드맵 작성 \\(Phase 1~4 체크리스트\\) *)"
+      "Bash(git commit -m 'docs: B2B SaaS 배포 로드맵 작성 \\(Phase 1~4 체크리스트\\) *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)"
     ]
   }
 }

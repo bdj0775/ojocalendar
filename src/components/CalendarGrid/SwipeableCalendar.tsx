@@ -15,12 +15,15 @@ interface Props {
   current: MonthPanel;
   next:    MonthPanel;
   todayStr:        string;
-  onDateClick:     (cell: GridCell) => void;
+  onDateClick:     (cell: GridCell, e: React.MouseEvent<HTMLDivElement>) => void;
   onBarClick:      (e: React.MouseEvent, bar: BookingBar) => void;
   onPrev: () => void;
   onNext: () => void;
-  eventColorMode?: 'channel' | 'property';
-  compact?:        boolean;
+  eventColorMode?:  'channel' | 'property';
+  compact?:         boolean;
+  hideNumbers?:     boolean;
+  numbersOnly?:     boolean;
+  selectedDateStr?: string;
 }
 
 const SwipeableCalendar = ({
@@ -29,6 +32,9 @@ const SwipeableCalendar = ({
   onPrev, onNext,
   eventColorMode = 'channel',
   compact = false,
+  hideNumbers = false,
+  numbersOnly = false,
+  selectedDateStr,
 }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragX, setDragX]       = useState(0);
@@ -38,12 +44,10 @@ const SwipeableCalendar = ({
   const startY   = useRef<number | null>(null);
   const dirLocked = useRef<'h' | 'v' | null>(null);
 
-  // targetX: 드래그 최종 목표 offset, done: 전환 후 호출될 콜백
   const settle = useCallback((targetX: number, done?: () => void) => {
     setAnimating(true);
     setDragX(targetX);
     setTimeout(() => {
-      // done()과 dragX 리셋을 같은 tick에 → React 18 auto-batch 덕에 단일 리렌더
       setDragX(0);
       setAnimating(false);
       done?.();
@@ -51,7 +55,7 @@ const SwipeableCalendar = ({
   }, []);
 
   const onTouchStart = (e: React.TouchEvent) => {
-    if (animating) return;
+    if (animating || numbersOnly) return;
     startX.current  = e.touches[0].clientX;
     startY.current  = e.touches[0].clientY;
     dirLocked.current = null;
@@ -62,7 +66,6 @@ const SwipeableCalendar = ({
     const dx = e.touches[0].clientX - startX.current;
     const dy = e.touches[0].clientY - (startY.current ?? 0);
 
-    // 방향 판별: 수평 vs 수직
     if (dirLocked.current === null) {
       if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
       dirLocked.current = Math.abs(dx) >= Math.abs(dy) * 1.1 ? 'h' : 'v';
@@ -81,11 +84,11 @@ const SwipeableCalendar = ({
 
     const w = containerRef.current?.offsetWidth ?? window.innerWidth;
     if (dragX < -SWIPE_THRESHOLD) {
-      settle(-w, onNext);   // 왼쪽 드래그 → 다음 달
+      settle(-w, onNext);
     } else if (dragX > SWIPE_THRESHOLD) {
-      settle(w, onPrev);    // 오른쪽 드래그 → 이전 달
+      settle(w, onPrev);
     } else {
-      settle(0);             // 임계값 미달 → 제자리 복귀
+      settle(0);
     }
   };
 
@@ -100,7 +103,6 @@ const SwipeableCalendar = ({
         style={{
           display:   'flex',
           width:     '300%',
-          // 트랙 기준 -33.333% = 컨테이너 1칸 왼쪽 → 현재 달 패널이 화면에 표시됨
           transform: `translateX(calc(-33.333% + ${dragX}px))`,
           transition: animating
             ? 'transform 320ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
@@ -121,6 +123,9 @@ const SwipeableCalendar = ({
               onBarClick={onBarClick}
               eventColorMode={eventColorMode}
               compact={compact}
+              hideNumbers={hideNumbers}
+              numbersOnly={numbersOnly}
+              selectedDateStr={selectedDateStr}
             />
           </div>
         ))}
