@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { CELL_HEIGHT } from '../../components/CalendarGrid/CalendarGrid';
 import { Plus, ChevronLeft, ChevronRight, Menu, ChevronDown } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
@@ -106,6 +106,17 @@ const CalendarPage = () => {
     channel: string;
     propertyId: string;
   } | null>(null);
+
+  // 안정적인 콜백 참조 (모달의 useLayoutEffect dep에 들어가므로 참조 안정성 필수)
+  const handlePreviewChange = useCallback(
+    (ci: string, co: string, ch: string, pid: string) =>
+      setPreviewDates({ checkIn: ci, checkOut: co, channel: ch, propertyId: pid }),
+    [],
+  );
+  const handleQuickBookingClose = useCallback(() => {
+    setQuickBookingAnchor(null);
+    setPreviewDates(null);
+  }, []);
 
   // ── 바텀시트 상태 ──────────────────────────────────────────────
   const [snap, setSnap] = useState<SnapPoint>('hidden');
@@ -440,8 +451,18 @@ const CalendarPage = () => {
     const rect = e.currentTarget.getBoundingClientRect();
     // 모달과 동일한 로직: 점유되지 않은 첫 번째 숙소 선택
     const occSet = new Set<string>();
-    bookings.forEach(b => { if (b.checkIn <= cell.dateStr && b.checkOut > cell.dateStr && b.propertyId) occSet.add(b.propertyId); });
-    maintenance.forEach(m => { if (m.startDate <= cell.dateStr && m.endDate > cell.dateStr && m.propertyId) occSet.add(m.propertyId); });
+    const knownIds = new Set(properties.map(p => p.id));
+    const firstPropId = properties[0]?.id;
+    const getEffectivePropId = (pid?: string) => (pid && knownIds.has(pid)) ? pid : firstPropId;
+
+    bookings.forEach(b => { 
+      const pid = getEffectivePropId(b.propertyId);
+      if (b.checkIn <= cell.dateStr && b.checkOut > cell.dateStr && pid) occSet.add(pid); 
+    });
+    maintenance.forEach(m => { 
+      const pid = getEffectivePropId(m.propertyId);
+      if (m.startDate <= cell.dateStr && m.endDate > cell.dateStr && pid) occSet.add(pid); 
+    });
     const initProp = (properties.find(p => !occSet.has(p.id)) ?? properties[0]);
     setPreviewDates({
       checkIn: cell.dateStr,
@@ -696,10 +717,8 @@ const CalendarPage = () => {
         <CompactQuickBookingModal
           date={quickBookingAnchor.date}
           anchorRect={quickBookingAnchor.rect}
-          onPreviewChange={(ci, co, ch, pid) =>
-            setPreviewDates({ checkIn: ci, checkOut: co, channel: ch, propertyId: pid })
-          }
-          onClose={() => { setQuickBookingAnchor(null); setPreviewDates(null); }}
+          onPreviewChange={handlePreviewChange}
+          onClose={handleQuickBookingClose}
         />
       )}
       {datePickerOpen && (

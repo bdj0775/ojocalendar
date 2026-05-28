@@ -107,11 +107,13 @@ export function useBookingBars(
 
     // propertyId → 슬롯, propertyId별로 독립적으로 dedup (같은 슬롯의 다른 숙소끼리 날짜 겹침 허용)
     // 1단계: propertyId별 버킷으로 분류
+    const firstPropId = properties?.[0]?.id ?? '__none__';
+    const knownIds = new Set(properties?.map(p => p.id) ?? []);
     const propBuckets = new Map<string, CalItem[]>();
     allItems.forEach(item => {
-      const key = item.propertyId ?? '__none__';
-      if (!propBuckets.has(key)) propBuckets.set(key, []);
-      propBuckets.get(key)!.push(item);
+      const pid = (item.propertyId && knownIds.has(item.propertyId)) ? item.propertyId : firstPropId;
+      if (!propBuckets.has(pid)) propBuckets.set(pid, []);
+      propBuckets.get(pid)!.push({ ...item, propertyId: pid }); // 정규화된 propertyId로 덮어쓰기
     });
 
     // 2단계: propertyId별 dedup (같은 숙소 내 중복 예약 제거)

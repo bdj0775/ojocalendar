@@ -111,8 +111,18 @@ const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }
   const [selectedPropertyId, setSelectedPropertyId] = useState(() => {
     const st = useStore.getState();
     const occ = new Set<string>();
-    st.bookings.forEach(b => { if (b.checkIn <= date && b.checkOut > date && b.propertyId) occ.add(b.propertyId); });
-    st.maintenance.forEach(m => { if (m.startDate <= date && m.endDate > date && m.propertyId) occ.add(m.propertyId); });
+    const knownIds = new Set(st.properties.map(p => p.id));
+    const firstPropId = st.properties[0]?.id;
+    const getEffectivePropId = (pid?: string) => (pid && knownIds.has(pid)) ? pid : firstPropId;
+
+    st.bookings.forEach(b => { 
+      const pid = getEffectivePropId(b.propertyId);
+      if (b.checkIn <= date && b.checkOut > date && pid) occ.add(pid); 
+    });
+    st.maintenance.forEach(m => { 
+      const pid = getEffectivePropId(m.propertyId);
+      if (m.startDate <= date && m.endDate > date && pid) occ.add(pid); 
+    });
     return (st.properties.find(p => !occ.has(p.id)) ?? st.properties[0])?.id ?? '';
   });
 
