@@ -61,10 +61,9 @@ function buildCalendarGrid(year: number, month: number) {
 
 type SnapPoint = 'hidden' | 'half' | 'full';
 const SNAP_SEQ: SnapPoint[] = ['hidden', 'half', 'full'];
-const HANDLE_H = 36; // px — 항상 보이는 핸들 높이
 
 function getSnapY(snap: SnapPoint, sheetH: number): number {
-  if (snap === 'hidden') return sheetH - HANDLE_H;
+  if (snap === 'hidden') return sheetH;          // 완전히 화면 밖
   if (snap === 'half')   return sheetH * 0.5;
   return 0;
 }
@@ -90,12 +89,22 @@ const CalendarPage = () => {
   const [snap, setSnap] = useState<SnapPoint>('hidden');
   const dragStartY  = useRef<number | null>(null);
   const [dragDy, setDragDy] = useState(0);
+  // 화면 전체 터치로 시트 열기 (hidden 상태일 때만)
+  const outerDrag = useRef<{ y: number; x: number; dir: 'h' | 'v' | null } | null>(null);
 
   const sheetH = () => window.innerHeight - 56; // 56 = 헤더 근사값
 
   const baseY    = getSnapY(snap, sheetH());
-  const clampedY = Math.max(0, Math.min(sheetH() - HANDLE_H, baseY + dragDy));
+  const clampedY = Math.max(0, Math.min(sheetH(), baseY + dragDy));
 
+  // 달력 축소 계산
+  const sheetVisible  = Math.max(0, sheetH() - clampedY);
+  const calProgress   = Math.min(1, sheetVisible / (sheetH() * 0.5));
+  const calScale      = 1 - calProgress * 0.4;   // 1.0 → 0.6
+  const dotMode       = calProgress > 0.5;
+  const calTransition = dragDy === 0 ? 'transform 380ms cubic-bezier(0.32,0.72,0,1)' : 'none';
+
+  // 시트 자체 드래그 (시트가 보일 때)
   const onTouchStart = (e: React.TouchEvent) => {
     dragStartY.current = e.touches[0].clientY;
   };
@@ -110,8 +119,35 @@ const CalendarPage = () => {
     setDragDy(0);
     if (Math.abs(dy) < 35) return;
     const i = SNAP_SEQ.indexOf(snap);
-    if (dy < 0 && i < 2) setSnap(SNAP_SEQ[i + 1]);   // 위로 → 더 열기
-    else if (dy > 0 && i > 0) setSnap(SNAP_SEQ[i - 1]); // 아래로 → 닫기
+    if (dy < 0 && i < 2) setSnap(SNAP_SEQ[i + 1]);
+    else if (dy > 0 && i > 0) setSnap(SNAP_SEQ[i - 1]);
+  };
+
+  // 화면 어디서든 위로 스와이프 → 시트 열기 (hidden 상태일 때만)
+  const onOuterTouchStart = (e: React.TouchEvent) => {
+    if (snap !== 'hidden') return;
+    outerDrag.current = { y: e.touches[0].clientY, x: e.touches[0].clientX, dir: null };
+  };
+  const onOuterTouchMove = (e: React.TouchEvent) => {
+    if (!outerDrag.current) return;
+    const s = outerDrag.current;
+    const dy = e.touches[0].clientY - s.y;
+    const dx = Math.abs(e.touches[0].clientX - s.x);
+    if (s.dir === null) {
+      if (Math.abs(dy) < 6 && dx < 6) return;
+      s.dir = Math.abs(dy) >= dx ? 'v' : 'h';
+    }
+    if (s.dir !== 'v' || dy > 0) return; // 위로만
+    setDragDy(dy);
+  };
+  const onOuterTouchEnd = (e: React.TouchEvent) => {
+    if (!outerDrag.current) return;
+    const s = outerDrag.current;
+    outerDrag.current = null;
+    if (s.dir !== 'v') { setDragDy(0); return; }
+    const finalDy = e.changedTouches[0].clientY - s.y;
+    setDragDy(0);
+    if (finalDy < -50) setSnap('half');
   };
 
   // ── 숙소 정렬 순서 ─────────────────────────────────────────────
@@ -244,7 +280,13 @@ const CalendarPage = () => {
   const ko = language === 'ko';
 
   return (
-    <div className="relative w-full overflow-hidden pt-2" style={{ height: '100dvh' }}>
+    <div
+      className="relative w-full overflow-hidden pt-2"
+      style={{ height: '100dvh' }}
+      onTouchStart={onOuterTouchStart}
+      onTouchMove={onOuterTouchMove}
+      onTouchEnd={onOuterTouchEnd}
+    >
 
       {/* ── 헤더 ── */}
       <div className="px-3 mb-2">
@@ -320,18 +362,27 @@ const CalendarPage = () => {
         </div>
       </div>
 
-      {/* ── 달력 ── */}
-      <SwipeableCalendar
-        prev={panels.prev}
-        current={panels.current}
-        next={panels.next}
-        todayStr={todayStr}
-        onDateClick={handleDateClick}
-        onBarClick={handleBarClick}
-        onPrev={prevMonth}
-        onNext={nextMonth}
-        eventColorMode={settings?.eventColorMode ?? 'channel'}
-      />
+      {/* ── 달력 (바텀시트 올라올수록 scaleY 축소) ── */}
+      <div
+        style={{
+          transform: `scaleY(${calScale})`,
+          transformOrigin: 'top center',
+          transition: calTransition,
+        }}
+      >
+        <SwipeableCalendar
+          prev={panels.prev}
+          current={panels.current}
+          next={panels.next}
+          todayStr={todayStr}
+          onDateClick={handleDateClick}
+          onBarClick={handleBarClick}
+          onPrev={prevMonth}
+          onNext={nextMonth}
+          eventColorMode={settings?.eventColorMode ?? 'channel'}
+          compact={dotMode}
+        />
+      </div>
 
       {/* ── 바텀시트 ── */}
       <div
@@ -347,26 +398,19 @@ const CalendarPage = () => {
         onTouchEnd={onTouchEnd}
       >
         {/* 핸들 */}
-        <div className="flex flex-col items-center pt-2.5 pb-1 flex-shrink-0 cursor-grab select-none">
-          <div className="w-9 h-[4px] rounded-full bg-border/70 mb-1" />
-          {snap === 'hidden' && (
-            <span className="text-[10px] font-semibold text-muted-foreground/60 tracking-wide">
-              {ko ? '다가오는 예약' : 'Upcoming'}
-            </span>
-          )}
+        <div className="flex items-center justify-center pt-2.5 pb-1 flex-shrink-0 cursor-grab select-none">
+          <div className="w-9 h-[4px] rounded-full bg-border/70" />
         </div>
 
         {/* 타이틀 */}
-        {snap !== 'hidden' && (
-          <div className="px-5 pb-3 flex items-baseline justify-between flex-shrink-0">
-            <span className="text-[15px] font-bold text-foreground">
-              {ko ? '다가오는 예약' : 'Upcoming Stays'}
-            </span>
-            <span className="text-[11px] text-muted-foreground">
-              {upcomingStays.length}{ko ? '건' : ' bookings'}
-            </span>
-          </div>
-        )}
+        <div className="px-5 pb-3 flex items-baseline justify-between flex-shrink-0">
+          <span className="text-[15px] font-bold text-foreground">
+            {ko ? '다가오는 예약' : 'Upcoming Stays'}
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            {upcomingStays.length}{ko ? '건' : ' bookings'}
+          </span>
+        </div>
 
         {/* 카드 목록 */}
         <div className="flex-1 overflow-y-auto px-5 pb-24">

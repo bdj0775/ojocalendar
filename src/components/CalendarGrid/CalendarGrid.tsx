@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { isHoliday, getHolidayName } from '../../utils/holidays';
 import { useTranslation } from '../../hooks/useTranslation';
 import type { BookingBar } from './useBookingBars';
@@ -31,6 +32,14 @@ const getBarCls = (ch: string, isPast: boolean) =>
     isPast ? 'opacity-50' : '',
   ].join(' ');
 
+const CHANNEL_DOT_COLOR: Record<string, string> = {
+  airbnb:      '#FF5A5F',
+  bookingcom:  '#003B95',
+  direct:      '#10B981',
+  naver:       '#03C75A',
+  maintenance: '#94A3B8',
+};
+
 // ── Props ─────────────────────────────────────────────────────
 export interface GridCell {
   day: number;
@@ -45,6 +54,7 @@ interface CalendarGridProps {
   onDateClick:     (cell: GridCell) => void;
   onBarClick:      (e: React.MouseEvent, bar: BookingBar) => void;
   eventColorMode?: 'channel' | 'property';
+  compact?:        boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -55,11 +65,31 @@ const CalendarGrid = ({
   onDateClick,
   onBarClick,
   eventColorMode = 'channel',
+  compact = false,
 }: CalendarGridProps) => {
   const { language } = useTranslation();
   const dowLabels = DOW_LABELS[language] ?? DOW_LABELS.en;
   const totalRows = Math.ceil(calendarGrid.length / 7);
   const ko = language === 'ko';
+
+  // compact 모드: 셀별 dot 색상 맵
+  const cellDotMap = useMemo(() => {
+    if (!compact) return null;
+    const map = new Map<number, string[]>();
+    bookingBars.forEach(bar => {
+      for (let c = 0; c < bar.span; c++) {
+        const idx = bar.rowIndex * 7 + bar.colStart + c;
+        if (idx >= calendarGrid.length) continue;
+        const arr = map.get(idx) ?? [];
+        const color = eventColorMode === 'property'
+          ? bar.propColor
+          : (CHANNEL_DOT_COLOR[bar.channelClass] ?? '#6366F1');
+        if (arr.length < 3 && !arr.includes(color)) arr.push(color);
+        map.set(idx, arr);
+      }
+    });
+    return map;
+  }, [compact, bookingBars, calendarGrid.length, eventColorMode]);
 
   return (
     <div
@@ -105,18 +135,30 @@ const CalendarGrid = ({
             )}
             <div className={`flex items-center gap-1 ${index < 7 ? 'mt-3.5' : ''}`}>
               <span className={numCls}>{cell.day}</span>
-              {holiName && cell.isCurrentMonth && (
+              {!compact && holiName && cell.isCurrentMonth && (
                 <span className="text-[9px] leading-none font-semibold text-calendar-sun opacity-85 whitespace-nowrap overflow-hidden text-ellipsis">
                   {holiName}
                 </span>
               )}
             </div>
+            {/* compact dot 표시 */}
+            {compact && cellDotMap?.get(index) && (
+              <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-[3px]">
+                {cellDotMap.get(index)!.map((color, di) => (
+                  <span
+                    key={di}
+                    className="rounded-full flex-shrink-0"
+                    style={{ width: 4, height: 4, background: color }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         );
       })}
 
-      {/* ── 예약 바 ── */}
-      {bookingBars.map((bar, i) => (
+      {/* ── 예약 바 (compact 모드에서는 숨김) ── */}
+      {!compact && bookingBars.map((bar, i) => (
         <div
           key={`${bar.id}-${i}`}
           className={getBarCls(bar.channelClass, bar.isPast)}

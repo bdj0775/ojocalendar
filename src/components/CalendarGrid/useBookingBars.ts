@@ -19,6 +19,8 @@ export interface BookingBar {
   left: string;
   width: string;
   top: string;
+  rowIndex: number;   // 달력 주(row) 인덱스 (0~5)
+  colStart: number;   // 시작 열 (0~6)
   isFirst: boolean;
   isLast: boolean;
   isPast: boolean;
@@ -170,12 +172,14 @@ export function useBookingBars(
             channelClass,
             propertyId:  item.propertyId,
             propColor:   getPropColor(item.propertyId),
-            left:    `calc(${(col  / 7) * 100}% + 2px)`,
-            width:   `calc(${(span / 7) * 100}% - 4px)`,
-            top:     `${topPx}px`,
-            isFirst: cur === startIdx,
-            isLast:  segEnd === endIdx,
-            isPast:  endDate <= today,
+            left:     `calc(${(col  / 7) * 100}% + 2px)`,
+            width:    `calc(${(span / 7) * 100}% - 4px)`,
+            top:      `${topPx}px`,
+            rowIndex: row,
+            colStart: col,
+            isFirst:  cur === startIdx,
+            isLast:   segEnd === endIdx,
+            isPast:   endDate <= today,
           });
           cur = segEnd + 1;
         }

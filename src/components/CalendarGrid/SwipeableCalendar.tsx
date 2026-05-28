@@ -20,6 +20,7 @@ interface Props {
   onPrev: () => void;
   onNext: () => void;
   eventColorMode?: 'channel' | 'property';
+  compact?:        boolean;
 }
 
 const SwipeableCalendar = ({
@@ -27,6 +28,7 @@ const SwipeableCalendar = ({
   todayStr, onDateClick, onBarClick,
   onPrev, onNext,
   eventColorMode = 'channel',
+  compact = false,
 }: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragX, setDragX]       = useState(0);
@@ -118,6 +120,7 @@ const SwipeableCalendar = ({
               onDateClick={onDateClick}
               onBarClick={onBarClick}
               eventColorMode={eventColorMode}
+              compact={compact}
             />
           </div>
         ))}
