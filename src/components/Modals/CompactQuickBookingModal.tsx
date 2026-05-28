@@ -46,13 +46,13 @@ const wrap = (v: number, min: number, max: number) =>
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
-  date:           string;
-  anchorRect:     DOMRect;
-  onClose:        () => void;
-  onDatesChange?: (checkIn: string, checkOut: string) => void;
+  date:             string;
+  anchorRect:       DOMRect;
+  onClose:          () => void;
+  onPreviewChange?: (checkIn: string, checkOut: string, channel: string, propertyId: string) => void;
 }
 
-const CompactQuickBookingModal = ({ date, anchorRect, onClose, onDatesChange }: Props) => {
+const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }: Props) => {
   const { properties, bookings, maintenance, addBooking, showToast } = useStore();
 
   // ── 위치 계산 (두 패스: invisible 렌더 → 높이 측정 → visible) ─────────────
@@ -145,7 +145,7 @@ const CompactQuickBookingModal = ({ date, anchorRect, onClose, onDatesChange }: 
   const ciDim = new Date(ciY, ciM, 0).getDate();
   const coDim = new Date(coY, coM, 0).getDate();
 
-  useEffect(() => { onDatesChange?.(checkIn, checkOut); }, [checkIn, checkOut, onDatesChange]);
+  useEffect(() => { onPreviewChange?.(checkIn, checkOut, channel, selectedPropertyId); }, [checkIn, checkOut, channel, selectedPropertyId, onPreviewChange]);
   useEffect(() => {
     if (!amountCustom) syncAmount((selectedProp?.basePrice ?? 0) * nights);
   // eslint-disable-next-line react-hooks/exhaustive-deps

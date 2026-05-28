@@ -100,7 +100,12 @@ const CalendarPage = () => {
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // ── 프리뷰 바: 모달이 열린 동안 입력 중인 날짜를 달력에 미리 표시 ──────
-  const [previewDates, setPreviewDates] = useState<{ checkIn: string; checkOut: string } | null>(null);
+  const [previewDates, setPreviewDates] = useState<{
+    checkIn: string;
+    checkOut: string;
+    channel: string;
+    propertyId: string;
+  } | null>(null);
 
   // ── 바텀시트 상태 ──────────────────────────────────────────────
   const [snap, setSnap] = useState<SnapPoint>('hidden');
@@ -298,10 +303,33 @@ const CalendarPage = () => {
   const nextBars    = useBookingBars(visibleBookings, visibleMaintenance, nextGrid,    visibleProperties);
 
   // ── 프리뷰 바 계산 — 현재 월 그리드에만 적용 ────────────────────────────
+  const CHANNEL_STYLES_MAP: Record<string, string> = {
+    Airbnb:        'airbnb',
+    'Booking.com': 'bookingcom',
+    Direct:        'direct',
+    Naver:         'naver',
+  };
+
   const previewBars = useMemo<BookingBar[]>(() => {
     if (!previewDates || !currentGrid.length) return [];
-    const { checkIn: ci, checkOut: co } = previewDates;
+    const { checkIn: ci, checkOut: co, channel, propertyId } = previewDates;
     if (ci >= co) return [];
+
+    // 채널 클래스 결정
+    const channelClass = CHANNEL_STYLES_MAP[channel] ?? 'airbnb';
+
+    // 숙소 슬롯 인덱스 및 색상 결정
+    const slotIndex = (() => {
+      if (!propertyId || !visibleProperties.length) return 0;
+      const idx = visibleProperties.findIndex(p => p.id === propertyId);
+      return idx >= 0 ? Math.min(idx, 2) : 0;
+    })();
+    const propColor = (() => {
+      if (!propertyId || !visibleProperties.length) return PROP_COLORS[0];
+      const idx = visibleProperties.findIndex(p => p.id === propertyId);
+      if (idx < 0) return PROP_COLORS[0];
+      return visibleProperties[idx].color || PROP_COLORS[idx % PROP_COLORS.length];
+    })();
 
     // checkOut은 exclusive → 마지막 포함 날짜 = checkOut - 1
     const lastDay = addDays(co, -1);
@@ -316,6 +344,8 @@ const CalendarPage = () => {
     if (endIdx < startIdx) return [];
 
     const nights = diffDays(ci, co);
+    const BAR_H  = 22;
+    const BAR_GAP = 2;
     const bars: BookingBar[] = [];
     let cur = startIdx;
     while (cur <= endIdx) {
@@ -323,13 +353,17 @@ const CalendarPage = () => {
       const segEnd = Math.min(endIdx, (row + 1) * 7 - 1);
       const col    = cur % 7;
       const span   = segEnd - cur + 1;
-      const topPx  = row * CELL_HEIGHT + BAR_OFFSET_Y + (row === 0 ? 14 : 0);
+      // 기존 useBookingBars와 동일한 topPx 계산 (slotIndex 반영)
+      const topPx  = row * CELL_HEIGHT
+        + BAR_OFFSET_Y
+        + (row === 0 ? 14 : 0)
+        + slotIndex * (BAR_H + BAR_GAP);
 
       bars.push({
         id: '__preview__', type: 'booking',
-        guestName: '', channel: undefined, nationality: undefined,
+        guestName: '', channel, nationality: undefined,
         guests: 0, nights, span,
-        channelClass: 'airbnb', propColor: '#6366F1',
+        channelClass, propColor,
         left: `calc(${(col / 7) * 100}% + 2px)`,
         width: `calc(${(span / 7) * 100}% - 4px)`,
         top: `${topPx}px`,
@@ -340,7 +374,7 @@ const CalendarPage = () => {
       cur = segEnd + 1;
     }
     return bars;
-  }, [previewDates, currentGrid]);
+  }, [previewDates, currentGrid, visibleProperties]);
 
   const panels = useMemo(() => ({
     prev:    { grid: prevGrid,    bars: prevBars    },
@@ -634,7 +668,9 @@ const CalendarPage = () => {
         <CompactQuickBookingModal
           date={quickBookingAnchor.date}
           anchorRect={quickBookingAnchor.rect}
-          onDatesChange={(ci, co) => setPreviewDates({ checkIn: ci, checkOut: co })}
+          onPreviewChange={(ci, co, ch, pid) =>
+            setPreviewDates({ checkIn: ci, checkOut: co, channel: ch, propertyId: pid })
+          }
           onClose={() => { setQuickBookingAnchor(null); setPreviewDates(null); }}
         />
       )}

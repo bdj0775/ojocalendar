@@ -23,22 +23,22 @@ export const CELL_HEIGHT   = 100; // --calendar-cell-h
 export const COMPACT_CELL_H = 52; // compact 모드 셀 높이 (scaleY 없이 별도 레이어)
 
 const getBarCls = (ch: string, isPast: boolean, isPreview?: boolean) =>
-  isPreview
-    ? [
-        'absolute flex items-center overflow-hidden rounded-[4px]',
-        'z-raise pointer-events-none',
-        'h-[var(--calendar-bar-h)] px-1',
-        'border border-dashed border-primary/50 bg-primary/10 text-primary',
-        'animate-fade-in',
-      ].join(' ')
-    : [
-        'absolute flex items-center overflow-hidden rounded-[4px]',
-        'z-raise cursor-pointer shadow-sm',
-        'transition-all hover:brightness-95 hover:-translate-y-px hover:z-fab',
-        'h-[var(--calendar-bar-h)] px-1',
-        BAR_CHANNEL_CLS[ch] ?? BAR_CHANNEL_CLS.airbnb,
-        isPast ? 'opacity-50' : '',
-      ].join(' ');
+  [
+    'absolute flex items-center overflow-hidden rounded-[4px]',
+    'h-[var(--calendar-bar-h)] px-1',
+    isPreview
+      ? [
+          'z-raise pointer-events-none animate-fade-in',
+          BAR_CHANNEL_CLS[ch] ?? BAR_CHANNEL_CLS.airbnb,
+          'opacity-55',
+        ].join(' ')
+      : [
+          'z-raise cursor-pointer shadow-sm',
+          'transition-all hover:brightness-95 hover:-translate-y-px hover:z-fab',
+          BAR_CHANNEL_CLS[ch] ?? BAR_CHANNEL_CLS.airbnb,
+          isPast ? 'opacity-50' : '',
+        ].join(' '),
+  ].join(' ');
 
 const CHANNEL_DOT_COLOR: Record<string, string> = {
   airbnb:      '#FF5A5F',
@@ -195,7 +195,7 @@ const CalendarGrid = ({
           className={getBarCls(bar.channelClass, bar.isPast, bar.isPreview)}
           style={{
             top: bar.top, left: bar.left, width: bar.width,
-            ...(!bar.isPreview && eventColorMode === 'property' && { backgroundColor: bar.propColor }),
+            ...(eventColorMode === 'property' && { backgroundColor: bar.propColor }),
           }}
           onClick={bar.isPreview ? undefined : e => onBarClick(e, bar)}
         >
