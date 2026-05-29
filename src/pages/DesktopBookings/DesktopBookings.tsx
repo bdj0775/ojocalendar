@@ -169,10 +169,9 @@ const DesktopBookings = () => {
     );
     if (!match) { setSelectedCalendarDate(null); return; }
 
-    // 해당 월로 필터 맞추고 나머지 해제
-    const [y, m] = selectedCalendarDate.split('-').map(Number);
-    setFYear(y);
-    setFMonth(m);
+    // 필터 전체 초기화 (특정 월·연도 지정 없이 전체로 두고 이동)
+    setFYear('all');
+    setFMonth('all');
     setFCh('all');
     setFProp('all');
     setFSearch('');
@@ -190,9 +189,6 @@ const DesktopBookings = () => {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setHighlightId(pendingScrollId);
     setPendingScrollId(null);
-
-    const t = setTimeout(() => setHighlightId(null), 2200);
-    return () => clearTimeout(t);
   }, [rows, pendingScrollId]);
 
   // ── sort ──────────────────────────────────────────────────────────
@@ -250,9 +246,9 @@ const DesktopBookings = () => {
   };
 
   // ── cell style helpers ────────────────────────────────────────────
-  const tdBase     = 'px-2.5 py-2.5 text-[12px] leading-none whitespace-nowrap';
+  const tdBase     = 'px-3 py-2.5 text-[12px] leading-none whitespace-nowrap';
   const tdEditable = `${tdBase} cursor-pointer hover:bg-accent/20 transition-colors`;
-  const tdRO       = `${tdBase} text-muted-foreground/80`; // 진한 회색
+  const tdRO       = `${tdBase} text-muted-foreground/80`;
   const inputCls   = 'w-full text-[12px] bg-card border border-primary/60 rounded-[3px] px-1.5 py-0.5 outline-none focus:border-primary tabular-nums';
   const newInputCls = 'w-full text-[12px] bg-muted/40 rounded-[3px] px-1.5 py-1 outline-none focus:bg-card focus:ring-1 focus:ring-primary/40 transition-all placeholder:text-muted-foreground/40 tabular-nums';
 
@@ -308,10 +304,10 @@ const DesktopBookings = () => {
     const aCls = align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start';
     return (
       <th
-        className={`px-2.5 py-2.5 text-[11px] font-medium text-muted-foreground/60 select-none whitespace-nowrap border-b border-border/50 ${col ? 'cursor-pointer hover:text-muted-foreground' : ''}`}
+        className={`px-3 py-2 text-[10.5px] font-semibold text-muted-foreground/50 select-none whitespace-nowrap border-b border-border/50 ${col ? 'cursor-pointer hover:text-muted-foreground/80' : ''}`}
         onClick={col ? () => handleSort(col) : undefined}
       >
-        <span className={`inline-flex items-center ${aCls} w-full`}>
+        <span className={`inline-flex items-center gap-0.5 ${aCls} w-full`}>
           {label}
           {col && <SortIcon active={sortCol === col} dir={sortDir} />}
         </span>
@@ -330,7 +326,10 @@ const DesktopBookings = () => {
 
   // ─────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col bg-background overflow-hidden">
+    <div
+      className="h-full flex flex-col bg-background overflow-hidden"
+      onClick={() => { if (highlightId) setHighlightId(null); }}
+    >
 
       {/* ── Filter bar ── */}
       <div className="px-5 pb-3 flex items-center gap-2 flex-shrink-0 border-b border-border/30 flex-wrap">
@@ -388,23 +387,23 @@ const DesktopBookings = () => {
 
       {/* ── Table ── */}
       <div ref={tableWrapRef} className="flex-1 overflow-auto [scrollbar-width:thin]">
-        <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 1100 }}>
+        <table className="w-full border-collapse" style={{ tableLayout: 'fixed', minWidth: 1080 }}>
           <colgroup>
-            <col style={{ width: 76 }} />   {/* 연월 */}
-            <col style={{ width: 62 }} />   {/* 입실 */}
-            <col style={{ width: 62 }} />   {/* 퇴실 */}
-            <col style={{ width: 46 }} />   {/* 박수 */}
-            <col style={{ width: 112 }} />  {/* 예약자명 */}
-            <col style={{ width: 48 }} />   {/* 인원 */}
-            <col style={{ width: 80 }} />   {/* 채널 */}
-            <col style={{ width: 92 }} />   {/* 결제금액 */}
-            <col style={{ width: 56 }} />   {/* 수수료율 */}
-            <col style={{ width: 88 }} />   {/* 수수료 금액 */}
-            <col style={{ width: 92 }} />   {/* 입금액 */}
-            <col style={{ width: 76 }} />   {/* ADR */}
-            <col style={{ width: 58 }} />   {/* 리드타임 */}
-            <col style={{ width: 76 }} />   {/* 예약일 */}
-            <col style={{ width: 36 }} />   {/* 삭제 */}
+            <col style={{ width: 70 }} />   {/* 연월 */}
+            <col style={{ width: 58 }} />   {/* 입실 */}
+            <col style={{ width: 58 }} />   {/* 퇴실 */}
+            <col style={{ width: 44 }} />   {/* 박수 */}
+            <col style={{ width: 116 }} />  {/* 예약자명 */}
+            <col style={{ width: 46 }} />   {/* 인원 */}
+            <col style={{ width: 76 }} />   {/* 채널 */}
+            <col style={{ width: 96 }} />   {/* 결제금액 */}
+            <col style={{ width: 52 }} />   {/* 수수료율 */}
+            <col style={{ width: 90 }} />   {/* 수수료 금액 */}
+            <col style={{ width: 96 }} />   {/* 입금액 */}
+            <col style={{ width: 80 }} />   {/* ADR */}
+            <col style={{ width: 54 }} />   {/* 리드타임 */}
+            <col style={{ width: 70 }} />   {/* 예약일 */}
+            <col style={{ width: 34 }} />   {/* 삭제 */}
           </colgroup>
 
           <thead className="sticky top-0 z-10 bg-background">
