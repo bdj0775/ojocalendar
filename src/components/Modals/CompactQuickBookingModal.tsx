@@ -53,7 +53,7 @@ interface Props {
 }
 
 const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }: Props) => {
-  const { properties, bookings, maintenance, addBooking, showToast } = useStore();
+  const { properties, bookings, addBooking, showToast } = useStore();
 
   // ── 위치 계산 (두 패스: invisible 렌더 → 높이 측정 → visible) ─────────────
   const modalRef              = useRef<HTMLDivElement>(null);
@@ -102,10 +102,11 @@ const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }
   // ── 점유 숙소 ─────────────────────────────────────────────────────────────
   const occupiedIds = useMemo(() => {
     const s = new Set<string>();
-    bookings.forEach(b => { if (b.checkIn <= date && b.checkOut > date && b.propertyId) s.add(b.propertyId); });
-    maintenance.forEach(m => { if (m.startDate <= date && m.endDate > date && m.propertyId) s.add(m.propertyId); });
+    bookings.forEach(b => {
+      if (b.status !== 'cancelled' && b.checkIn <= date && b.checkOut > date && b.propertyId) s.add(b.propertyId);
+    });
     return s;
-  }, [bookings, maintenance, date]);
+  }, [bookings, date]);
 
   // ── 상태 ──────────────────────────────────────────────────────────────────
   const [selectedPropertyId, setSelectedPropertyId] = useState(() => {
@@ -117,11 +118,7 @@ const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }
 
     st.bookings.forEach(b => { 
       const pid = getEffectivePropId(b.propertyId);
-      if (b.checkIn <= date && b.checkOut > date && pid) occ.add(pid); 
-    });
-    st.maintenance.forEach(m => { 
-      const pid = getEffectivePropId(m.propertyId);
-      if (m.startDate <= date && m.endDate > date && pid) occ.add(pid); 
+      if (b.status !== 'cancelled' && b.checkIn <= date && b.checkOut > date && pid) occ.add(pid); 
     });
     return (st.properties.find(p => !occ.has(p.id)) ?? st.properties[0])?.id ?? '';
   });

@@ -91,14 +91,6 @@ export interface Property {
   cleaningFee: number;
 }
 
-export interface Maintenance {
-  id: string;
-  propertyId?: string;
-  startDate: string;
-  endDate: string;
-  label: string;
-}
-
 export interface UserProfile {
   id: string;
   email?: string;
@@ -135,13 +127,10 @@ export interface StoreState {
   // Data
   properties: Property[];
   bookings: Booking[];
-  maintenance: Maintenance[];
 
   // Modal state
   selectedDate: string | null;
   selectedBookingId: string | null;
-  selectedMaintDate: string | null;
-  selectedMaintenanceId: string | null;
 
   // Settings
   settings: Settings;
@@ -170,17 +159,10 @@ export interface StoreState {
   updateBookingStatus: (id: string, status: BookingStatus) => Promise<void>;
   deleteBooking: (id: string) => Promise<void>;
 
-  addMaintenance: (m: Omit<Maintenance, 'id'>) => Promise<void>;
-  updateMaintenance: (id: string, patch: Partial<Maintenance>) => Promise<void>;
-  deleteMaintenance: (id: string) => Promise<void>;
-
   openDayModal: (dateStr: string) => void;
   closeDayModal: () => void;
   openBookingModal: (id: string) => void;
   closeBookingModal: () => void;
-  openMaintModal: (dateStr: string) => void;
-  openEditMaintModal: (id: string) => void;
-  closeMaintModal: () => void;
 
   updateSettings: (patch: Partial<Settings>) => void;
 

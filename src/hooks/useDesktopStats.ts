@@ -33,15 +33,30 @@ interface MonthStats {
 
 const calcMonthStats = (validBookings: (Booking & { amount: number })[], year: number, month: number): MonthStats => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  let gross = 0, net = 0, occNights = 0, otaComm = 0, bookingCount = 0;
+  let gross = 0, net = 0, otaComm = 0, bookingCount = 0;
+  const occupiedDates = new Set<string>();
+
   validBookings.forEach(b => {
     const totalNights = Math.max(1, Math.round(
       (new Date(b.checkOut + 'T12:00:00').getTime() - new Date(b.checkIn + 'T12:00:00').getTime()) / 86400000,
     ));
-    const n = getOverlapNights(b.checkIn, b.checkOut, year, month);
+    const mStart = new Date(year, month, 1, 12, 0, 0);
+    const mEnd = new Date(year, month + 1, 1, 12, 0, 0);
+    const bStart = new Date(b.checkIn + 'T12:00:00');
+    const bEnd = new Date(b.checkOut + 'T12:00:00');
+    const overlapStart = bStart > mStart ? bStart : mStart;
+    const overlapEnd = bEnd < mEnd ? bEnd : mEnd;
+    const n = overlapStart >= overlapEnd ? 0 : Math.round((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24));
+    
     if (n > 0) {
       bookingCount++;
-      occNights += n;
+      // Add unique dates to Set
+      let cur = new Date(overlapStart);
+      while (cur < overlapEnd) {
+        occupiedDates.add(`${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`);
+        cur.setDate(cur.getDate() + 1);
+      }
+      
       const gPortion = (b.amount / totalNights) * n;
       const commRate = b.commission || 0;
       const nPortion = gPortion * (1 - commRate / 100);
@@ -50,9 +65,11 @@ const calcMonthStats = (validBookings: (Booking & { amount: number })[], year: n
       if (b.channel !== 'Direct') otaComm += (gPortion - nPortion);
     }
   });
+  
+  const occNights = occupiedDates.size;
   return {
-    gross: Math.round(gross), net: Math.round(net), occNights,
-    occupancy: Math.round((occNights / daysInMonth) * 100),
+    gross: Math.round(gross), net: Math.round(net), occNights: Math.min(occNights, daysInMonth),
+    occupancy: Math.min(100, Math.round((occNights / daysInMonth) * 100)),
     adr: occNights === 0 ? 0 : Math.round(gross / occNights),
     otaComm: Math.round(otaComm), bookingCount, daysInMonth,
   };

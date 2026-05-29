@@ -9,7 +9,7 @@ import NotificationBell from '../../components/Notifications/NotificationBell';
 import { useTranslation } from '../../hooks/useTranslation';
 import BookingEditModal from '../../components/Modals/BookingEditModal';
 import CompactQuickBookingModal from '../../components/Modals/CompactQuickBookingModal';
-import MaintenanceModal from '../../components/Modals/MaintenanceModal';
+
 import YearMonthPickerModal from '../../components/Modals/YearMonthPickerModal';
 import SwipeableCalendar from '../../components/CalendarGrid/SwipeableCalendar';
 import { useBookingBars, PROP_COLORS, BAR_OFFSET_Y, type BookingBar } from '../../components/CalendarGrid/useBookingBars';
@@ -89,7 +89,7 @@ const CalendarPage = () => {
   const navigate = useNavigate();
   const { t, language } = useTranslation();
   const {
-    bookings, maintenance, currentYear, currentMonth, properties, settings,
+    bookings,  currentYear, currentMonth, properties, settings,
     nextMonth, prevMonth, goToday, setMonth, openBookingModal, openEditMaintModal,
     visiblePropertyIds, setVisiblePropertyIds,
     propertyOrder, setPropertyOrder,
@@ -303,15 +303,7 @@ const CalendarPage = () => {
     });
   }, [bookings, visiblePropertyIds, properties]);
 
-  const visibleMaintenance = useMemo(() => {
-    if (visiblePropertyIds === null) return maintenance;
-    const knownIds = new Set(properties.map(p => p.id));
-    const firstPropId = properties[0]?.id;
-    return maintenance.filter(m => {
-      const pid = (m.propertyId && knownIds.has(m.propertyId)) ? m.propertyId : firstPropId;
-      return pid != null && visiblePropertyIds.includes(pid);
-    });
-  }, [maintenance, visiblePropertyIds, properties]);
+  const visibleMaintenance: any[] = [];
 
   const [prevYear,  prevMonthIdx]  = useMemo(() => offsetMonth(currentYear, currentMonth, -1), [currentYear, currentMonth]);
   const [nextYear,  nextMonthIdx]  = useMemo(() => offsetMonth(currentYear, currentMonth,  1), [currentYear, currentMonth]);
@@ -327,9 +319,9 @@ const CalendarPage = () => {
     [sortedProperties, visiblePropertyIds],
   );
 
-  const prevBars    = useBookingBars(visibleBookings, visibleMaintenance, prevGrid,    visibleProperties);
-  const currentBars = useBookingBars(visibleBookings, visibleMaintenance, currentGrid, visibleProperties);
-  const nextBars    = useBookingBars(visibleBookings, visibleMaintenance, nextGrid,    visibleProperties);
+  const prevBars    = useBookingBars(visibleBookings, prevGrid,    visibleProperties);
+  const currentBars = useBookingBars(visibleBookings, currentGrid, visibleProperties);
+  const nextBars    = useBookingBars(visibleBookings, nextGrid,    visibleProperties);
 
   // ── 프리뷰 바 계산 — 현재 월 그리드에만 적용 ────────────────────────────
   const CHANNEL_STYLES_MAP: Record<string, string> = {
@@ -486,10 +478,6 @@ const CalendarPage = () => {
     bookings.forEach(b => { 
       const pid = getEffectivePropId(b.propertyId);
       if (b.checkIn <= cell.dateStr && b.checkOut > cell.dateStr && pid) occSet.add(pid); 
-    });
-    maintenance.forEach(m => { 
-      const pid = getEffectivePropId(m.propertyId);
-      if (m.startDate <= cell.dateStr && m.endDate > cell.dateStr && pid) occSet.add(pid); 
     });
     const initProp = (properties.find(p => !occSet.has(p.id)) ?? properties[0]);
 
@@ -758,7 +746,7 @@ const CalendarPage = () => {
         <Plus size={ICON_SIZES.md} color="white" />
       </button>
 
-      <MaintenanceModal />
+      
       <BookingEditModal />
       {quickBookingAnchor && (
         <CompactQuickBookingModal

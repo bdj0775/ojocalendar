@@ -77,6 +77,7 @@ const BookingEditModal = () => {
   const [memoFocused,  setMemoFocused]  = useState(false);
   const [confirmDel,   setConfirmDel]   = useState(false);
   const [isSaving,     setIsSaving]     = useState(false);
+  const [bookingDate,  setBookingDate]  = useState(''); // <-- ADDED
   const [pickerType, setPickerType] = useState<'checkIn' | 'checkOut' | null>(null);
 
   // booking이 바뀔 때마다 폼 초기화
@@ -94,6 +95,7 @@ const BookingEditModal = () => {
     setAmountRaw(amt.toLocaleString());
     setCommRate(channelRate);
     setCommCustom(false);
+    setBookingDate(booking.bookingDate ?? '');
     setMemo(booking.memo ?? '');
     setConfirmDel(false);
   }, [selectedBookingId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -103,7 +105,7 @@ const BookingEditModal = () => {
   const nights    = diffDays(checkIn, checkOut);
   const commission = Math.round(amount * commRate / 100);
   const weekend   = checkIn ? isWeekendDate(checkIn) : false;
-  const leadTime  = booking.bookingDate ? diffDays(booking.bookingDate, booking.checkIn) : null;
+  const leadTime  = bookingDate ? diffDays(bookingDate, checkIn) : null;
 
   // ── handlers ─────────────────────────────────────────────────────────────
   const handleCheckIn = (val: string) => {
@@ -156,6 +158,7 @@ const BookingEditModal = () => {
         guestName: guestName.trim(),
         checkIn, checkOut,
         guests: guestCount,
+        bookingDate,
         nationality, channel: channel as 'Airbnb' | 'Booking.com' | 'Naver' | 'Direct',
         amount, commission: commRate,
         memo: memo.trim() || undefined,
@@ -391,9 +394,15 @@ const BookingEditModal = () => {
           {/* Footer & Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-border/30">
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide">
-                예약일: {booking.bookingDate ? fmtDateShort(booking.bookingDate) : '-'}
-              </span>
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide">
+                예약일: 
+                <input 
+                  type="date" 
+                  value={bookingDate} 
+                  onChange={e => setBookingDate(e.target.value)} 
+                  className="bg-transparent border-b border-muted-foreground/30 text-slate-800 dark:text-slate-200 outline-none w-[90px]"
+                />
+              </div>
               {leadTime !== null && (
                 <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide">
                   리드타임: {leadTime > 0 ? `${leadTime}일 전` : '당일'}

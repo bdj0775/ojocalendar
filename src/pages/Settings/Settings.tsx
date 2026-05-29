@@ -4,7 +4,60 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
 import PropertyDetailModal from '../../components/Modals/PropertyDetailModal';
+import { supabase } from '../../services/supabaseClient';
 import type { Channel, Property } from '../../types';
+
+// ── 26년 예약 데이터 (6~9월 복구용) ────────────────────────────────
+const RESTORE_2026_DATA = [
+  // 6월
+  { guestname:'김유진',  checkin:'2026-05-29', checkout:'2026-06-03', bookingdate:'2026-01-24', guests:5, infants:0, nationality:'Korea',  channel:'Naver',       amount:1020000, commission:2.0  },
+  { guestname:'전수현',  checkin:'2026-06-03', checkout:'2026-06-04', bookingdate:'2026-05-13', guests:5, infants:0, nationality:'Korea',  channel:'Airbnb',      amount:221315,  commission:15.5 },
+  { guestname:'진우',    checkin:'2026-06-04', checkout:'2026-06-05', bookingdate:'2026-05-29', guests:3, infants:0, nationality:'Korea',  channel:'Airbnb',      amount:198000,  commission:15.5 },
+  { guestname:'huai-an', checkin:'2026-06-05', checkout:'2026-06-06', bookingdate:'2026-05-10', guests:3, infants:0, nationality:'Taiwan', channel:'Airbnb',      amount:265000,  commission:15.5 },
+  { guestname:'김광규',  checkin:'2026-06-06', checkout:'2026-06-07', bookingdate:'2026-04-03', guests:5, infants:0, nationality:'Korea',  channel:'Naver',       amount:249000,  commission:2.0  },
+  { guestname:'이현민',  checkin:'2026-06-07', checkout:'2026-06-09', bookingdate:'2026-04-28', guests:2, infants:1, nationality:'Korea',  channel:'Naver',       amount:363000,  commission:2.0  },
+  { guestname:'jaslyn',  checkin:'2026-06-09', checkout:'2026-06-10', bookingdate:'2026-01-11', guests:4, infants:0, nationality:'Others', channel:'Airbnb',      amount:258762,  commission:18.2 },
+  { guestname:'대만',    checkin:'2026-06-10', checkout:'2026-06-11', bookingdate:'2026-04-25', guests:4, infants:0, nationality:'Taiwan', channel:'Airbnb',      amount:220000,  commission:15.5 },
+  { guestname:'tzu',     checkin:'2026-06-12', checkout:'2026-06-13', bookingdate:'2026-03-28', guests:4, infants:0, nationality:'Taiwan', channel:'Booking.com', amount:209760,  commission:0    },
+  { guestname:'대만',    checkin:'2026-06-13', checkout:'2026-06-14', bookingdate:'2026-04-15', guests:2, infants:0, nationality:'Taiwan', channel:'Airbnb',      amount:235000,  commission:15.5 },
+  { guestname:'justyna', checkin:'2026-06-14', checkout:'2026-06-15', bookingdate:'2026-05-08', guests:2, infants:0, nationality:'Others', channel:'Airbnb',      amount:190000,  commission:15.5 },
+  { guestname:'대만',    checkin:'2026-06-16', checkout:'2026-06-18', bookingdate:'2026-02-15', guests:4, infants:0, nationality:'Taiwan', channel:'Booking.com', amount:388800,  commission:0    },
+  { guestname:'정수경',  checkin:'2026-06-18', checkout:'2026-06-19', bookingdate:'2026-06-18', guests:2, infants:1, nationality:'Korea',  channel:'Naver',       amount:180000,  commission:2.0  },
+  { guestname:'대만',    checkin:'2026-06-19', checkout:'2026-06-21', bookingdate:'2026-03-07', guests:4, infants:0, nationality:'Taiwan', channel:'Airbnb',      amount:446680,  commission:17.7 },
+  { guestname:'xin yu',  checkin:'2026-06-22', checkout:'2026-06-23', bookingdate:'2026-04-06', guests:1, infants:0, nationality:'Others', channel:'Airbnb',      amount:220000,  commission:17.1 },
+  { guestname:'dory',    checkin:'2026-06-23', checkout:'2026-06-24', bookingdate:'2026-05-20', guests:3, infants:0, nationality:'Taiwan', channel:'Airbnb',      amount:220000,  commission:15.5 },
+  { guestname:'유소영',  checkin:'2026-06-24', checkout:'2026-06-25', bookingdate:'2026-05-17', guests:4, infants:0, nationality:'Korea',  channel:'Naver',       amount:189000,  commission:2.0  },
+  { guestname:'정은아',  checkin:'2026-06-26', checkout:'2026-06-27', bookingdate:'2026-04-21', guests:3, infants:0, nationality:'Korea',  channel:'Naver',       amount:229000,  commission:2.0  },
+  { guestname:'고윤하',  checkin:'2026-06-27', checkout:'2026-06-28', bookingdate:'2026-05-28', guests:3, infants:0, nationality:'Korea',  channel:'Naver',       amount:229000,  commission:2.0  },
+  { guestname:'최예슬',  checkin:'2026-06-28', checkout:'2026-06-29', bookingdate:'2026-05-18', guests:1, infants:0, nationality:'Korea',  channel:'Direct',      amount:132000,  commission:0    },
+  { guestname:'jemma',   checkin:'2026-06-29', checkout:'2026-07-01', bookingdate:'2025-11-10', guests:2, infants:0, nationality:'Others', channel:'Booking.com', amount:408000,  commission:0    },
+  // 7월
+  { guestname:'sharon',  checkin:'2026-07-02', checkout:'2026-07-03', bookingdate:'2026-04-04', guests:3, infants:0, nationality:'Others', channel:'Airbnb', amount:220000, commission:17.1 },
+  { guestname:'이진주',  checkin:'2026-07-03', checkout:'2026-07-05', bookingdate:'2026-07-03', guests:2, infants:0, nationality:'Korea', channel:'Direct', amount:360000, commission:0 },
+  { guestname:'liu',     checkin:'2026-07-09', checkout:'2026-07-10', bookingdate:'2026-04-18', guests:3, infants:0, nationality:'Taiwan', channel:'Airbnb', amount:220000, commission:15.5 },
+  { guestname:'최지현',  checkin:'2026-07-15', checkout:'2026-07-17', bookingdate:'2026-02-26', guests:2, infants:0, nationality:'Korea', channel:'Naver', amount:310000, commission:2.0 },
+  { guestname:'차수진',  checkin:'2026-07-17', checkout:'2026-07-19', bookingdate:'2026-07-17', guests:3, infants:0, nationality:'Korea', channel:'Naver', amount:370000, commission:2.0 },
+  { guestname:'wayne',   checkin:'2026-07-19', checkout:'2026-07-20', bookingdate:'2026-05-17', guests:4, infants:0, nationality:'Others', channel:'Airbnb', amount:220000, commission:15.5 },
+  { guestname:'이동우',  checkin:'2026-07-22', checkout:'2026-07-24', bookingdate:'2026-03-16', guests:4, infants:0, nationality:'Korea', channel:'Naver', amount:390000, commission:2.0 },
+  { guestname:'cheng',   checkin:'2026-07-27', checkout:'2026-07-29', bookingdate:'2026-01-22', guests:4, infants:0, nationality:'Taiwan', channel:'Booking.com', amount:471230, commission:0 },
+  { guestname:'목동수',  checkin:'2026-07-29', checkout:'2026-07-30', bookingdate:'2026-03-16', guests:3, infants:0, nationality:'Korea', channel:'Naver', amount:200000, commission:2.0 },
+  { guestname:'lei',     checkin:'2026-07-30', checkout:'2026-08-01', bookingdate:'2026-03-15', guests:4, infants:0, nationality:'Taiwan', channel:'Booking.com', amount:394730, commission:0 },
+  // 8월
+  { guestname:'노혜선',  checkin:'2026-08-04', checkout:'2026-08-05', bookingdate:'2026-08-04', guests:3, infants:0, nationality:'Korea', channel:'Naver', amount:0, commission:2.0 },
+  { guestname:'본부장님',checkin:'2026-08-06', checkout:'2026-08-07', bookingdate:'2026-08-06', guests:5, infants:0, nationality:'Korea', channel:'Direct', amount:240000, commission:0 },
+  { guestname:'최유정',  checkin:'2026-08-09', checkout:'2026-08-10', bookingdate:'2026-08-09', guests:4, infants:0, nationality:'Korea', channel:'Naver', amount:0, commission:2.0 },
+  { guestname:'elisabeth',checkin:'2026-08-10',checkout:'2026-08-12', bookingdate:'2026-05-04', guests:4, infants:0, nationality:'Others', channel:'Booking.com', amount:464871, commission:0 },
+  { guestname:'floor',   checkin:'2026-08-20', checkout:'2026-08-21', bookingdate:'2026-08-20', guests:3, infants:0, nationality:'Others', channel:'Airbnb', amount:0, commission:15.5 },
+  { guestname:'leonardo',checkin:'2026-08-21', checkout:'2026-08-23', bookingdate:'2026-05-14', guests:4, infants:0, nationality:'Others', channel:'Booking.com', amount:508800, commission:0 },
+  { guestname:'rocio',   checkin:'2026-08-29', checkout:'2026-08-30', bookingdate:'2026-04-17', guests:3, infants:0, nationality:'Others', channel:'Booking.com', amount:231562, commission:0 },
+  // 9월
+  { guestname:'simone',  checkin:'2026-09-01', checkout:'2026-09-03', bookingdate:'2026-03-30', guests:2, infants:0, nationality:'Others', channel:'Booking.com', amount:388151, commission:0 },
+  { guestname:'배병조',  checkin:'2026-09-04', checkout:'2026-09-11', bookingdate:'2026-05-03', guests:3, infants:0, nationality:'Korea', channel:'Naver', amount:1313000, commission:2.0 },
+  { guestname:'yang',    checkin:'2026-09-16', checkout:'2026-09-17', bookingdate:'2026-04-04', guests:4, infants:0, nationality:'Taiwan', channel:'Booking.com', amount:190929, commission:0 },
+  { guestname:'sonam',   checkin:'2026-09-20', checkout:'2026-09-22', bookingdate:'2026-03-16', guests:3, infants:0, nationality:'Others', channel:'Airbnb', amount:420426, commission:17.1 },
+  { guestname:'김진희',  checkin:'2026-09-23', checkout:'2026-09-25', bookingdate:'2026-03-26', guests:4, infants:0, nationality:'Korea', channel:'Naver', amount:430000, commission:2.0 },
+  { guestname:'ziv',     checkin:'2026-09-26', checkout:'2026-09-28', bookingdate:'2026-03-08', guests:3, infants:0, nationality:'Others', channel:'Booking.com', amount:407180, commission:0 },
+] as const;
 
 const ICAL_CHANNELS: { channel: Channel; label: string; dot: string }[] = [
   { channel: 'Airbnb',      label: 'Airbnb',      dot: 'bg-rose-500'   },
@@ -36,13 +89,140 @@ const SettingsPage = () => {
   const {
     settings, properties, updateSettings, updateProperty, addProperty, deleteProperty,
     syncChannels, syncLoading, lastSyncResults,
-    fetchSyncChannels, saveSyncChannel, deleteSyncChannel, triggerSync,
+    fetchSyncChannels, saveSyncChannel, deleteSyncChannel, triggerSync, fetchData,
   } = useStore();
 
   const ko = language === 'ko';
   const [notifications, setNotifications] = useState(settings?.notifications ?? true);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isAddingProperty, setIsAddingProperty] = useState(false);
+  const [restoreStatus, setRestoreStatus] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  const handleRestoreJune2026 = async () => {
+    setRestoring(true);
+    setRestoreStatus('현재 데이터 확인 중...');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setRestoreStatus('❌ 로그인 필요'); return; }
+
+      const prop = properties[0];
+      if (!prop) { setRestoreStatus('❌ 숙소를 먼저 추가해주세요'); return; }
+
+      // 중복 체크 및 기존 데이터 조회
+      const { data: existing } = await supabase
+        .from('bookings').select('id, guestname, checkin, bookingdate')
+        .eq('host_id', user.id)
+        .gte('checkin', '2026-05-29').lte('checkin', '2026-09-30'); // <-- UPDATED RANGE
+
+      const existingMap = new Map((existing ?? []).map(b => [`${b.guestname}|${b.checkin}`, b]));
+      const existingSet = new Set(existingMap.keys());
+
+      const toInsert = RESTORE_2026_DATA.filter(
+        b => !existingSet.has(`${b.guestname}|${b.checkin}`)
+      );
+
+      const toUpdate = RESTORE_2026_DATA.map(b => {
+        const exist = existingMap.get(`${b.guestname}|${b.checkin}`);
+        if (exist && exist.bookingdate !== b.bookingdate) {
+          return { id: exist.id, newBookingDate: b.bookingdate };
+        }
+        return null;
+      }).filter(Boolean);
+
+      if (toInsert.length === 0 && toUpdate.length === 0) {
+        setRestoreStatus('✅ 이미 모두 올바르게 입력되어 있습니다');
+        return;
+      }
+
+      setRestoreStatus(`${toInsert.length}건 삽입, ${toUpdate.length}건 수정 중...`);
+
+      // 업데이트 실행
+      if (toUpdate.length > 0) {
+        for (const update of toUpdate) {
+          await supabase.from('bookings').update({ bookingdate: update!.newBookingDate }).eq('id', update!.id);
+        }
+      }
+
+      // 삽입 실행
+      if (toInsert.length > 0) {
+        const rows = toInsert.map(b => ({
+          host_id: user.id, property_id: prop.id,
+          guestname: b.guestname, checkin: b.checkin, checkout: b.checkout,
+          bookingdate: b.bookingdate, guests: b.guests, infants: b.infants,
+          nationality: b.nationality, channel: b.channel,
+          status: 'confirmed', amount: b.amount, commission: b.commission,
+        }));
+
+        const { error } = await supabase.from('bookings').insert(rows);
+        if (error) { setRestoreStatus(`❌ ${error.message}`); return; }
+      }
+
+      await fetchData();
+      setRestoreStatus(`✅ ${toInsert.length}건 복구, ${toUpdate.length}건 예약일 수정 완료!`);
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const [cleaningStatus, setCleaningStatus] = useState<string | null>(null);
+  const [isCleaning, setIsCleaning] = useState(false);
+
+  const handleCleanupData = async () => {
+    setIsCleaning(true);
+    setCleaningStatus('데이터 정제 확인 중...');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setCleaningStatus('❌ 로그인 필요'); return; }
+
+      const { data: allBookings } = await supabase
+        .from('bookings').select('id, nationality, channel')
+        .eq('host_id', user.id);
+
+      if (!allBookings) {
+        setCleaningStatus('❌ 데이터가 없습니다.'); return;
+      }
+
+      let updateCount = 0;
+      for (const b of allBookings) {
+        let newNat = b.nationality;
+        let newChan = b.channel;
+
+        // Normalize Nationality
+        const nLow = (b.nationality || '').toLowerCase().trim();
+        if (['대한민국', '한국', 'korea', 'kr'].includes(nLow)) newNat = 'Korea';
+        else if (['대만', 'taiwan', 'tw'].includes(nLow)) newNat = 'Taiwan';
+        else if (['싱가폴', '싱가포르', 'singapore', 'sg'].includes(nLow)) newNat = 'Singapore';
+        else if (['중국', 'china', 'cn'].includes(nLow)) newNat = 'China';
+        else if (['서구권', '미국', '영국', '프랑스', '독일', '호주', '캐나다', '이탈리아', '스페인', '네덜란드', '스위스', '러시아', 'western', 'us', 'uk'].includes(nLow)) newNat = 'Western';
+        else if (nLow !== 'others' && nLow !== 'korea' && nLow !== 'taiwan' && nLow !== 'singapore' && nLow !== 'china' && nLow !== 'western') newNat = 'Others';
+
+        // Normalize Channel
+        const cLow = (b.channel || '').toLowerCase().trim();
+        if (['에어비앤비', 'airbnb'].includes(cLow)) newChan = 'Airbnb';
+        else if (['부킹닷컴', 'booking.com', 'booking'].includes(cLow)) newChan = 'Booking.com';
+        else if (['네이버', 'naver'].includes(cLow)) newChan = 'Naver';
+        else if (cLow !== 'airbnb' && cLow !== 'booking.com' && cLow !== 'naver' && cLow !== 'direct') newChan = 'Direct';
+
+        if (newNat !== b.nationality || newChan !== b.channel) {
+          await supabase.from('bookings').update({ nationality: newNat, channel: newChan }).eq('id', b.id);
+          updateCount++;
+        }
+      }
+
+      if (updateCount > 0) {
+        await fetchData();
+        setCleaningStatus(`✅ 정제 완료: ${updateCount}건의 데이터가 수정되었습니다.`);
+      } else {
+        setCleaningStatus('✅ 모든 데이터가 이미 깨끗합니다.');
+      }
+    } catch(e: any) {
+      setCleaningStatus(`❌ 오류: ${e.message}`);
+    } finally {
+      setIsCleaning(false);
+    }
+  };
+
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   const toggleDark = () => {
@@ -138,6 +318,42 @@ const SettingsPage = () => {
           <span className="text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg flex-shrink-0 ml-3">
             {settings?.plan === 'pro' ? 'Pro' : 'Basic'}
           </span>
+        </div>
+
+        {/* ── 6~9월 데이터 복구 버튼 (임시) ── */}
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl px-4 py-3.5 mb-3">
+          <p className="text-[12px] font-bold text-amber-700 dark:text-amber-400 mb-1">26년 예약 데이터 일괄 복구</p>
+          <p className="text-[11px] text-amber-600/80 dark:text-amber-500/80 mb-3">
+            누락된 6~9월 예약을 자동으로 확인하고, 잘못된 예약일을 수정합니다.
+          </p>
+          <button
+            onClick={handleRestoreJune2026}
+            disabled={restoring}
+            className="h-8 px-4 text-[12px] font-semibold bg-amber-500 text-white rounded-lg disabled:opacity-50 transition-opacity"
+          >
+            {restoring ? '처리 중...' : '데이터 복구/수정 실행'}
+          </button>
+          {restoreStatus && (
+            <p className="mt-2 text-[12px] text-amber-700 dark:text-amber-400 font-medium">{restoreStatus}</p>
+          )}
+        </div>
+
+        {/* ── 데이터베이스 정제 ── */}
+        <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/40 rounded-xl px-4 py-3.5 mb-3">
+          <p className="text-[12px] font-bold text-sky-700 dark:text-sky-400 mb-1">데이터베이스 정제</p>
+          <p className="text-[11px] text-sky-600/80 dark:text-sky-500/80 mb-3">
+            '대한민국' → 'Korea' 등 통계에 방해되는 이명(異名) 데이터를 표준 규격으로 일괄 정제합니다.
+          </p>
+          <button
+            onClick={handleCleanupData}
+            disabled={isCleaning}
+            className="h-8 px-4 text-[12px] font-semibold bg-sky-500 text-white rounded-lg disabled:opacity-50 transition-opacity"
+          >
+            {isCleaning ? '정제 중...' : '데이터 정제 실행'}
+          </button>
+          {cleaningStatus && (
+            <p className="mt-2 text-[12px] text-sky-700 dark:text-sky-400 font-medium">{cleaningStatus}</p>
+          )}
         </div>
 
         {/* ── 숙소 관리 ── */}

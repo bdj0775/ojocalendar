@@ -11,6 +11,7 @@ import {
   Area,
 } from 'recharts';
 import { useStore } from '../../store/useStore';
+import { OverlapDetector } from '../../components/OverlapDetector';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useDesktopStats } from '../../hooks/useDesktopStats';
 import { useBookingPace } from '../../hooks/useBookingPace';
@@ -63,6 +64,47 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
   const actualMonthIdx = new Date().getMonth();
   const MONTH_EN_IDX: Record<string, number> = {
     Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11,
+  };
+
+  const initializeWithDummyData = async () => {
+    try {
+      if (!userProfile) return;
+      await supabase.from('bookings').delete().eq('host_id', userProfile.id);
+      await supabase.from('properties').delete().eq('host_id', userProfile.id);
+
+      const { data: props, error: pErr } = await supabase
+        .from('properties')
+        .insert([{ host_id: userProfile.id, name: '오조록' }])
+        .select();
+      if (pErr) throw pErr;
+
+      const newProp = props[0];
+      const bkRows = DUMMY_BOOKINGS.map(b => ({
+        property_id: newProp.id,
+        host_id: userProfile.id,
+        guestname: b.guestName,
+        checkin: b.checkIn,
+        checkout: b.checkOut,
+        guests: b.guests,
+        infants: b.infants,
+        nationality: b.nationality,
+        channel: b.channel,
+        status: b.status,
+        amount: b.amount,
+        commission: b.commission,
+        bookingdate: b.bookingDate,
+        memo: b.memo,
+      }));
+
+      const { error: bErr } = await supabase.from('bookings').insert(bkRows);
+      if (bErr) throw bErr;
+
+      showToast('샘플 데이터를 복구했습니다.', 'success');
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      showToast('데이터 복구 중 오류가 발생했습니다.', 'error');
+    }
   };
 
   // 차트용 데이터 — 실제 오늘 기준으로 점선/배경바/하이라이트 결정
@@ -172,6 +214,8 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
         </div>
       </header>
 
+      <OverlapDetector />
+
       {/* Grid */}
       <div className="grid grid-cols-3 gap-4">
 
@@ -187,32 +231,7 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
             </p>
             <button
               className="py-3 px-7 bg-gradient-to-br from-primary to-accent-foreground text-white border-0 rounded-inner cursor-pointer font-bold text-sm transition-all hover:-translate-y-px hover:shadow-lg hover:shadow-primary/40"
-              onClick={async () => {
-                if (!userProfile) return;
-                const pId = properties[0]?.id;
-                if (!pId) { showToast(ko ? '숙소 정보가 없습니다. 페이지를 새로고침해주세요.' : 'No property found. Please refresh.', 'error'); return; }
-                try {
-                  showToast(ko ? '샘플 데이터 복구를 시작합니다..' : 'Restoring sample data...', 'info');
-                  const bkRows = DUMMY_BOOKINGS.map(b => ({
-                    host_id: userProfile.id, property_id: pId,
-                    guestname: b.guestName, checkin: b.checkIn, checkout: b.checkOut,
-                    guests: b.guests, infants: b.infants, nationality: b.nationality,
-                    channel: b.channel, status: b.status || 'confirmed',
-                    amount: b.amount || 0, commission: b.commission || 0,
-                  }));
-                  await supabase.from('bookings').insert(bkRows);
-                  const mtRows = DUMMY_MAINTENANCE.map(m => ({
-                    host_id: userProfile.id, property_id: pId,
-                    startdate: m.startDate, enddate: m.endDate, label: m.label,
-                  }));
-                  await supabase.from('maintenance').insert(mtRows);
-                  await fetchData();
-                  showToast(ko ? '샘플 데이터 복구가 완료되었습니다.' : 'Sample data restored.', 'success');
-                } catch (e) {
-                  console.error(e);
-                  showToast((ko ? '복구 중 오류: ' : 'Error: ') + (e as Error).message, 'error');
-                }
-              }}
+              onClick={initializeWithDummyData}
             >
               {ko ? '샘플 데이터 복구하기' : 'Recover Sample Data'}
             </button>
@@ -426,8 +445,8 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
         </div>
 
         {/* Box 5: Monthly Trends */}
-        <div className={`col-span-2 ${cardCls}`}>
-          <div className="flex items-center justify-between mb-4">
+        <div className="col-span-2 flex flex-col bg-card text-card-foreground border border-border rounded-2xl p-5 relative overflow-hidden transition-all duration-300 shadow-sm">
+        <div className="flex items-end justify-between mb-8">
             <span className={chartTitleCls}>{ko ? '월별 추이 (11개월)' : 'Monthly Trends (11 Months)'}</span>
             <div className="flex items-center gap-6">
 

@@ -10,6 +10,7 @@ import {
   CartesianGrid, ReferenceLine,
 } from 'recharts';
 import { useStore } from '../../store/useStore';
+import { OverlapDetector } from '../../components/OverlapDetector';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useDesktopStats } from '../../hooks/useDesktopStats';
 import { useBookingPace } from '../../hooks/useBookingPace';
@@ -225,10 +226,6 @@ const DashboardPage = () => {
                     guests: b.guests, infants: b.infants, nationality: b.nationality,
                     channel: b.channel, status: b.status || 'confirmed',
                     amount: b.amount || 0, commission: b.commission || 0,
-                  })));
-                  await supabase.from('maintenance').insert(DUMMY_MAINTENANCE.map(m => ({
-                    host_id: userProfile.id, property_id: pId,
-                    startdate: m.startDate, enddate: m.endDate, label: m.label,
                   })));
                   await fetchData();
                   showToast('완료', 'success');

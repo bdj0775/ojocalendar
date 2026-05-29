@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
-import type { Booking, Maintenance, Property } from '../../types';
+import type { Booking, Property } from '../../types';
 
 // 숙소별 색상 — MobileSidebar와 공유
 export const PROP_COLORS = ['#5C6BC0', '#FF7043', '#9CCC65', '#29B6F6', '#26A69A', '#7E57C2'];
 
 export interface BookingBar {
   id: string | number;
-  type: 'booking' | 'maintenance';
+  type: 'booking' ;
   guestName: string;
   channel?: string;
   nationality?: string;
@@ -29,7 +29,7 @@ export interface BookingBar {
 
 interface CalItem {
   id: string | number;
-  type: 'booking' | 'maintenance';
+  type: 'booking' ;
   checkIn: string;
   checkOut: string;
   guestName: string;
@@ -68,7 +68,7 @@ const MAX_SLOTS = 3;
 
 export function useBookingBars(
   bookings: Booking[],
-  maintenance: Maintenance[],
+  
   calendarGrid: GridCell[],
   properties?: Property[], // 숙소 배열 (순서 + 색상 기준)
 ): BookingBar[] {
@@ -77,13 +77,6 @@ export function useBookingBars(
 
     const allItems: CalItem[] = [
       ...bookings.map(b => ({ ...b, type: 'booking' as const })),
-      ...maintenance.map(m => ({
-        ...m,
-        type:      'maintenance' as const,
-        guestName: m.label,
-        checkIn:   m.startDate,
-        checkOut:  m.endDate,
-      })),
     ];
 
     const visibleStart = parseLocalStr(calendarGrid[0].dateStr);
@@ -158,9 +151,7 @@ export function useBookingBars(
 
         if (endIdx < startIdx) return;
 
-        const channelClass = item.type === 'maintenance'
-          ? 'maintenance'
-          : (CHANNEL_STYLES[item.channel || ''] || 'airbnb');
+        const channelClass = (CHANNEL_STYLES[item.channel || ''] || 'airbnb');
 
         let cur = startIdx;
         while (cur <= endIdx) {
@@ -201,5 +192,5 @@ export function useBookingBars(
     });
 
     return bars;
-  }, [bookings, maintenance, calendarGrid, properties]);
+  }, [bookings, calendarGrid, properties]);
 }

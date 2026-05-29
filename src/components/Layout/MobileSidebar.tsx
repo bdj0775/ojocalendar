@@ -169,31 +169,52 @@ const MobileSidebar = () => {
   // KPI for current month — lightweight, no forecast computation
   const kpi = useMemo(() => {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const mStart = new Date(currentYear, currentMonth, 1, 12, 0, 0);
-    const mEnd = new Date(currentYear, currentMonth + 1, 1, 12, 0, 0);
-    let gross = 0, occNights = 0, otaComm = 0;
+    const validBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed');
+    const getOverlapNights = (inD: string, outD: string, y: number, m: number) => {
+        const mStart = new Date(y, m, 1, 12, 0, 0);
+        const mEnd = new Date(y, m + 1, 1, 12, 0, 0);
+        const bStart = new Date(inD + 'T12:00:00');
+        const bEnd = new Date(outD + 'T12:00:00');
+        const overlapStart = bStart > mStart ? bStart : mStart;
+        const overlapEnd = bEnd < mEnd ? bEnd : mEnd;
+        return overlapStart >= overlapEnd ? 0 : Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 86400000);
+    };
 
-    bookings
-      .filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed')
+    let gross = 0, otaComm = 0;
+    const occupiedDates = new Set<string>();
+
+    validBookings
+      .filter(b => getOverlapNights(b.checkIn, b.checkOut, currentYear, currentMonth) > 0)
       .forEach(b => {
+        const mStart = new Date(currentYear, currentMonth, 1, 12, 0, 0);
+        const mEnd = new Date(currentYear, currentMonth + 1, 1, 12, 0, 0);
         const bStart = new Date(b.checkIn + 'T12:00:00');
         const bEnd = new Date(b.checkOut + 'T12:00:00');
         const overlapStart = bStart > mStart ? bStart : mStart;
         const overlapEnd = bEnd < mEnd ? bEnd : mEnd;
-        if (overlapStart >= overlapEnd) return;
-        const n = Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 86400000);
-        if (n <= 0) return;
+        const n = overlapStart >= overlapEnd ? 0 : Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 86400000);
+        
         const totalNights = Math.max(1, Math.round((bEnd.getTime() - bStart.getTime()) / 86400000));
         const amount = Number(b.amount) || 0;
-        const gPortion = (amount / totalNights) * n;
-        const commRate = b.commission || 0;
-        gross += gPortion;
-        if (b.channel !== 'Direct') otaComm += gPortion * (commRate / 100);
-        occNights += n;
+        
+        if (n > 0) {
+          let cur = new Date(overlapStart);
+          while (cur < overlapEnd) {
+            occupiedDates.add(`${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`);
+            cur.setDate(cur.getDate() + 1);
+          }
+          const gPortion = (amount / totalNights) * n;
+          gross += gPortion;
+          if (b.channel !== 'Direct') {
+            const cRate = b.commission || 0;
+            otaComm += gPortion * (cRate / 100);
+          }
+        }
       });
 
+    const occNights = occupiedDates.size;
     return {
-      occupancyRate: Math.round((occNights / daysInMonth) * 100),
+      occupancyRate: Math.min(100, Math.round((occNights / daysInMonth) * 100)),
       grossRevenue: Math.round(gross),
       adrThisMonth: occNights === 0 ? 0 : Math.round(gross / occNights),
       otaCommission: Math.round(otaComm),

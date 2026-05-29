@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
-import { DUMMY_BOOKINGS, DUMMY_MAINTENANCE } from '../../utils/dummyData';
+import { DUMMY_BOOKINGS } from '../../utils/dummyData';
 import DashboardPage from '../Dashboard/Dashboard';
 import CalendarPage from '../Calendar/Calendar';
 
@@ -37,7 +37,7 @@ export const FeatureCarousel = () => {
     }
     return () => {
       if (!useStore.getState().isAuthenticated) {
-        useStore.setState({ bookings: [], maintenance: [], properties: [] });
+        useStore.setState({ bookings: [], properties: [] });
       }
     };
   }, []);
@@ -53,7 +53,7 @@ export const FeatureCarousel = () => {
       setActive(0);
       useStore.setState({
         bookings: DUMMY_BOOKINGS.map(b => ({ ...b, propertyId: MOCK_PROP_ID })) as any,
-        maintenance: DUMMY_MAINTENANCE.map(m => ({ ...m, propertyId: MOCK_PROP_ID })) as any,
+        
         currentYear: 2025,
         currentMonth: 7, // 8월
       });

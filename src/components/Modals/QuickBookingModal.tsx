@@ -58,7 +58,7 @@ interface Props {
 }
 
 const QuickBookingModal = ({ date, onClose }: Props) => {
-  const { properties, bookings, maintenance, addBooking, showToast } = useStore();
+  const { properties, bookings, addBooking, showToast } = useStore();
 
   // 해당 날짜에 이미 예약/휴무가 있는 숙소 ID 집합
   const occupiedPropertyIds = useMemo(() => {
@@ -66,21 +66,15 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
     bookings.forEach(b => {
       if (b.checkIn <= date && b.checkOut > date && b.propertyId) s.add(b.propertyId);
     });
-    maintenance.forEach(m => {
-      if (m.startDate <= date && m.endDate > date && m.propertyId) s.add(m.propertyId);
-    });
     return s;
-  }, [bookings, maintenance, date]);
+  }, [bookings, date]);
 
   // 첫 번째 여유 숙소로 자동 선택
   const [selectedPropertyId, setSelectedPropertyId] = useState(() => {
     const state = useStore.getState();
     const occ = new Set<string>();
     state.bookings.forEach(b => {
-      if (b.checkIn <= date && b.checkOut > date && b.propertyId) occ.add(b.propertyId);
-    });
-    state.maintenance.forEach(m => {
-      if (m.startDate <= date && m.endDate > date && m.propertyId) occ.add(m.propertyId);
+      if (b.status !== 'cancelled' && b.checkIn <= date && b.checkOut > date && b.propertyId) occ.add(b.propertyId);
     });
     const firstAvail = state.properties.find(p => !occ.has(p.id));
     return (firstAvail ?? state.properties[0])?.id ?? '';
@@ -101,6 +95,7 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
   const [amountCustom, setAmountCustom] = useState(false);
   const [commRate,     setCommRate]     = useState(17);
   const [commCustom,   setCommCustom]   = useState(false);
+  const [bookingDate,  setBookingDate]  = useState(today); // <-- ADDED
   const [memo,         setMemo]         = useState('');
   const [memoFocused,  setMemoFocused]  = useState(false);
   const [isSaving,     setIsSaving]     = useState(false);
@@ -114,7 +109,7 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
     if (!amountCustom) syncAmount((selectedProperty?.basePrice ?? 0) * nights);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPropertyId]);
-  const leadTime   = diffDays(today, checkIn);
+  const leadTime   = diffDays(bookingDate, checkIn);
   const commission = Math.round(amount * commRate / 100);
   const weekend    = isWeekendDate(checkIn);
 
@@ -197,7 +192,7 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
         infants: 0,
         nationality, channel,
         amount, commission: commRate,
-        bookingDate: today,
+        bookingDate: bookingDate,
         propertyId: selectedPropertyId || undefined,
         memo: memo.trim() || undefined,
       });
@@ -418,8 +413,17 @@ const QuickBookingModal = ({ date, onClose }: Props) => {
           {/* Footer & Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-border/30">
             <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide">
+                예약일: 
+                <input 
+                  type="date" 
+                  value={bookingDate} 
+                  onChange={e => setBookingDate(e.target.value)} 
+                  className="bg-transparent border-b border-muted-foreground/30 text-slate-800 dark:text-slate-200 outline-none w-[90px]"
+                />
+              </div>
               <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide">
-                리드타임: {leadTime > 0 ? `${leadTime}일 전` : '오늘'}
+                리드타임: {leadTime > 0 ? `${leadTime}일 전` : '당일'}
               </span>
               <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wide">
                 예상 점유율: {monthOccupancy}%

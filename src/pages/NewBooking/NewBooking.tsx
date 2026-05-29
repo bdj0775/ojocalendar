@@ -195,7 +195,7 @@ const NewBookingPage = () => {
     }
     const state = useStore.getState();
     type AnyEvent = { id: string; propertyId?: string; checkIn?: string; checkOut?: string; startDate?: string; endDate?: string };
-    const allEvents = [...state.bookings, ...state.maintenance] as AnyEvent[];
+    const allEvents = [...state.bookings, ] as AnyEvent[];
     return allEvents.some(e => {
       if (editBooking && e.id === editBooking.id) return false;
       // 다른 숙소 이벤트는 겹침 검사 제외

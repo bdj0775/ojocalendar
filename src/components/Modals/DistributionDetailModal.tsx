@@ -101,7 +101,7 @@ export default function DistributionDetailModal({ mode, isDark, onClose }: Props
       if (totalNights === 0) return null;
 
       // OCC% = 총 숙박박수 / 해당월 일수 × 100 → 막대 높이와 정확히 비례
-      const occPct = Math.round((r.occNights / r.days) * 100);
+      const occPct = Math.min(100, Math.round((r.occNights / r.days) * 100));
 
       const prev = i > 0 ? mdata.get(`${months[i - 1].y}-${months[i - 1].m}`) : null;
       const prevTotalCount = prev ? prev.totalCount : 0;

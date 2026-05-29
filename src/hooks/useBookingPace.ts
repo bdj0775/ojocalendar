@@ -89,7 +89,8 @@ export const useBookingPace = (): BookingPaceResult => {
     const currentMonthTarget = targets.find(t => t.isCurrent)!;
     const todayOccupancy = accumulatorsNights[targets.indexOf(currentMonthTarget)];
     const todayRevenue = accumulatorsRev[targets.indexOf(currentMonthTarget)];
-    const todayOccupancyPct = Number(((todayOccupancy / currentMonthTarget.daysInMonth) * 100).toFixed(1));
+    const rawOccupancyPct = Number(((todayOccupancy / currentMonthTarget.daysInMonth) * 100).toFixed(1));
+    const todayOccupancyPct = Math.min(100, rawOccupancyPct);
 
     return {
       paceData, targets,

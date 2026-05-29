@@ -58,7 +58,7 @@ export const useStore = create<StoreState>()(
           if (session) {
             get().fetchData();
           } else {
-            set({ properties: [], bookings: [], maintenance: [], settings: { ...get().settings, profileName: '' } });
+            set({ properties: [], bookings: [], settings: { ...get().settings, profileName: '' } });
           }
         });
       },
@@ -115,9 +115,7 @@ export const useStore = create<StoreState>()(
         set({ currentYear: now.getFullYear(), currentMonth: now.getMonth() });
       },
 
-      properties: [],
       bookings: [],
-      maintenance: [],
 
       migrateData: async () => {
         const user = get().userProfile;
@@ -189,17 +187,6 @@ export const useStore = create<StoreState>()(
               })),
             });
           }
-          const { data: mData, error: mErr } = await supabase
-            .from('maintenance').select('*').eq('host_id', user.id);
-          if (mErr) throw mErr;
-          if (mData) {
-            set({
-              maintenance: mData.map(m => ({
-                id: m.id, propertyId: m.property_id,
-                startDate: m.startdate, endDate: m.enddate, label: m.label,
-              })),
-            });
-          }
           await get().fetchNotifications();
         } catch (err) {
           console.error('Fetch Error:', err);
@@ -262,7 +249,6 @@ export const useStore = create<StoreState>()(
         const snap = {
           properties:    get().properties,
           bookings:      get().bookings,
-          maintenance:   get().maintenance,
           syncChannels:  get().syncChannels,
         };
 
@@ -275,7 +261,6 @@ export const useStore = create<StoreState>()(
           return {
             properties:   remaining,
             bookings:     state.bookings.filter(b => b.propertyId !== propId),
-            maintenance:  state.maintenance.filter(m => m.propertyId !== propId),
             syncChannels: state.syncChannels.filter(c => c.propertyId !== propId),
             visiblePropertyIds:
               filtered === null || filtered.length === allRemainingIds.length ? null : filtered,
@@ -284,14 +269,13 @@ export const useStore = create<StoreState>()(
 
         // Delete related records first, then the property itself
         // (Supabase foreign keys may not have CASCADE — handle explicitly)
-        const [bErr, mErr, sErr, pErr] = await Promise.all([
+        const [bErr, sErr, pErr] = await Promise.all([
           supabase.from('bookings').delete().eq('property_id', propId),
-          supabase.from('maintenance').delete().eq('property_id', propId),
           supabase.from('sync_channels').delete().eq('property_id', propId),
           supabase.from('properties').delete().eq('id', propId),
         ]).then(results => results.map(r => r.error));
 
-        const error = bErr || mErr || sErr || pErr;
+        const error = bErr || sErr || pErr;
         if (error) {
           set(snap);
           get().showToast('숙소 삭제에 실패했습니다.', 'error');
@@ -359,55 +343,13 @@ export const useStore = create<StoreState>()(
         }
       },
 
-      addMaintenance: async (m) => {
-        const user = get().userProfile;
-        const pId = m.propertyId ?? get().properties[0]?.id;
-        if (!user || !pId) return;
-        const { data, error } = await supabase.from('maintenance').insert({
-          host_id: user.id, property_id: pId,
-          startdate: m.startDate, enddate: m.endDate, label: m.label,
-        }).select().single();
-        if (error) {
-          get().showToast('휴무 저장에 실패했습니다.', 'error');
-          throw error;
-        }
-        set(state => ({ maintenance: [...state.maintenance, { ...m, id: data.id }] }));
-      },
-
-      updateMaintenance: async (id, patch) => {
-        set(state => ({ maintenance: state.maintenance.map(m => m.id === id ? { ...m, ...patch } : m) }));
-        const rowData: Record<string, unknown> = {};
-        if (patch.startDate !== undefined) rowData.startdate = patch.startDate;
-        if (patch.endDate !== undefined) rowData.enddate = patch.endDate;
-        if (patch.label !== undefined) rowData.label = patch.label;
-        const { error } = await supabase.from('maintenance').update(rowData).eq('id', id);
-        if (error) {
-          get().showToast('휴무 수정에 실패했습니다.', 'error');
-          throw error;
-        }
-      },
-
-      deleteMaintenance: async (id) => {
-        set(state => ({ maintenance: state.maintenance.filter(m => m.id !== id) }));
-        const { error } = await supabase.from('maintenance').delete().eq('id', id);
-        if (error) {
-          get().showToast('휴무 삭제에 실패했습니다.', 'error');
-          throw error;
-        }
-      },
-
       selectedDate: null,
       selectedBookingId: null,
-      selectedMaintDate: null,
-      selectedMaintenanceId: null,
 
-      openDayModal: (dateStr) => set({ selectedDate: dateStr, selectedBookingId: null, selectedMaintenanceId: null }),
-      closeDayModal: () => set({ selectedDate: null }),
-      openBookingModal: (id) => set({ selectedBookingId: id, selectedDate: null, selectedMaintenanceId: null }),
+      openDayModal: (dateStr) => set({ selectedDate: dateStr, selectedBookingId: null }),
+      closeDayModal: () => set({ selectedDate: null, selectedBookingId: null }),
+      openBookingModal: (id) => set({ selectedBookingId: id, selectedDate: null }),
       closeBookingModal: () => set({ selectedBookingId: null }),
-      openMaintModal: (dateStr) => set({ selectedMaintDate: dateStr, selectedDate: null }),
-      openEditMaintModal: (id) => set({ selectedMaintenanceId: id, selectedDate: null }),
-      closeMaintModal: () => set({ selectedMaintDate: null, selectedMaintenanceId: null }),
 
       settings: {
         notifications: true,
