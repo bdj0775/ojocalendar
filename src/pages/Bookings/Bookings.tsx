@@ -32,7 +32,6 @@ const fmtYM = (ym: string) => {
 };
 
 const fmtN = (v: number) => v.toLocaleString();
-
 const commAmt = (amount: number, rate: number) => Math.round(amount * rate / 100);
 
 // ── constants ──────────────────────────────────────────────────────
@@ -71,7 +70,6 @@ interface CardProps {
 
 const BookingCard = ({ guestName, checkIn, checkOut, channel, amount, nights, net, propColor, onTap, ko, guests }: CardProps) => {
   const chLabel = ko ? CH_LABEL_KO[channel] ?? channel : channel === 'Booking.com' ? 'Booking' : channel;
-
   return (
     <button onClick={onTap} className="w-full text-left bg-card border border-border/40 rounded-xl overflow-hidden active:scale-[0.985] transition-transform">
       <div className="flex">
@@ -80,24 +78,22 @@ const BookingCard = ({ guestName, checkIn, checkOut, channel, amount, nights, ne
           style={propColor ? { backgroundColor: propColor } : undefined}
         />
         <div className="flex-1 px-3 py-2.5 min-w-0">
-          {/* 행 1: 예약자명 + 날짜 + 결제금액 */}
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-[13px] font-semibold text-foreground flex-1 truncate leading-none">
+            <span className="text-[13px] font-semibold text-foreground flex-1 leading-none min-w-0 whitespace-nowrap overflow-hidden" style={{ textOverflow: 'clip' }}>
               {guestName || '—'}
             </span>
-            <span className="text-[11px] text-muted-foreground/70 shrink-0 tabular-nums whitespace-nowrap">
+            <span className="text-[11px] text-muted-foreground/70 flex-shrink-0 tabular-nums whitespace-nowrap">
               {fmtMD(checkIn)} → {fmtMD(checkOut)}
             </span>
-            <span className="text-[13px] font-semibold text-foreground tabular-nums shrink-0 leading-none whitespace-nowrap">
+            <span className="text-[13px] font-semibold text-foreground tabular-nums flex-shrink-0 leading-none whitespace-nowrap">
               {fmtN(amount)}원
             </span>
           </div>
-          {/* 행 2: 채널 · 박수 · 인원 + 입금액 */}
           <div className="flex items-center">
             <span className="text-[11px] text-muted-foreground/70 whitespace-nowrap">{chLabel}</span>
             <Dot /><span className="text-[11px] text-muted-foreground/70 whitespace-nowrap">{nights}박</span>
             <Dot /><span className="text-[11px] text-muted-foreground/70 whitespace-nowrap">{guests}명</span>
-            <span className="ml-auto text-[12px] font-medium text-primary tabular-nums shrink-0 whitespace-nowrap pl-2">
+            <span className="ml-auto text-[12px] font-medium text-primary tabular-nums flex-shrink-0 whitespace-nowrap pl-2">
               입금&nbsp;{fmtN(net)}원
             </span>
           </div>
@@ -120,11 +116,12 @@ const BookingsPage = () => {
 
   const [fYear,   setFYear]   = useState(() => new Date().getFullYear());
   const [fch,     setFCh]     = useState<Channel | 'all'>('all');
+  const [fProps,  setFProps]  = useState<string[]>([]);   // 빈 배열 = 전체
   const [fsearch, setFSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('checkIn_desc');
   const [sortOpen, setSortOpen] = useState(false);
+  const [propOpen, setPropOpen] = useState(false);
 
-  // 오늘 스크롤
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
 
@@ -141,7 +138,8 @@ const BookingsPage = () => {
   // ── 필터링·정렬 ───────────────────────────────────────────────
   const rows = useMemo(() => {
     let data = bookings.filter(b => b.checkIn.startsWith(String(fYear)));
-    if (fch !== 'all') data = data.filter(b => b.channel === fch);
+    if (fch !== 'all')       data = data.filter(b => b.channel === fch);
+    if (fProps.length > 0)   data = data.filter(b => fProps.includes(b.propertyId ?? ''));
     if (fsearch.trim()) {
       const q = fsearch.toLowerCase();
       data = data.filter(b => b.guestName.toLowerCase().includes(q));
@@ -154,7 +152,7 @@ const BookingsPage = () => {
         default:             return b.checkIn.localeCompare(a.checkIn);
       }
     });
-  }, [bookings, fYear, fch, fsearch, sortKey]);
+  }, [bookings, fYear, fch, fProps, fsearch, sortKey]);
 
   // ── 월별 그룹 ─────────────────────────────────────────────────
   const grouped = useMemo(() => {
@@ -173,10 +171,10 @@ const BookingsPage = () => {
   // ── 숙소 색상 맵 ─────────────────────────────────────────────
   const propMap = useMemo(() => {
     const FB = ['#6366f1','#ec4899','#f59e0b','#10b981','#3b82f6','#8b5cf6'];
-    return new Map(properties.map((p, i) => [p.id, { color: p.color ?? FB[i % FB.length] }]));
+    return new Map(properties.map((p, i) => [p.id, { name: p.name, color: p.color ?? FB[i % FB.length] }]));
   }, [properties]);
 
-  // ── 오늘 스크롤 effect ────────────────────────────────────────
+  // ── 오늘 스크롤 ───────────────────────────────────────────────
   useEffect(() => {
     if (!pendingScrollId) return;
     const el = cardRefs.current.get(pendingScrollId);
@@ -187,21 +185,26 @@ const BookingsPage = () => {
 
   const handleToday = () => {
     const today = todayISO();
-    const todayYear = new Date().getFullYear();
     const match =
       bookings.find(b => b.checkIn <= today && b.checkOut > today) ??
       bookings.find(b => b.checkIn === today) ??
       bookings.filter(b => b.checkIn >= today).sort((a, b) => a.checkIn.localeCompare(b.checkIn))[0];
     if (!match) return;
-    setFYear(todayYear);
-    setFCh('all');
-    setFSearch('');
-    setSortKey('checkIn_desc');
+    setFYear(parseInt(match.checkIn.split('-')[0], 10));
+    setFCh('all'); setFProps([]); setFSearch(''); setSortKey('checkIn_desc');
     setPendingScrollId(match.id);
   };
 
-  const isFiltered = fch !== 'all' || fsearch.trim() !== '';
+  const toggleProp = (id: string) =>
+    setFProps(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const isFiltered = fch !== 'all' || fProps.length > 0 || fsearch.trim() !== '';
   const activeSortLabel = SORT_OPTIONS.find(o => o.key === sortKey)?.[ko ? 'ko' : 'en'] ?? '';
+  const propBadgeLabel  = fProps.length === 0
+    ? (ko ? '전체' : 'All')
+    : fProps.length === 1
+      ? (propMap.get(fProps[0])?.name ?? (ko ? '숙소' : 'Prop'))
+      : `${fProps.length}개`;
 
   const renderCard = (b: typeof rows[0]) => {
     const nights = diffDays(b.checkIn, b.checkOut);
@@ -237,7 +240,6 @@ const BookingsPage = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* 오늘 버튼 */}
           <button
             onClick={handleToday}
             className="h-8 px-3 text-[11px] font-semibold bg-muted/60 text-muted-foreground rounded-lg hover:bg-muted whitespace-nowrap transition-colors"
@@ -248,18 +250,15 @@ const BookingsPage = () => {
           {/* 정렬 드롭다운 */}
           <div className="relative">
             <button
-              onClick={() => setSortOpen(o => !o)}
+              onClick={() => { setSortOpen(o => !o); setPropOpen(false); }}
               className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-muted/60 text-muted-foreground/80 text-[11px] font-medium whitespace-nowrap transition-colors hover:bg-muted"
             >
               <SlidersHorizontal size={12} />
               {activeSortLabel}
             </button>
-
             {sortOpen && (
               <>
-                {/* 외부 클릭 오버레이 */}
                 <div className="fixed inset-0 z-40" onClick={() => setSortOpen(false)} />
-                {/* 드롭다운 */}
                 <div className="absolute right-0 top-full mt-1.5 bg-card border border-border/60 rounded-xl shadow-lg z-50 overflow-hidden min-w-[140px] py-1">
                   {SORT_OPTIONS.map(opt => (
                     <button
@@ -280,38 +279,32 @@ const BookingsPage = () => {
         </div>
       </header>
 
-      {/* ── 연간 요약 ── */}
-      <div className="flex items-center px-4 py-2.5 border-b border-border/30 gap-2.5 flex-nowrap overflow-hidden">
-        {/* 연도 선택 */}
+      {/* ── 연간 요약 — 폰트 줄임, nowrap ── */}
+      <div className="flex items-center px-4 py-2.5 border-b border-border/30 gap-2 flex-nowrap">
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={() => setFYear(y => y - 1)}
-            className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
+          <button onClick={() => setFYear(y => y - 1)} className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors">
             <ChevronLeft size={13} />
           </button>
-          <span className="text-[13px] font-bold text-foreground tabular-nums whitespace-nowrap">{fYear}년</span>
-          <button
-            onClick={() => setFYear(y => y + 1)}
-            className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
+          <span className="text-[12px] font-bold text-foreground tabular-nums whitespace-nowrap">{fYear}년</span>
+          <button onClick={() => setFYear(y => y + 1)} className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors">
             <ChevronRight size={13} />
           </button>
         </div>
 
-        <span className="text-[12px] text-muted-foreground/50 tabular-nums whitespace-nowrap flex-shrink-0">
+        <span className="text-[11px] text-muted-foreground/50 tabular-nums whitespace-nowrap flex-shrink-0">
           {rows.length}{ko ? '건' : ''}
         </span>
-        <span className="text-[12px] text-foreground/70 tabular-nums whitespace-nowrap flex-shrink truncate min-w-0">
+        <span className="text-[11px] text-foreground/70 tabular-nums whitespace-nowrap flex-shrink-0">
           {fmtN(yearTotals.amount)}원
         </span>
-        <span className="text-[12px] font-semibold text-primary tabular-nums whitespace-nowrap flex-shrink-0 ml-auto">
+        <span className="text-[11px] font-semibold text-primary tabular-nums whitespace-nowrap flex-shrink-0 ml-auto">
           입금&nbsp;{fmtN(yearTotals.net)}원
         </span>
       </div>
 
-      {/* ── 검색 + 채널 필터 (sticky) ── */}
+      {/* ── 검색 + 채널·숙소 필터 (sticky) ── */}
       <div className="sticky top-0 z-10 bg-background/97 backdrop-blur-sm px-4 pt-2.5 pb-2.5 border-b border-border/20">
+        {/* 검색창 */}
         <div className="relative mb-2">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 pointer-events-none" />
           <input
@@ -328,32 +321,89 @@ const BookingsPage = () => {
           )}
         </div>
 
-        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {(['all', ...ALL_CHANNELS] as const).map(ch => {
-            const isActive = fch === ch;
-            const label = ch === 'all'
-              ? (ko ? '전체' : 'All')
-              : ko ? CH_LABEL_KO[ch] : (ch === 'Booking.com' ? 'Booking' : ch);
-            return (
+        {/* 채널 칩 + 숙소 드롭다운 */}
+        <div className="flex items-center gap-2">
+          {/* 채널 칩 - 스크롤 */}
+          <div className="flex gap-1.5 overflow-x-auto flex-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {(['all', ...ALL_CHANNELS] as const).map(ch => {
+              const isActive = fch === ch;
+              const label = ch === 'all'
+                ? (ko ? '전체' : 'All')
+                : ko ? CH_LABEL_KO[ch] : (ch === 'Booking.com' ? 'Booking' : ch);
+              return (
+                <button
+                  key={ch}
+                  onClick={() => { setFCh(ch as Channel | 'all'); setSortOpen(false); setPropOpen(false); }}
+                  className={[
+                    'flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap',
+                    isActive ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground',
+                  ].join(' ')}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 숙소 필터 드롭다운 — 숙소 2개 이상일 때만 표시 */}
+          {properties.length > 1 && (
+            <div className="relative flex-shrink-0">
               <button
-                key={ch}
-                onClick={() => setFCh(ch as Channel | 'all')}
+                onClick={() => { setPropOpen(o => !o); setSortOpen(false); }}
                 className={[
-                  'flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap',
-                  isActive ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground',
+                  'flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap',
+                  fProps.length > 0 ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground',
                 ].join(' ')}
               >
-                {label}
+                {propBadgeLabel}
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" className="opacity-60">
+                  <path d="M4 5.5L1 2.5h6L4 5.5z" />
+                </svg>
               </button>
-            );
-          })}
+
+              {propOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setPropOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1.5 bg-card border border-border/60 rounded-xl shadow-lg z-50 overflow-hidden min-w-[130px] py-1">
+                    {/* 전체 (초기화) */}
+                    <button
+                      onClick={() => { setFProps([]); setPropOpen(false); }}
+                      className={`flex items-center justify-between w-full px-4 py-2.5 text-[12px] transition-colors hover:bg-muted/50 border-b border-border/20 ${fProps.length === 0 ? 'text-primary font-semibold' : 'text-foreground'}`}
+                    >
+                      <span className="whitespace-nowrap">{ko ? '전체' : 'All'}</span>
+                      {fProps.length === 0 && <Check size={12} className="text-primary ml-3 flex-shrink-0" />}
+                    </button>
+                    {/* 숙소별 체크 항목 */}
+                    {properties.map(p => {
+                      const info = propMap.get(p.id);
+                      const checked = fProps.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => toggleProp(p.id)}
+                          className="flex items-center gap-2 w-full px-4 py-2.5 text-[12px] transition-colors hover:bg-muted/50"
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: info?.color }}
+                          />
+                          <span className="flex-1 text-left text-foreground whitespace-nowrap">{p.name}</span>
+                          {checked && <Check size={12} className="text-primary flex-shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* 필터 초기화 */}
       {isFiltered && rows.length > 0 && (
         <div className="px-4 pt-1.5">
-          <button onClick={() => { setFCh('all'); setFSearch(''); }} className="text-[11px] text-primary font-medium">
+          <button onClick={() => { setFCh('all'); setFProps([]); setFSearch(''); }} className="text-[11px] text-primary font-medium">
             {ko ? '필터 초기화' : 'Clear filters'}
           </button>
         </div>
@@ -374,16 +424,12 @@ const BookingsPage = () => {
                     {bks.length}{ko ? '건' : ''}&nbsp;·&nbsp;입금&nbsp;{fmtN(gNet)}원
                   </span>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  {bks.map(renderCard)}
-                </div>
+                <div className="flex flex-col gap-1.5">{bks.map(renderCard)}</div>
               </div>
             );
           })
         ) : (
-          <div className="flex flex-col gap-1.5">
-            {rows.map(renderCard)}
-          </div>
+          <div className="flex flex-col gap-1.5">{rows.map(renderCard)}</div>
         )}
       </div>
 
@@ -399,7 +445,7 @@ const BookingsPage = () => {
               : (ko ? `${fYear}년 예약 데이터가 없습니다` : `No bookings in ${fYear}`)}
           </p>
           {isFiltered && (
-            <button onClick={() => { setFCh('all'); setFSearch(''); }} className="mt-3 text-[12px] text-primary font-semibold">
+            <button onClick={() => { setFCh('all'); setFProps([]); setFSearch(''); }} className="mt-3 text-[12px] text-primary font-semibold">
               {ko ? '필터 초기화' : 'Clear filters'}
             </button>
           )}
