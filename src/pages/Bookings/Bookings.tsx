@@ -304,45 +304,22 @@ const BookingsPage = () => {
 
       {/* ── 검색 + 채널·숙소 필터 (sticky) ── */}
       <div className="sticky top-0 z-10 bg-background/97 backdrop-blur-sm px-4 pt-2.5 pb-2.5 border-b border-border/20">
-        {/* 검색창 */}
-        <div className="relative mb-2">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 pointer-events-none" />
-          <input
-            type="text"
-            placeholder={ko ? '예약자명 검색...' : 'Search guest...'}
-            value={fsearch}
-            onChange={e => setFSearch(e.target.value)}
-            className="w-full pl-8 pr-8 py-1.5 text-[12px] bg-muted/60 rounded-lg text-foreground placeholder:text-muted-foreground/40 outline-none focus:bg-muted transition-colors"
-          />
-          {fsearch && (
-            <button onClick={() => setFSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground">
-              <X size={13} />
-            </button>
-          )}
-        </div>
-
-        {/* 채널 칩 + 숙소 드롭다운 */}
-        <div className="flex items-center gap-2">
-          {/* 채널 칩 - 스크롤 */}
-          <div className="flex gap-1.5 overflow-x-auto flex-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {(['all', ...ALL_CHANNELS] as const).map(ch => {
-              const isActive = fch === ch;
-              const label = ch === 'all'
-                ? (ko ? '전체' : 'All')
-                : ko ? CH_LABEL_KO[ch] : (ch === 'Booking.com' ? 'Booking' : ch);
-              return (
-                <button
-                  key={ch}
-                  onClick={() => { setFCh(ch as Channel | 'all'); setSortOpen(false); setPropOpen(false); }}
-                  className={[
-                    'flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap',
-                    isActive ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground',
-                  ].join(' ')}
-                >
-                  {label}
-                </button>
-              );
-            })}
+        {/* 검색창 + 숙소 드롭다운 */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="relative flex-1 min-w-0">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 pointer-events-none" />
+            <input
+              type="text"
+              placeholder={ko ? '예약자명 검색...' : 'Search guest...'}
+              value={fsearch}
+              onChange={e => setFSearch(e.target.value)}
+              className="w-full pl-8 pr-7 py-1.5 text-[12px] bg-muted/60 rounded-lg text-foreground placeholder:text-muted-foreground/40 outline-none focus:bg-muted transition-colors"
+            />
+            {fsearch && (
+              <button onClick={() => setFSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground">
+                <X size={13} />
+              </button>
+            )}
           </div>
 
           {/* 숙소 필터 드롭다운 — 숙소 2개 이상일 때만 표시 */}
@@ -351,7 +328,7 @@ const BookingsPage = () => {
               <button
                 onClick={() => { setPropOpen(o => !o); setSortOpen(false); }}
                 className={[
-                  'flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap',
+                  'flex items-center gap-1 h-8 text-[11px] font-semibold px-2.5 rounded-lg transition-colors whitespace-nowrap',
                   fProps.length > 0 ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground',
                 ].join(' ')}
               >
@@ -397,6 +374,28 @@ const BookingsPage = () => {
               )}
             </div>
           )}
+        </div>
+
+        {/* 채널 칩 */}
+        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {(['all', ...ALL_CHANNELS] as const).map(ch => {
+            const isActive = fch === ch;
+            const label = ch === 'all'
+              ? (ko ? '전체' : 'All')
+              : ko ? CH_LABEL_KO[ch] : (ch === 'Booking.com' ? 'Booking' : ch);
+            return (
+              <button
+                key={ch}
+                onClick={() => { setFCh(ch as Channel | 'all'); setSortOpen(false); setPropOpen(false); }}
+                className={[
+                  'flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap',
+                  isActive ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
