@@ -79,23 +79,21 @@ export const useStore = create<StoreState>()(
       },
       signInWithGoogle: async () => {
         const redirectTo = `${window.location.origin}/auth/callback`;
-        console.log('[OAuth] Google 시작, redirectTo:', redirectTo);
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: { redirectTo },
         });
-        console.log('[OAuth] Google 결과:', { url: data?.url, error });
         if (error) throw error;
+        void data;
       },
       signInWithKakao: async () => {
         const redirectTo = `${window.location.origin}/auth/callback`;
-        console.log('[OAuth] Kakao 시작, redirectTo:', redirectTo);
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'kakao',
           options: { redirectTo },
         });
-        console.log('[OAuth] Kakao 결과:', { url: data?.url, error });
         if (error) throw error;
+        void data;
       },
       logout: async () => {
         await supabase.auth.signOut();
@@ -547,7 +545,7 @@ export const useStore = create<StoreState>()(
           .eq('is_read', false)
           .order('created_at', { ascending: false })
           .limit(50);
-        if (error) { console.error('fetchNotifications error:', error); return; }
+        if (error) { get().showToast('알림을 불러오지 못했습니다', 'error'); return; }
         if (data) {
           const notifs: SyncNotification[] = data.map(r => ({
             id: r.id,
@@ -570,7 +568,7 @@ export const useStore = create<StoreState>()(
           .from('sync_notifications')
           .update({ is_read: true })
           .eq('id', notificationId);
-        if (error) { console.error('markNotificationRead error:', error); return; }
+        if (error) { get().showToast('알림 처리 중 오류가 발생했습니다', 'error'); return; }
         set(state => {
           const updated = state.syncNotifications.filter(n => n.id !== notificationId);
           return { syncNotifications: updated, unreadCount: updated.length };
@@ -585,7 +583,7 @@ export const useStore = create<StoreState>()(
           .update({ is_read: true })
           .eq('host_id', user.id)
           .eq('is_read', false);
-        if (error) { console.error('markAllNotificationsRead error:', error); return; }
+        if (error) { get().showToast('알림 처리 중 오류가 발생했습니다', 'error'); return; }
         set({ syncNotifications: [], unreadCount: 0 });
       },
     }),

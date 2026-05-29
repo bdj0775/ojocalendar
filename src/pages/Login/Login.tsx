@@ -32,7 +32,7 @@ const LoginPage = () => {
   const [signupSuccess, setSignupSuccess] = useState(false);
   const [forgotMsg, setForgotMsg] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg('');
@@ -59,7 +59,6 @@ const LoginPage = () => {
       await signInWithGoogle();
     } catch (err) {
       const msg = (err as Error).message;
-      console.error('[Google OAuth]', err);
       setErrorMsg(msg || 'Google 로그인 중 오류가 발생했습니다.');
       setOauthLoading(null);
     }
@@ -72,7 +71,6 @@ const LoginPage = () => {
       await signInWithKakao();
     } catch (err) {
       const msg = (err as Error).message;
-      console.error('[Kakao OAuth]', err);
       setErrorMsg(msg || '카카오 로그인 중 오류가 발생했습니다.');
       setOauthLoading(null);
     }
