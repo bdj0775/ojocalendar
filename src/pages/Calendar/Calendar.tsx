@@ -93,6 +93,7 @@ const CalendarPage = () => {
     nextMonth, prevMonth, goToday, setMonth, openBookingModal, openEditMaintModal,
     visiblePropertyIds, setVisiblePropertyIds,
     propertyOrder, setPropertyOrder,
+    setSelectedCalendarDate,
   } = useStore();
 
   const { open: openSidebar } = useSidebar();
@@ -461,6 +462,17 @@ const CalendarPage = () => {
         });
       }
       return;
+    }
+
+    // 데스크탑: 예약이 있는 날짜 클릭 시 예약목록 탭으로 이동
+    if (window.innerWidth >= 1024) {
+      const hasBooking = visibleBookings.some(
+        b => b.checkIn <= cell.dateStr && b.checkOut > cell.dateStr,
+      );
+      if (hasBooking) {
+        setSelectedCalendarDate(cell.dateStr);
+        return;
+      }
     }
 
     // 셀에 붙여서 컴팩트 모달 표시 + 프리뷰 바 즉시 표시

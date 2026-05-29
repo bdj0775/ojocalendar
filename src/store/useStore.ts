@@ -535,6 +535,9 @@ export const useStore = create<StoreState>()(
       syncNotifications: [],
       unreadCount: 0,
 
+      selectedCalendarDate: null,
+      setSelectedCalendarDate: (date) => set({ selectedCalendarDate: date }),
+
       fetchNotifications: async () => {
         const user = get().userProfile;
         if (!user) return;

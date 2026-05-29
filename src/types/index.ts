@@ -215,6 +215,10 @@ export interface StoreState {
   fetchNotifications: () => Promise<void>;
   markNotificationRead: (notificationId: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
+
+  // 달력 셀 클릭 → 예약목록 연동
+  selectedCalendarDate: string | null;
+  setSelectedCalendarDate: (date: string | null) => void;
 }
 
 // ============================================================

@@ -5,6 +5,7 @@ import DesktopDashboard from '../DesktopDashboard/DesktopDashboard';
 import DesktopBookings from '../DesktopBookings/DesktopBookings';
 import DesktopSettings from '../DesktopSettings/DesktopSettings';
 import type { DesktopTab } from '../../components/DesktopTabNav/DesktopTabNav';
+import { useStore } from '../../store/useStore';
 
 const TAB_LABELS: Record<DesktopTab, string> = {
   dashboard: '대시보드',
@@ -17,6 +18,11 @@ const DesktopOverview = () => {
   const isDragging = useRef(false);
   const [activeTab, setActiveTab] = useState<DesktopTab>('dashboard');
   const [isDark, setIsDark] = useState(false);
+
+  const { selectedCalendarDate } = useStore();
+  useEffect(() => {
+    if (selectedCalendarDate) setActiveTab('bookings');
+  }, [selectedCalendarDate]);
 
   useEffect(() => {
     if (isDark) {
