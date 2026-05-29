@@ -273,7 +273,10 @@ const BookingsPage = () => {
           </button>
         </div>
 
-        <span className="text-[12px] text-foreground/70 tabular-nums ml-1">
+        <span className="text-[12px] text-muted-foreground/50 tabular-nums ml-1">
+          {rows.length}{ko ? '건' : ''}
+        </span>
+        <span className="text-[12px] text-foreground/70 tabular-nums">
           {fmtN(yearTotals.amount)}원
         </span>
         <span className="text-[12px] font-semibold text-primary tabular-nums ml-auto">
@@ -328,15 +331,12 @@ const BookingsPage = () => {
         </div>
       </div>
 
-      {/* ── 필터 결과 건수 ── */}
-      {rows.length > 0 && (
-        <div className="px-4 py-2 text-[11px] text-muted-foreground/60">
-          {rows.length}{ko ? '건' : ' results'}
-          {isFiltered && (
-            <button onClick={() => { setFCh('all'); setFSearch(''); }} className="ml-2 text-primary">
-              {ko ? '초기화' : 'Clear'}
-            </button>
-          )}
+      {/* 필터 활성 시 초기화 버튼만 노출 */}
+      {isFiltered && rows.length > 0 && (
+        <div className="px-4 pt-1.5 pb-0">
+          <button onClick={() => { setFCh('all'); setFSearch(''); }} className="text-[11px] text-primary font-medium">
+            {ko ? '필터 초기화' : 'Clear filters'}
+          </button>
         </div>
       )}
 
