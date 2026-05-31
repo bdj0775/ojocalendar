@@ -108,6 +108,8 @@ export interface Settings {
   propertyName: string;
   plan?: string;
   eventColorMode?: 'channel' | 'property';
+  peakSeasonStart?: string; // 'MM-DD', e.g. '07-01'
+  peakSeasonEnd?: string;   // 'MM-DD', e.g. '08-15'
 }
 
 // ============================================================
@@ -117,17 +119,18 @@ export interface Settings {
 export interface OnboardingDraft {
   profileName: string;
   language: 'ko' | 'en';
-  propertyName: string;
+  roomNames: string[];       // 첫 번째가 대표 객실, 최대 3개
   baseGuests: number;
   basePrice: number;
   weekendPrice: number;
   extraGuestFee: number;
   cleaningFee: number;
+  peakSeasonStart: string;   // 'MM-DD'
+  peakSeasonEnd: string;     // 'MM-DD'
   checkInTime: string;
   checkOutTime: string;
   airbnbIcal: string;
   bookingIcal: string;
-  naverIcal: string;
 }
 
 // ============================================================

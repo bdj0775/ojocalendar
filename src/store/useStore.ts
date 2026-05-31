@@ -363,6 +363,8 @@ export const useStore = create<StoreState>()(
         profileName: '',
         profileRole: '',
         propertyName: '오조록',
+        peakSeasonStart: '07-01',
+        peakSeasonEnd: '08-15',
       } as Settings,
 
       updateSettings: (patch) =>
@@ -509,10 +511,11 @@ export const useStore = create<StoreState>()(
 
       onboardingDraft: {
         profileName: '', language: 'ko',
-        propertyName: '', baseGuests: 2,
+        roomNames: [''], baseGuests: 2,
         basePrice: 0, weekendPrice: 0, extraGuestFee: 0, cleaningFee: 0,
+        peakSeasonStart: '07-01', peakSeasonEnd: '08-15',
         checkInTime: '15:00', checkOutTime: '11:00',
-        airbnbIcal: '', bookingIcal: '', naverIcal: '',
+        airbnbIcal: '', bookingIcal: '',
       } as OnboardingDraft,
       patchOnboardingDraft: (patch: Partial<OnboardingDraft>) =>
         set(state => ({ onboardingDraft: { ...state.onboardingDraft, ...patch } })),
@@ -520,10 +523,11 @@ export const useStore = create<StoreState>()(
         onboardingStep: 1,
         onboardingDraft: {
           profileName: '', language: 'ko',
-          propertyName: '', baseGuests: 2,
+          roomNames: [''], baseGuests: 2,
           basePrice: 0, weekendPrice: 0, extraGuestFee: 0, cleaningFee: 0,
+          peakSeasonStart: '07-01', peakSeasonEnd: '08-15',
           checkInTime: '15:00', checkOutTime: '11:00',
-          airbnbIcal: '', bookingIcal: '', naverIcal: '',
+          airbnbIcal: '', bookingIcal: '',
         },
       }),
 
@@ -595,13 +599,20 @@ export const useStore = create<StoreState>()(
         onboardingStep: state.onboardingStep,
         onboardingDraft: state.onboardingDraft,
       }),
-      // rehydration 후 캘린더 월을 항상 오늘로 초기화
-      // (구버전 localStorage에 currentYear/currentMonth가 남아있어도 무시)
       onRehydrateStorage: () => (state) => {
         if (state) {
+          // 캘린더 월을 항상 오늘로 초기화
           const now = new Date();
           state.currentYear = now.getFullYear();
           state.currentMonth = now.getMonth();
+          // 구버전 onboardingDraft (propertyName 필드) → roomNames 마이그레이션
+          const d = state.onboardingDraft as unknown as Record<string, unknown>;
+          if (!Array.isArray(d?.roomNames)) {
+            state.onboardingDraft = {
+              ...state.onboardingDraft,
+              roomNames: [(d?.propertyName as string) ?? ''],
+            };
+          }
         }
       },
     },
