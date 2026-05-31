@@ -242,6 +242,10 @@ export interface StoreState {
   setDesktopBookingsFilter: (patch: Partial<DesktopBookingsFilter>) => void;
   mobileBookingsFilter: MobileBookingsFilter;
   setMobileBookingsFilter: (patch: Partial<MobileBookingsFilter>) => void;
+
+  // 온보딩 완료 여부 (신규 유저 감지 + 리다이렉트 제어)
+  onboardingCompleted: boolean;
+  setOnboardingCompleted: (v: boolean) => void;
 }
 
 // ============================================================

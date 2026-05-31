@@ -158,7 +158,8 @@ export const useStore = create<StoreState>()(
           const { data: pData, error: pErr } = await supabase
             .from('properties').select('*').eq('host_id', user.id);
           if (pErr) throw pErr;
-          if (pData?.length === 0) { await get().migrateData(); return; }
+          // 숙소 없음 → 온보딩 마법사가 숙소 생성을 담당 (자동 생성 제거)
+          // 기존 "샘플 데이터 복구" 버튼은 migrateData()를 직접 호출하므로 유지
           if (pData) {
             const seenNames = new Set<string>();
             const deduped = pData.filter(p => {
@@ -500,6 +501,9 @@ export const useStore = create<StoreState>()(
       setMobileBookingsFilter: (patch: Partial<MobileBookingsFilter>) =>
         set(state => ({ mobileBookingsFilter: { ...state.mobileBookingsFilter, ...patch } })),
 
+      onboardingCompleted: false,
+      setOnboardingCompleted: (v: boolean) => set({ onboardingCompleted: v }),
+
       fetchNotifications: async () => {
         const user = get().userProfile;
         if (!user) return;
@@ -564,6 +568,7 @@ export const useStore = create<StoreState>()(
         activeDesktopTab: state.activeDesktopTab,
         desktopBookingsFilter: state.desktopBookingsFilter,
         mobileBookingsFilter: state.mobileBookingsFilter,
+        onboardingCompleted: state.onboardingCompleted,
       }),
       // rehydration 후 캘린더 월을 항상 오늘로 초기화
       // (구버전 localStorage에 currentYear/currentMonth가 남아있어도 무시)

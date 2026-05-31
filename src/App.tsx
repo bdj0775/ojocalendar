@@ -13,6 +13,7 @@ import BookingsPage from './pages/Bookings/Bookings';
 import SettingsPage from './pages/Settings/Settings';
 import NewBookingPage from './pages/NewBooking/NewBooking';
 import DesktopOverview from './pages/DesktopOverview/DesktopOverview';
+import OnboardingPage from './pages/Onboarding/Onboarding';
 import LandingPage from './landing/LandingPage';
 import { InstallPrompt } from './components/InstallPrompt/InstallPrompt';
 import { SplashScreen } from './components/Splash/SplashScreen';
@@ -25,12 +26,16 @@ const Spinner = ({ text }: { text: string }) => (
   </div>
 );
 
-/** / 경로 전용 — 비인증 시 랜딩, 인증 시 앱 렌더 */
+/** / 경로 전용 — 비인증 시 랜딩, 신규 유저 시 온보딩, 인증 시 앱 렌더 */
 const RootGate = () => {
-  const { isAuthenticated, authLoading, dataLoading } = useStore();
+  const { isAuthenticated, authLoading, dataLoading, properties, onboardingCompleted } = useStore();
   if (authLoading) return <Spinner text="세션 확인 중..." />;
   if (!isAuthenticated) return <LandingPage />;
   if (dataLoading) return <Spinner text="데이터 불러오는 중..." />;
+  // 신규 유저: 숙소 미등록 + 온보딩 미완료 → 온보딩으로
+  if (!onboardingCompleted && properties.length === 0) {
+    return <Navigate to="/onboarding" replace />;
+  }
   return <MainLayout />;
 };
 
@@ -47,8 +52,19 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
   return <>{children}</>;
 };
 
+/** /onboarding 전용 가드 — 비인증 시 /login, 온보딩 완료 시 / 리다이렉트 */
+const OnboardingGuard = ({ children }: RequireAuthProps) => {
+  const { isAuthenticated, authLoading, dataLoading, onboardingCompleted, properties } = useStore();
+  if (authLoading) return <Spinner text="세션 확인 중..." />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (dataLoading) return <Spinner text="데이터 불러오는 중..." />;
+  // 이미 온보딩 완료했거나 숙소가 있으면 앱으로
+  if (onboardingCompleted || properties.length > 0) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
 const App = () => {
-  const { initAuth } = useStore();
+  const { initAuth, onboardingCompleted } = useStore();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   // Skip splash on OAuth callback route so auth isn't blocked
   const [splashDone, setSplashDone] = useState(
@@ -73,6 +89,7 @@ const App = () => {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/onboarding" element={<OnboardingGuard><OnboardingPage /></OnboardingGuard>} />
           <Route path="/" element={<RootGate />}>
             <Route index element={isDesktop ? <DesktopOverview /> : <CalendarPage />} />
             <Route path="dashboard" element={isDesktop ? <Navigate to="/" replace /> : <DashboardPage />} />
@@ -82,7 +99,8 @@ const App = () => {
           <Route path="/new-booking" element={<RequireAuth><NewBookingPage /></RequireAuth>} />
         </Routes>
         <Toast />
-        <InstallPrompt />
+        {/* InstallPrompt는 온보딩 완료 후에만 표시 — 가입 직후 팝업 방지 */}
+        {onboardingCompleted && <InstallPrompt />}
       </BrowserRouter>
     </ErrorBoundary>
   );
