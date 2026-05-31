@@ -274,6 +274,10 @@ export interface StoreState {
   onboardingDraft: OnboardingDraft;
   patchOnboardingDraft: (patch: Partial<OnboardingDraft>) => void;
   resetOnboarding: () => void;
+
+  // 첫 방문 힌트 (온보딩 직후 1회 표시)
+  showWelcomeHint: boolean;
+  dismissWelcomeHint: () => void;
 }
 
 // ============================================================

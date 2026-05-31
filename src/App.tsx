@@ -54,12 +54,12 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
 
 /** /onboarding 전용 가드 — 비인증 시 /login, 온보딩 완료 시 / 리다이렉트 */
 const OnboardingGuard = ({ children }: RequireAuthProps) => {
-  const { isAuthenticated, authLoading, dataLoading, onboardingCompleted, properties } = useStore();
+  const { isAuthenticated, authLoading, dataLoading, onboardingCompleted } = useStore();
   if (authLoading) return <Spinner text="세션 확인 중..." />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (dataLoading) return <Spinner text="데이터 불러오는 중..." />;
-  // 이미 온보딩 완료했거나 숙소가 있으면 앱으로
-  if (onboardingCompleted || properties.length > 0) return <Navigate to="/" replace />;
+  // 온보딩 완료 플래그가 true면 앱으로 (기존 유저가 설정에서 재진입 가능)
+  if (onboardingCompleted) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 

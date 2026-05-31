@@ -41,7 +41,7 @@ export const NavbarSection = () => {
           >
             {CONTENT.nav.loginLabel}
           </button>
-          <Button size="sm" variant="primary" onClick={() => navigate('/login')}>
+          <Button size="sm" variant="primary" onClick={() => navigate('/login?mode=signup')}>
             {CONTENT.nav.ctaLabel}
           </Button>
         </div>

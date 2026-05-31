@@ -504,7 +504,14 @@ export const useStore = create<StoreState>()(
         set(state => ({ mobileBookingsFilter: { ...state.mobileBookingsFilter, ...patch } })),
 
       onboardingCompleted: false,
-      setOnboardingCompleted: (v: boolean) => set({ onboardingCompleted: v }),
+      setOnboardingCompleted: (v: boolean) => set({
+        onboardingCompleted: v,
+        // 온보딩 완료 시 웰컴 힌트 활성화
+        showWelcomeHint: v ? true : false,
+      }),
+
+      showWelcomeHint: false,
+      dismissWelcomeHint: () => set({ showWelcomeHint: false }),
 
       onboardingStep: 1,
       setOnboardingStep: (step: number) => set({ onboardingStep: step }),

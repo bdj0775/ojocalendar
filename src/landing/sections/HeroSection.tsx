@@ -45,7 +45,7 @@ export const HeroSection = () => {
             <Button
               size="lg"
               variant="primary"
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/login?mode=signup')}
               className="text-base px-7"
             >
               {CONTENT.hero.ctaPrimary}
@@ -53,7 +53,7 @@ export const HeroSection = () => {
             <Button
               size="lg"
               variant="secondary"
-              onClick={androidReady ? triggerAndroid : () => navigate('/login')}
+              onClick={androidReady ? triggerAndroid : () => navigate('/login?mode=signup')}
               className="text-base px-7"
             >
               {CONTENT.hero.ctaSecondary}

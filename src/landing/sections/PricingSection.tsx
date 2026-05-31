@@ -26,7 +26,7 @@ export const PricingSection = () => {
         items={p.items}
         cta={p.cta}
         note={p.note}
-        onCtaClick={() => navigate('/login')}
+        onCtaClick={() => navigate('/login?mode=signup')}
       />
     </SectionWrapper>
   );

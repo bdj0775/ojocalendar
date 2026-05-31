@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
 import PropertyDetailModal from '../../components/Modals/PropertyDetailModal';
@@ -65,12 +66,13 @@ const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
 
 // ── Component ──────────────────────────────────────────────────
 const DesktopSettings = () => {
+  const navigate = useNavigate();
   const { t, language } = useTranslation();
   const {
     settings, properties, updateSettings, updateProperty, addProperty, deleteProperty,
     syncChannels, syncLoading, lastSyncResults,
     fetchSyncChannels, saveSyncChannel, deleteSyncChannel, triggerSync,
-    logout,
+    logout, setOnboardingCompleted, resetOnboarding,
   } = useStore();
 
   const ko = language === 'ko';
@@ -336,6 +338,18 @@ const DesktopSettings = () => {
             <span className={valRight}>{settings?.currency || 'KRW'}</span>
           </div>
         </div>
+
+        {/* 초기 설정 재진입 */}
+        <button
+          className="w-full py-3.5 mt-2 text-[13px] font-semibold text-muted-foreground bg-card border border-border/30 rounded-xl hover:bg-muted transition-colors"
+          onClick={() => {
+            resetOnboarding();
+            setOnboardingCompleted(false);
+            navigate('/onboarding');
+          }}
+        >
+          {ko ? '초기 설정 다시 하기' : 'Redo Initial Setup'}
+        </button>
 
         {/* 로그아웃 */}
         <button

@@ -1,5 +1,6 @@
 import { Menu } from 'lucide-react';
 import { useSidebar } from '../../context/SidebarContext';
+import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -85,11 +86,13 @@ const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
 // ── Component ──────────────────────────────────────────────────
 const SettingsPage = () => {
   const { open: openSidebar } = useSidebar();
+  const navigate = useNavigate();
   const { t, language } = useTranslation();
   const {
     settings, properties, updateSettings, updateProperty, addProperty, deleteProperty,
     syncChannels, syncLoading, lastSyncResults,
     fetchSyncChannels, saveSyncChannel, deleteSyncChannel, triggerSync, fetchData,
+    setOnboardingCompleted, resetOnboarding,
   } = useStore();
 
   const ko = language === 'ko';
@@ -520,6 +523,18 @@ const SettingsPage = () => {
             <span className={val}>{settings?.currency || 'KRW'}</span>
           </div>
         </div>
+
+        {/* ── 초기 설정 재진입 ── */}
+        <button
+          className="w-full py-3.5 mt-1 text-[13px] font-semibold text-muted-foreground bg-card border border-border/30 rounded-xl transition-colors hover:bg-muted"
+          onClick={() => {
+            resetOnboarding();
+            setOnboardingCompleted(false);
+            navigate('/onboarding');
+          }}
+        >
+          {ko ? '초기 설정 다시 하기' : 'Redo Initial Setup'}
+        </button>
 
         {/* ── 로그아웃 ── */}
         <button

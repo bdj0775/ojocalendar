@@ -13,7 +13,7 @@ export const CtaSection = () => {
         </h2>
         <p className="type-body text-primary-foreground/80 max-w-sm">{c.sub}</p>
         <button
-          onClick={() => navigate('/login')}
+          onClick={() => navigate('/login?mode=signup')}
           className="mt-2 rounded-2xl bg-white px-8 py-4 type-body-strong font-semibold text-primary shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all hover:bg-primary-50 active:scale-[0.98]"
         >
           {c.button}

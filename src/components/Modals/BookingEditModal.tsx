@@ -91,9 +91,18 @@ const BookingEditModal = () => {
     setChannel(booking.channel ?? 'Airbnb');
     const amt = booking.amount ?? 0;
     const channelRate = CHANNELS.find(c => c.key === booking.channel)?.rate ?? 0;
+    
+    let comm = booking.commission ?? 0;
+    if (comm > 100) {
+      comm = amt > 0 ? Math.round((comm / amt) * 100) : 0;
+    }
+    if (comm === 0) {
+      comm = channelRate;
+    }
+    
     setAmount(amt);
     setAmountRaw(amt.toLocaleString());
-    setCommRate(channelRate);
+    setCommRate(comm);
     setCommCustom(false);
     setBookingDate(booking.bookingDate ?? '');
     setMemo(booking.memo ?? '');
