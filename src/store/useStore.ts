@@ -3,7 +3,8 @@ import { persist } from 'zustand/middleware';
 import { supabase } from '../services/supabaseClient';
 import { validateICalUrl } from '../services/icalSync/icalFetcher';
 import type {
-  StoreState, BookingStatus, Settings, SyncNotification, Property,
+  StoreState, BookingStatus, Settings, SyncNotification, Property, DesktopTab,
+  DesktopBookingsFilter, MobileBookingsFilter,
 } from '../types';
 
 const today = new Date();
@@ -48,7 +49,7 @@ export const useStore = create<StoreState>()(
           if (session) get().fetchData();
         });
 
-        supabase.auth.onAuthStateChange((_event, session) => {
+        supabase.auth.onAuthStateChange((event, session) => {
           set({
             isAuthenticated: !!session,
             userProfile: session?.user ?? null,
@@ -56,7 +57,9 @@ export const useStore = create<StoreState>()(
           });
           syncName(session?.user ?? null);
           if (session) {
-            get().fetchData();
+            // TOKEN_REFRESHED = 토큰만 갱신, 데이터는 변하지 않음
+            // 재fetch하면 dataLoading: true → UI 전체 unmount → 탭 상태 초기화 유발
+            if (event !== 'TOKEN_REFRESHED') get().fetchData();
           } else {
             set({ properties: [], bookings: [], settings: { ...get().settings, profileName: '' } });
           }
@@ -115,6 +118,7 @@ export const useStore = create<StoreState>()(
         set({ currentYear: now.getFullYear(), currentMonth: now.getMonth() });
       },
 
+      properties: [],
       bookings: [],
 
       migrateData: async () => {
@@ -480,6 +484,22 @@ export const useStore = create<StoreState>()(
       selectedCalendarDate: null,
       setSelectedCalendarDate: (date) => set({ selectedCalendarDate: date }),
 
+      activeDesktopTab: 'dashboard' as DesktopTab,
+      setActiveDesktopTab: (tab: DesktopTab) => set({ activeDesktopTab: tab }),
+
+      desktopBookingsFilter: {
+        year: 'all', month: 'all', channel: 'all', prop: 'all',
+        search: '', sortCol: 'checkIn', sortDir: 'desc',
+      } as DesktopBookingsFilter,
+      setDesktopBookingsFilter: (patch: Partial<DesktopBookingsFilter>) =>
+        set(state => ({ desktopBookingsFilter: { ...state.desktopBookingsFilter, ...patch } })),
+
+      mobileBookingsFilter: {
+        year: new Date().getFullYear(), channel: 'all', props: [], search: '', sortKey: 'checkIn_desc',
+      } as MobileBookingsFilter,
+      setMobileBookingsFilter: (patch: Partial<MobileBookingsFilter>) =>
+        set(state => ({ mobileBookingsFilter: { ...state.mobileBookingsFilter, ...patch } })),
+
       fetchNotifications: async () => {
         const user = get().userProfile;
         if (!user) return;
@@ -541,7 +561,19 @@ export const useStore = create<StoreState>()(
         settings: state.settings,
         visiblePropertyIds: state.visiblePropertyIds,
         propertyOrder: state.propertyOrder,
+        activeDesktopTab: state.activeDesktopTab,
+        desktopBookingsFilter: state.desktopBookingsFilter,
+        mobileBookingsFilter: state.mobileBookingsFilter,
       }),
+      // rehydration 후 캘린더 월을 항상 오늘로 초기화
+      // (구버전 localStorage에 currentYear/currentMonth가 남아있어도 무시)
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const now = new Date();
+          state.currentYear = now.getFullYear();
+          state.currentMonth = now.getMonth();
+        }
+      },
     },
   ),
 );

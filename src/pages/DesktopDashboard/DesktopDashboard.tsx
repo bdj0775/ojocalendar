@@ -140,7 +140,9 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
   const activeDotStroke = isDark ? '#0c0c1d' : '#ffffff';
 
   // Theme-conditional classes (transitioning to semantic variables)
-  const wrapCls = 'h-full p-5 pb-10 overflow-y-auto bg-background text-foreground [scrollbar-width:thin]';
+  // 헤더는 스크롤 영역 밖에 고정 — 스크롤바 유무에 따른 너비 변동 방지
+  const wrapCls = 'h-full flex flex-col bg-background text-foreground';
+  const scrollCls = 'flex-1 px-5 pb-10 overflow-y-auto [scrollbar-width:thin]';
 
   const cardCls = 'bg-card text-card-foreground border border-border rounded-2xl p-5 relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5 shadow-sm hover:shadow-lg hover:border-primary/50';
 
@@ -190,8 +192,9 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
 
   return (
     <div className={wrapCls}>
-      {/* Header */}
-      <header className="flex items-center justify-between mb-4 h-8">
+      {/* Header — 스크롤 영역 밖에 고정 */}
+      <div className="px-5 pt-5 pb-4 flex-shrink-0">
+      <header className="flex items-center justify-between h-8">
         <div className="flex items-center gap-3">
           <h1 className={headerTitleCls}>{ko ? '대시보드' : 'Dashboard'}</h1>
           <div className="flex items-center gap-1.5 ml-1">
@@ -213,7 +216,9 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
           </div>
         </div>
       </header>
+      </div>{/* /header wrapper */}
 
+      <div className={scrollCls}>
       <OverlapDetector />
 
       {/* Grid */}
@@ -750,6 +755,7 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
       {isLeadTimeModalOpen && <LeadTimeDetailModal isDark={isDark} onClose={() => setIsLeadTimeModalOpen(false)} />}
       {isChannelDetailOpen && <DistributionDetailModal mode="channel" isDark={isDark} onClose={() => setIsChannelDetailOpen(false)} />}
       {isNatDetailOpen && <DistributionDetailModal mode="nationality" isDark={isDark} onClose={() => setIsNatDetailOpen(false)} />}
+      </div>{/* /scrollCls */}
     </div>
   );
 };

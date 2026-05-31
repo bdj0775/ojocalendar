@@ -1,6 +1,7 @@
 import { useTranslation } from '../../hooks/useTranslation';
+import type { DesktopTab } from '../../types';
 
-export type DesktopTab = 'dashboard' | 'bookings' | 'settings';
+export type { DesktopTab };
 
 interface DesktopTabNavProps {
   activeTab: DesktopTab;

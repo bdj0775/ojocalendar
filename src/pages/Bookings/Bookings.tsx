@@ -7,7 +7,7 @@ import { useSidebar } from '../../context/SidebarContext';
 import NotificationBell from '../../components/Notifications/NotificationBell';
 import BookingEditModal from '../../components/Modals/BookingEditModal';
 import { ICON_SIZES } from '../../lib/iconSizes';
-import type { Channel } from '../../types';
+import type { Channel, SortKey } from '../../types';
 
 // ── helpers ────────────────────────────────────────────────────────
 const diffDays = (a: string, b: string) =>
@@ -51,7 +51,7 @@ const CH_LABEL_KO: Record<string, string> = {
   Direct:        '직접예약',
 };
 
-type SortKey = 'checkIn_desc' | 'checkIn_asc' | 'amount_desc' | 'amount_asc';
+// SortKey는 types/index.ts에서 import
 
 const SORT_OPTIONS: { key: SortKey; ko: string; en: string }[] = [
   { key: 'checkIn_desc', ko: '최신 입실순',   en: 'Newest first'   },
@@ -112,13 +112,15 @@ const BookingsPage = () => {
   const { open: openSidebar } = useSidebar();
   const ko = language === 'ko';
 
-  const { bookings, properties, openBookingModal } = useStore();
+  const { bookings, properties, openBookingModal, mobileBookingsFilter, setMobileBookingsFilter } = useStore();
 
-  const [fYear,   setFYear]   = useState(() => new Date().getFullYear());
-  const [fch,     setFCh]     = useState<Channel | 'all'>('all');
-  const [fProps,  setFProps]  = useState<string[]>([]);   // 빈 배열 = 전체
-  const [fsearch, setFSearch] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('checkIn_desc');
+  // filter + sort — 스토어에서 관리하여 탭 전환/리마운트 후에도 유지
+  const { year: fYear, channel: fch, props: fProps, search: fsearch, sortKey } = mobileBookingsFilter;
+  const setFYear   = (v: number)          => setMobileBookingsFilter({ year: v });
+  const setFCh     = (v: Channel | 'all') => setMobileBookingsFilter({ channel: v });
+  const setFProps  = (v: string[])        => setMobileBookingsFilter({ props: v });
+  const setFSearch = (v: string)          => setMobileBookingsFilter({ search: v });
+  const setSortKey = (v: SortKey)         => setMobileBookingsFilter({ sortKey: v });
   const [sortOpen, setSortOpen] = useState(false);
   const [propOpen, setPropOpen] = useState(false);
 

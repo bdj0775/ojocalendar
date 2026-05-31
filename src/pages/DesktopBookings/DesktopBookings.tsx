@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Plus, ChevronUp, ChevronDown, ChevronsUpDown, Search, X, Trash2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
-import type { Booking, Channel } from '../../types';
+import type { Booking, Channel, SortCol } from '../../types';
 
 // ── helpers ───────────────────────────────────────────────────────────
 const diffDays = (a: string, b: string) =>
@@ -20,9 +20,20 @@ const fmtMD = (ds: string) => { if (!ds) return '—'; const [, m, d] = ds.split
 const fmtN  = (v: number)  => v.toLocaleString();
 
 // commission 필드 = 수수료율(%) 그대로 저장
-// 수수료 금액 = round(amount * commission / 100)
-const commAmt = (b: Pick<Booking, 'amount' | 'commission'>) =>
-  Math.round(b.amount * b.commission / 100);
+// DB에 잘못 임포트된 수수료 금액(>100)은 자동으로 율로 환산 처리
+// DB에 잘못 임포트된 수수료 금액(>100)은 자동으로 율로 환산 처리, 0인 경우 채널별 기본 수수료율 적용
+const getDefaultCommRate = (ch: string) => ch === 'Airbnb' || ch === 'Booking.com' ? 17 : ch === 'Naver' ? 2 : 0;
+
+const commRateDisplay = (b: Pick<Booking, 'amount' | 'commission' | 'channel'>) => {
+  if (b.commission > 100) return b.amount > 0 ? Math.round((b.commission / b.amount) * 100) : 0;
+  if (b.commission === 0) return getDefaultCommRate(b.channel);
+  return b.commission;
+};
+
+const commAmt = (b: Pick<Booking, 'amount' | 'commission' | 'channel'>) => {
+  if (b.commission > 100) return b.commission;
+  return Math.round(b.amount * commRateDisplay(b) / 100);
+};
 
 // ── constants ─────────────────────────────────────────────────────────
 const ALL_CHANNELS: Channel[] = ['Airbnb', 'Booking.com', 'Naver', 'Direct'];
@@ -35,10 +46,7 @@ const CH_DOT: Record<string, string> = {
 };
 
 // ── types ─────────────────────────────────────────────────────────────
-type SortCol =
-  | 'checkIn' | 'checkOut' | 'nights' | 'guestName' | 'guests'
-  | 'channel' | 'amount' | 'commRate' | 'net'
-  | 'adr' | 'leadTime' | 'bookingDate';
+// SortCol은 types/index.ts에서 import
 
 // commission(rate)을 직접 편집 → patch.commission = newRate
 type EditableField =
@@ -84,18 +92,18 @@ const DesktopBookings = () => {
   const {
     bookings, properties, addBooking, updateBooking, deleteBooking,
     selectedCalendarDate, setSelectedCalendarDate,
+    desktopBookingsFilter, setDesktopBookingsFilter,
   } = useStore();
 
-  // filter
-  const [fyear,   setFYear]   = useState<number | 'all'>('all');
-  const [fmonth,  setFMonth]  = useState<number | 'all'>('all');
-  const [fch,     setFCh]     = useState<Channel | 'all'>('all');
-  const [fprop,   setFProp]   = useState<string>('all');
-  const [fsearch, setFSearch] = useState('');
-
-  // sort
-  const [sortCol, setSortCol] = useState<SortCol>('checkIn');
-  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
+  // filter + sort — 스토어에서 관리하여 탭 전환/리마운트 후에도 유지
+  const { year: fyear, month: fmonth, channel: fch, prop: fprop, search: fsearch, sortCol, sortDir } = desktopBookingsFilter;
+  const setFYear   = (v: number | 'all')  => setDesktopBookingsFilter({ year: v });
+  const setFMonth  = (v: number | 'all')  => setDesktopBookingsFilter({ month: v });
+  const setFCh     = (v: Channel | 'all') => setDesktopBookingsFilter({ channel: v });
+  const setFProp   = (v: string)          => setDesktopBookingsFilter({ prop: v });
+  const setFSearch = (v: string)          => setDesktopBookingsFilter({ search: v });
+  const setSortCol = (v: SortCol)         => setDesktopBookingsFilter({ sortCol: v });
+  const setSortDir = (v: 'desc' | 'asc') => setDesktopBookingsFilter({ sortDir: v });
 
   // inline edit
   const [editCell, setEditCell] = useState<EditCell | null>(null);
@@ -141,7 +149,7 @@ const DesktopBookings = () => {
         case 'guests':     va = a.guests;     vb = b.guests;     break;
         case 'channel':    va = a.channel;    vb = b.channel;    break;
         case 'amount':     va = a.amount;     vb = b.amount;     break;
-        case 'commRate':   va = a.commission; vb = b.commission; break;
+        case 'commRate':   va = commRateDisplay(a); vb = commRateDisplay(b); break;
         case 'net':        va = a.amount - commAmt(a); vb = b.amount - commAmt(b); break;
         case 'adr':        va = a.amount / na; vb = b.amount / nb; break;
         case 'leadTime':   va = a.bookingDate ? diffDays(a.bookingDate, a.checkIn) : 0; vb = b.bookingDate ? diffDays(b.bookingDate, b.checkIn) : 0; break;
@@ -193,7 +201,7 @@ const DesktopBookings = () => {
 
   // ── sort ──────────────────────────────────────────────────────────
   const handleSort = (col: SortCol) => {
-    if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    if (sortCol === col) setSortDir(sortDir === 'desc' ? 'asc' : 'desc');
     else { setSortCol(col); setSortDir('desc'); }
   };
 
@@ -478,7 +486,7 @@ const DesktopBookings = () => {
                   {EC(b, 'amount', <span className="font-medium text-foreground tabular-nums">{fmtN(b.amount)}원</span>, String(b.amount), 'number', 'right')}
 
                   {/* 수수료율 — commission 필드 = 율(%) 직접 표시 */}
-                  {EC(b, 'commRate', <span className="text-muted-foreground/80 tabular-nums">{b.commission}%</span>, String(b.commission), 'number', 'right')}
+                  {EC(b, 'commRate', <span className="text-muted-foreground/80 tabular-nums">{commRateDisplay(b)}%</span>, String(commRateDisplay(b)), 'number', 'right')}
 
                   {/* 수수료 금액 — 계산값, read-only */}
                   <td className={`${tdRO} text-right tabular-nums`}>-{fmtN(commAmount)}원</td>

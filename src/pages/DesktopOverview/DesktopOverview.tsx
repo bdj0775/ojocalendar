@@ -1,28 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Bell, User, Sun, Moon } from 'lucide-react';
+import { Bell, Sun, Moon } from 'lucide-react';
 import CalendarPage from '../Calendar/Calendar';
 import DesktopDashboard from '../DesktopDashboard/DesktopDashboard';
 import DesktopBookings from '../DesktopBookings/DesktopBookings';
 import DesktopSettings from '../DesktopSettings/DesktopSettings';
-import type { DesktopTab } from '../../components/DesktopTabNav/DesktopTabNav';
+import DesktopTabNav from '../../components/DesktopTabNav/DesktopTabNav';
+import type { DesktopTab } from '../../types';
 import { useStore } from '../../store/useStore';
 
-const TAB_LABELS: Record<DesktopTab, string> = {
-  dashboard: '대시보드',
-  bookings: '예약목록',
-  settings: '설정',
-};
 
 const DesktopOverview = () => {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
-  const [activeTab, setActiveTab] = useState<DesktopTab>('dashboard');
   const [isDark, setIsDark] = useState(false);
 
-  const { selectedCalendarDate } = useStore();
+  const { selectedCalendarDate, activeDesktopTab: activeTab, setActiveDesktopTab: setActiveTab } = useStore();
   useEffect(() => {
     if (selectedCalendarDate) setActiveTab('bookings');
-  }, [selectedCalendarDate]);
+  }, [selectedCalendarDate, setActiveTab]);
 
   useEffect(() => {
     if (isDark) {
@@ -104,29 +99,11 @@ const DesktopOverview = () => {
               <header className="flex items-center justify-between mb-4 h-8">
                 <div className="flex items-center gap-3">
                   <h1 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight m-0 ml-2">
-                    {TAB_LABELS[activeTab]}
+                    {activeTab === 'bookings' ? '예약목록' : '설정'}
                   </h1>
                 </div>
                 <div className="flex items-center gap-5">
-                  <nav className="flex items-center gap-5">
-                    {(Object.keys(TAB_LABELS) as DesktopTab[]).map(tab => (
-                      <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`
-                          bg-transparent border-0 cursor-pointer
-                          text-[12px] font-medium tracking-wide
-                          transition-colors duration-200 pb-0.5
-                          ${activeTab === tab
-                            ? 'text-foreground'
-                            : 'text-muted-foreground hover:text-foreground/70'
-                          }
-                        `}
-                      >
-                        {TAB_LABELS[tab]}
-                      </button>
-                    ))}
-                  </nav>
+                  <DesktopTabNav activeTab={activeTab} onTabChange={setActiveTab} />
                   <div className="w-px h-4 bg-border/60" />
                   <div className="flex items-center gap-2">
                     <button
@@ -137,9 +114,6 @@ const DesktopOverview = () => {
                       {isDark ? <Sun size={14} /> : <Moon size={14} />}
                     </button>
                     <button className={headerBtnCls}><Bell size={14} /></button>
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center bg-gradient-to-br from-primary to-accent-foreground shadow-sm">
-                      <User size={13} color="white" />
-                    </div>
                   </div>
                 </div>
               </header>

@@ -58,7 +58,13 @@ const calcMonthStats = (validBookings: (Booking & { amount: number })[], year: n
       }
       
       const gPortion = (b.amount / totalNights) * n;
-      const commRate = b.commission || 0;
+      const getDefaultCommRate = (ch: string) => ch === 'Airbnb' || ch === 'Booking.com' ? 17 : ch === 'Naver' ? 2 : 0;
+      const getEffectiveCommRate = (b: Booking & { amount: number }) => {
+        if (b.commission > 100) return b.amount > 0 ? (b.commission / b.amount) * 100 : 0;
+        if (b.commission === 0) return getDefaultCommRate(b.channel);
+        return b.commission || 0;
+      };
+      const commRate = getEffectiveCommRate(b);
       const nPortion = gPortion * (1 - commRate / 100);
       gross += gPortion;
       net += nPortion;
@@ -180,11 +186,14 @@ export const useDesktopStats = (
       : openingMonthKey + 3; // 오픈월 포함 4개월을 초기 기간으로 간주 (ex. 25년6월~9월)
 
     // 최근 N개월 평균 점유율 (과거 데이터가 부족할 때 대체값으로 사용)
+    // 반드시 완료된 과거 달만 샘플링 — 미래/현재 달 OTB를 역사 데이터로 오인하지 않도록
     const computeRecentAvgOcc = (exceptYear: number, exceptMonth: number): number => {
       const samples: number[] = [];
       for (let offset = 1; offset <= 18 && samples.length < 6; offset++) {
         let py = exceptYear, pm = exceptMonth - offset;
         while (pm < 0) { pm += 12; py--; }
+        // 미래 또는 현재 진행 중인 달은 제외 (OTB를 완료 점유율로 착각하는 버그 방지)
+        if (py > actualTodayYear || (py === actualTodayYear && pm >= actualTodayMonth)) continue;
         const past = calcMonthStats(validBookings, py, pm);
         if (past.bookingCount >= MIN_RELIABLE_BOOKINGS) samples.push(past.occupancy);
       }
@@ -452,7 +461,12 @@ export const useDesktopStats = (
       const bias              = biasCurve.get(D)   ?? 0;
       const histOTBatSamePoint = histOTBCurve.get(D) ?? 0;
 
-      const raw = computeForecastRaw(ty, tm, otb, undefined, histOTBatSamePoint || undefined);
+      // daysUntilStart > 90이면 histOTBatSamePoint는 D=90 기준 과거 평균이고
+      // 현재 OTB는 D=daysUntilStart 시점 — 서로 다른 시점을 비교하면 relPaceRatio가 과도하게 높아짐.
+      // 90일 초과 달에서는 relPaceRatio를 비활성화(=1.0)해 remainingPickup 과팽창 방지.
+      const histOTBforPace = daysUntilStart <= 90 ? (histOTBatSamePoint || undefined) : undefined;
+
+      const raw = computeForecastRaw(ty, tm, otb, undefined, histOTBforPace);
       const correctedOcc = Math.min(100, Math.max(otb.occupancy, Math.round(raw.predictedOcc + bias)));
 
       if (correctedOcc === raw.predictedOcc) return raw;

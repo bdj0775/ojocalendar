@@ -111,8 +111,39 @@ export interface Settings {
 }
 
 // ============================================================
+// Bookings filter / sort types
+// ============================================================
+
+export type SortCol =
+  | 'checkIn' | 'checkOut' | 'nights' | 'guestName' | 'guests'
+  | 'channel' | 'amount' | 'commRate' | 'net'
+  | 'adr' | 'leadTime' | 'bookingDate';
+
+export type SortKey = 'checkIn_desc' | 'checkIn_asc' | 'amount_desc' | 'amount_asc';
+
+export interface DesktopBookingsFilter {
+  year: number | 'all';
+  month: number | 'all';
+  channel: Channel | 'all';
+  prop: string;
+  search: string;
+  sortCol: SortCol;
+  sortDir: 'asc' | 'desc';
+}
+
+export interface MobileBookingsFilter {
+  year: number;
+  channel: Channel | 'all';
+  props: string[];
+  search: string;
+  sortKey: SortKey;
+}
+
+// ============================================================
 // Store
 // ============================================================
+
+export type DesktopTab = 'dashboard' | 'bookings' | 'settings';
 
 export interface StoreState {
   // Calendar
@@ -201,6 +232,16 @@ export interface StoreState {
   // 달력 셀 클릭 → 예약목록 연동
   selectedCalendarDate: string | null;
   setSelectedCalendarDate: (date: string | null) => void;
+
+  // 데스크탑 활성 탭 (remount 후에도 유지)
+  activeDesktopTab: DesktopTab;
+  setActiveDesktopTab: (tab: DesktopTab) => void;
+
+  // 예약목록 필터 (remount / 탭 전환 / 페이지 새로고침 후에도 유지)
+  desktopBookingsFilter: DesktopBookingsFilter;
+  setDesktopBookingsFilter: (patch: Partial<DesktopBookingsFilter>) => void;
+  mobileBookingsFilter: MobileBookingsFilter;
+  setMobileBookingsFilter: (patch: Partial<MobileBookingsFilter>) => void;
 }
 
 // ============================================================
