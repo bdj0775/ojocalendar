@@ -710,9 +710,22 @@ const CalendarPage = () => {
         {/* 카드 목록 */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-5 pb-24">
           {upcomingStays.length === 0 && (
-            <Body className="text-center py-8 text-muted-foreground">
-              {t('calendar.noUpcomingStays')}
-            </Body>
+            bookings.length === 0 ? (
+              <div className="flex flex-col items-center text-center py-10 gap-2">
+                <p className="text-sm font-medium text-foreground/70">
+                  {ko ? '아직 예약이 없어요' : 'No bookings yet'}
+                </p>
+                <p className="text-[12px] text-muted-foreground/60 leading-relaxed max-w-[220px]">
+                  {ko
+                    ? '날짜를 탭해서 첫 예약을 추가해보세요. 채널 연결은 설정에서 할 수 있어요.'
+                    : 'Tap a date to add your first booking. Connect channels in settings.'}
+                </p>
+              </div>
+            ) : (
+              <Body className="text-center py-8 text-muted-foreground">
+                {t('calendar.noUpcomingStays')}
+              </Body>
+            )
           )}
           {upcomingStays.map(stay => {
             const pIdx = properties.findIndex(p => p.id === stay.propertyId);

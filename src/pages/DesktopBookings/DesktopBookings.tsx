@@ -435,13 +435,44 @@ const DesktopBookings = () => {
           </thead>
 
           <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={15} className="py-20 text-center text-[13px] text-muted-foreground/50">
-                  {ko ? '예약 데이터가 없습니다' : 'No bookings found'}
-                </td>
-              </tr>
-            )}
+            {rows.length === 0 && (() => {
+              const isFiltered = fyear !== 'all' || fmonth !== 'all' || fch !== 'all' || fprop !== 'all' || fsearch.trim() !== '';
+              return (
+                <tr>
+                  <td colSpan={15}>
+                    <div className="flex flex-col items-center justify-center py-20 gap-2 text-center">
+                      {isFiltered ? (
+                        <>
+                          <p className="text-[13px] text-muted-foreground/60">
+                            {ko ? '검색 결과가 없습니다.' : 'No results found.'}
+                          </p>
+                          <button
+                            onClick={() => {
+                              setFYear('all'); setFMonth('all');
+                              setFCh('all'); setFProp('all'); setFSearch('');
+                            }}
+                            className="text-[12px] text-primary font-semibold"
+                          >
+                            {ko ? '필터 초기화' : 'Clear filters'}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-medium text-foreground/70">
+                            {ko ? '아직 예약이 없어요' : 'No bookings yet'}
+                          </p>
+                          <p className="text-[12px] text-muted-foreground/60 max-w-[280px] leading-relaxed">
+                            {ko
+                              ? '캘린더에서 날짜를 클릭해 첫 예약을 추가하거나, 설정에서 채널을 연결해 자동으로 동기화하세요.'
+                              : 'Click a date on the calendar to add a booking, or connect a channel in settings to auto-sync.'}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })()}
 
             {rows.map((b, idx) => {
               const nights      = diffDays(b.checkIn, b.checkOut);

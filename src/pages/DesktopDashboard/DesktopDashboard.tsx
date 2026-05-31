@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   Bell,
   ChevronLeft, ChevronRight,
-  ArrowUpRight, ArrowDownRight, Database, Sun, Moon,
+  ArrowUpRight, ArrowDownRight, Sun, Moon,
 } from 'lucide-react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
@@ -227,18 +227,19 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
         {/* Empty state */}
         {bookings.length === 0 && (
           <div className={emptyStateCls}>
-            <Database size={36} className="mx-auto text-primary" />
-            <h3 className={isDark ? 'text-slate-200 mt-3 mb-2 text-base font-semibold' : 'text-slate-900 mt-3 mb-2 text-base font-semibold'}>
-              {ko ? '데이터가 비어있습니다!' : 'No Data Available!'}
-            </h3>
-            <p className={isDark ? 'text-slate-600 mb-5 text-[13px]' : 'text-slate-500 mb-5 text-[13px]'}>
-              {ko ? '샘플 데이터를 복구하여 대시보드를 확인하세요.' : 'Recover sample data to preview the dashboard.'}
+            <p className="text-sm font-semibold text-foreground mb-1">
+              {ko ? '아직 예약이 없어요' : 'No bookings yet'}
+            </p>
+            <p className="text-[13px] text-muted-foreground mb-5 leading-relaxed">
+              {ko
+                ? '캘린더에서 날짜를 클릭해 첫 예약을 추가하거나, 설정에서 채널을 연결해 자동으로 동기화하세요.'
+                : 'Click a date on the calendar to add a booking, or connect a channel in settings to auto-sync.'}
             </p>
             <button
-              className="py-3 px-7 bg-gradient-to-br from-primary to-accent-foreground text-white border-0 rounded-inner cursor-pointer font-bold text-sm transition-all hover:-translate-y-px hover:shadow-lg hover:shadow-primary/40"
+              className="text-[12px] text-muted-foreground/50 hover:text-muted-foreground transition-colors underline-offset-2 hover:underline"
               onClick={initializeWithDummyData}
             >
-              {ko ? '샘플 데이터 복구하기' : 'Recover Sample Data'}
+              {ko ? '샘플 데이터로 미리보기' : 'Preview with sample data'}
             </button>
           </div>
         )}

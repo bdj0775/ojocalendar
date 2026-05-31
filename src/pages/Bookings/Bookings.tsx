@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, X, Plus, Menu, FileText, ChevronLeft, ChevronRight, SlidersHorizontal, Check } from 'lucide-react';
+import { Search, X, Plus, Menu, ChevronLeft, ChevronRight, SlidersHorizontal, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
@@ -436,19 +436,36 @@ const BookingsPage = () => {
 
       {/* ── 빈 상태 ── */}
       {rows.length === 0 && (
-        <div className="flex flex-col items-center justify-center pt-20 px-8 text-center">
-          <div className="w-14 h-14 rounded-full bg-muted/40 flex items-center justify-center mb-3">
-            <FileText size={22} className="text-muted-foreground/30" />
-          </div>
-          <p className="text-[13px] text-muted-foreground/50 leading-relaxed">
-            {isFiltered
-              ? (ko ? '검색 결과가 없습니다' : 'No results found')
-              : (ko ? `${fYear}년 예약 데이터가 없습니다` : `No bookings in ${fYear}`)}
-          </p>
-          {isFiltered && (
-            <button onClick={() => { setFCh('all'); setFProps([]); setFSearch(''); }} className="mt-3 text-[12px] text-primary font-semibold">
-              {ko ? '필터 초기화' : 'Clear filters'}
-            </button>
+        <div className="flex flex-col items-center justify-center pt-16 px-8 text-center gap-3">
+          {isFiltered ? (
+            <>
+              <p className="text-[13px] text-muted-foreground/60 leading-relaxed">
+                {ko ? '검색 결과가 없습니다.' : 'No results found.'}
+              </p>
+              <button
+                onClick={() => { setFCh('all'); setFProps([]); setFSearch(''); }}
+                className="text-[12px] text-primary font-semibold"
+              >
+                {ko ? '필터 초기화' : 'Clear filters'}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-foreground/70">
+                {ko ? '아직 예약이 없어요' : 'No bookings yet'}
+              </p>
+              <p className="text-[12px] text-muted-foreground/60 leading-relaxed max-w-[220px]">
+                {ko
+                  ? '캘린더에서 날짜를 탭하거나 + 버튼을 눌러 첫 예약을 추가해보세요.'
+                  : 'Tap a date on the calendar or press + to add your first booking.'}
+              </p>
+              <button
+                onClick={() => navigate('/new-booking')}
+                className="mt-1 text-[12px] text-primary font-semibold"
+              >
+                {ko ? '직접 예약 추가' : 'Add booking'}
+              </button>
+            </>
           )}
         </div>
       )}
