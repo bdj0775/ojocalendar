@@ -102,6 +102,30 @@ export const useStore = create<StoreState>()(
         await supabase.auth.signOut();
       },
 
+      deleteAccount: async () => {
+        const user = get().userProfile;
+        if (!user) throw new Error('로그인 상태가 아닙니다.');
+
+        // 1. 모든 유저 데이터 삭제 (RLS host_id 기반)
+        await Promise.all([
+          supabase.from('sync_notifications').delete().eq('host_id', user.id),
+          supabase.from('sync_channels').delete().eq('host_id', user.id),
+          supabase.from('bookings').delete().eq('host_id', user.id),
+        ]);
+        await supabase.from('properties').delete().eq('host_id', user.id);
+
+        // 2. 로컬 상태 초기화
+        get().resetOnboarding();
+        set({
+          properties: [], bookings: [],
+          syncChannels: [], syncNotifications: [], unreadCount: 0,
+          onboardingCompleted: false, showWelcomeHint: false,
+        });
+
+        // 3. 로그아웃 (auth 레코드는 Supabase 서비스 키 없이 클라이언트에서 삭제 불가)
+        await supabase.auth.signOut();
+      },
+
       setMonth: (year, month) => set({ currentYear: year, currentMonth: month }),
       nextMonth: () => {
         const { currentYear, currentMonth } = get();

@@ -278,6 +278,9 @@ export interface StoreState {
   // 첫 방문 힌트 (온보딩 직후 1회 표시)
   showWelcomeHint: boolean;
   dismissWelcomeHint: () => void;
+
+  // 회원탈퇴
+  deleteAccount: () => Promise<void>;
 }
 
 // ============================================================

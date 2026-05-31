@@ -112,12 +112,14 @@ const MobileSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const {
-    properties, settings, logout,
+    properties, settings, logout, deleteAccount,
     currentYear, currentMonth, prevMonth, nextMonth, setMonth, bookings,
     userProfile, triggerSync, syncLoading,
     visiblePropertyIds, setVisiblePropertyIds, updateProperty, deleteProperty, updateSettings,
     propertyOrder, setPropertyOrder,
   } = useStore();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
@@ -498,11 +500,49 @@ const MobileSidebar = () => {
             >
               로그아웃
             </button>
-            <span className="text-[10px] text-muted-foreground/40">v1.0</span>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="text-[11px] text-muted-foreground/40 hover:text-destructive transition-colors"
+            >
+              회원탈퇴
+            </button>
           </div>
         </div>
       </div>
     </div>
+
+    {showDeleteConfirm && (
+      <div className="fixed inset-0 z-[300] bg-black/50 flex items-end justify-center p-4">
+        <div className="w-full max-w-sm bg-card rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
+          <div className="flex flex-col gap-1">
+            <p className="text-base font-bold text-foreground">정말 탈퇴하시겠어요?</p>
+            <p className="text-[13px] text-muted-foreground leading-relaxed">
+              예약, 숙소, 채널 연결 등 모든 데이터가 즉시 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <button
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                try { await deleteAccount(); close(); }
+                catch { setDeleting(false); setShowDeleteConfirm(false); }
+              }}
+              className="w-full py-3.5 rounded-xl bg-destructive text-white text-[13px] font-semibold disabled:opacity-50"
+            >
+              {deleting ? '삭제 중...' : '탈퇴하기'}
+            </button>
+            <button
+              disabled={deleting}
+              onClick={() => setShowDeleteConfirm(false)}
+              className="w-full py-3 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {editingProperty && (
       <PropertyDetailModal

@@ -72,8 +72,10 @@ const DesktopSettings = () => {
     settings, properties, updateSettings, updateProperty, addProperty, deleteProperty,
     syncChannels, syncLoading, lastSyncResults,
     fetchSyncChannels, saveSyncChannel, deleteSyncChannel, triggerSync,
-    logout, setOnboardingCompleted, resetOnboarding,
+    logout, setOnboardingCompleted, resetOnboarding, deleteAccount,
   } = useStore();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const ko = language === 'ko';
   const [notifications, setNotifications] = useState(settings?.notifications ?? true);
@@ -342,11 +344,7 @@ const DesktopSettings = () => {
         {/* 초기 설정 재진입 */}
         <button
           className="w-full py-3.5 mt-2 text-[13px] font-semibold text-muted-foreground bg-card border border-border/30 rounded-xl hover:bg-muted transition-colors"
-          onClick={() => {
-            resetOnboarding();
-            setOnboardingCompleted(false);
-            navigate('/onboarding');
-          }}
+          onClick={() => { resetOnboarding(); setOnboardingCompleted(false); navigate('/onboarding'); }}
         >
           {ko ? '초기 설정 다시 하기' : 'Redo Initial Setup'}
         </button>
@@ -359,7 +357,50 @@ const DesktopSettings = () => {
           {ko ? '로그아웃' : 'Sign Out'}
         </button>
 
-        <p className="text-center text-[11px] text-muted-foreground/40 mt-8">Version 3.0.1</p>
+        {/* 회원탈퇴 */}
+        <button
+          className="w-full py-3 mt-1 text-[12px] font-medium text-muted-foreground/40 hover:text-destructive transition-colors"
+          onClick={() => setShowDeleteConfirm(true)}
+        >
+          {ko ? '회원탈퇴' : 'Delete Account'}
+        </button>
+
+        <p className="text-center text-[11px] text-muted-foreground/40 mt-4">Version 3.0.1</p>
+
+        {/* 탈퇴 확인 오버레이 */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[300] bg-black/50 flex items-center justify-center p-6">
+            <div className="w-full max-w-sm bg-card rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
+              <div className="flex flex-col gap-1">
+                <p className="text-base font-bold text-foreground">{ko ? '정말 탈퇴하시겠어요?' : 'Delete your account?'}</p>
+                <p className="text-[13px] text-muted-foreground leading-relaxed">
+                  {ko
+                    ? '예약, 숙소, 채널 연결 등 모든 데이터가 즉시 삭제됩니다. 이 작업은 되돌릴 수 없습니다.'
+                    : 'All bookings, properties, and channel connections will be permanently deleted.'}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  disabled={deleting}
+                  onClick={async () => {
+                    setDeleting(true);
+                    try { await deleteAccount(); } catch { setDeleting(false); setShowDeleteConfirm(false); }
+                  }}
+                  className="w-full py-3.5 rounded-xl bg-destructive text-white text-[13px] font-semibold disabled:opacity-50 transition-all"
+                >
+                  {deleting ? (ko ? '삭제 중...' : 'Deleting...') : (ko ? '탈퇴하기' : 'Delete Account')}
+                </button>
+                <button
+                  disabled={deleting}
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="w-full py-3 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {ko ? '취소' : 'Cancel'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {(editingProperty !== null || isAddingProperty) && (
