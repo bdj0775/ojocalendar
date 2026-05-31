@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { validateICalUrl } from '../services/icalSync/icalFetcher';
 import type {
   StoreState, BookingStatus, Settings, SyncNotification, Property, DesktopTab,
-  DesktopBookingsFilter, MobileBookingsFilter,
+  DesktopBookingsFilter, MobileBookingsFilter, OnboardingDraft,
 } from '../types';
 
 const today = new Date();
@@ -504,6 +504,29 @@ export const useStore = create<StoreState>()(
       onboardingCompleted: false,
       setOnboardingCompleted: (v: boolean) => set({ onboardingCompleted: v }),
 
+      onboardingStep: 1,
+      setOnboardingStep: (step: number) => set({ onboardingStep: step }),
+
+      onboardingDraft: {
+        profileName: '', language: 'ko',
+        propertyName: '', baseGuests: 2,
+        basePrice: 0, weekendPrice: 0, extraGuestFee: 0, cleaningFee: 0,
+        checkInTime: '15:00', checkOutTime: '11:00',
+        airbnbIcal: '', bookingIcal: '', naverIcal: '',
+      } as OnboardingDraft,
+      patchOnboardingDraft: (patch: Partial<OnboardingDraft>) =>
+        set(state => ({ onboardingDraft: { ...state.onboardingDraft, ...patch } })),
+      resetOnboarding: () => set({
+        onboardingStep: 1,
+        onboardingDraft: {
+          profileName: '', language: 'ko',
+          propertyName: '', baseGuests: 2,
+          basePrice: 0, weekendPrice: 0, extraGuestFee: 0, cleaningFee: 0,
+          checkInTime: '15:00', checkOutTime: '11:00',
+          airbnbIcal: '', bookingIcal: '', naverIcal: '',
+        },
+      }),
+
       fetchNotifications: async () => {
         const user = get().userProfile;
         if (!user) return;
@@ -569,6 +592,8 @@ export const useStore = create<StoreState>()(
         desktopBookingsFilter: state.desktopBookingsFilter,
         mobileBookingsFilter: state.mobileBookingsFilter,
         onboardingCompleted: state.onboardingCompleted,
+        onboardingStep: state.onboardingStep,
+        onboardingDraft: state.onboardingDraft,
       }),
       // rehydration 후 캘린더 월을 항상 오늘로 초기화
       // (구버전 localStorage에 currentYear/currentMonth가 남아있어도 무시)

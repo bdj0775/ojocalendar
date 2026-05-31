@@ -111,6 +111,26 @@ export interface Settings {
 }
 
 // ============================================================
+// Onboarding
+// ============================================================
+
+export interface OnboardingDraft {
+  profileName: string;
+  language: 'ko' | 'en';
+  propertyName: string;
+  baseGuests: number;
+  basePrice: number;
+  weekendPrice: number;
+  extraGuestFee: number;
+  cleaningFee: number;
+  checkInTime: string;
+  checkOutTime: string;
+  airbnbIcal: string;
+  bookingIcal: string;
+  naverIcal: string;
+}
+
+// ============================================================
 // Bookings filter / sort types
 // ============================================================
 
@@ -243,9 +263,14 @@ export interface StoreState {
   mobileBookingsFilter: MobileBookingsFilter;
   setMobileBookingsFilter: (patch: Partial<MobileBookingsFilter>) => void;
 
-  // 온보딩 완료 여부 (신규 유저 감지 + 리다이렉트 제어)
+  // 온보딩
   onboardingCompleted: boolean;
   setOnboardingCompleted: (v: boolean) => void;
+  onboardingStep: number;
+  setOnboardingStep: (step: number) => void;
+  onboardingDraft: OnboardingDraft;
+  patchOnboardingDraft: (patch: Partial<OnboardingDraft>) => void;
+  resetOnboarding: () => void;
 }
 
 // ============================================================

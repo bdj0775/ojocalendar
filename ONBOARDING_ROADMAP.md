@@ -51,51 +51,51 @@
 
 ---
 
-## Phase 2 — 온보딩 마법사 5단계 UI
+## Phase 2 — 온보딩 마법사 6단계 UI ✅ 완료
 
-> 기간 예상: 3~4일
+> 기간 예상: 3~4일 | 실제 완료일: 2026-05-31
 
-### Step 1 — 환영 + 프로필
-- [ ] 이름 입력 → `settings.profileName` 업데이트
-- [ ] 언어 선택 (ko / en) → `settings.language` 업데이트
-- [ ] 애니메이션 환영 메시지
+### Step 1 — 언어 + 이름
+- [x] 이름 입력 → `settings.profileName` 업데이트
+- [x] 언어 선택 (ko / en) → `settings.language` 업데이트
 
 ### Step 2 — 숙소 기본 정보
-- [ ] 숙소 이름 입력
-- [ ] 기준 인원 슬라이더/선택
-- [ ] 숙소 유형 선택 (펜션·게스트하우스·독채·기타)
+- [x] 숙소 이름 입력
+- [x] 기준 인원 선택 (1~6)
 
 ### Step 3 — 요금 설정
-- [ ] 평일 기본 요금 (basePrice)
-- [ ] 주말 요금 (weekendPrice)
-- [ ] 추가 인원 요금 (extraGuestFee)
-- [ ] 청소비 (cleaningFee)
-- [ ] "나중에 설정" 스킵 가능
+- [x] 평일 기본 요금 (basePrice)
+- [x] 주말 요금 (weekendPrice)
+- [x] 추가 인원 요금 (extraGuestFee)
+- [x] 청소비 (cleaningFee)
 
 ### Step 4 — 운영 시간
-- [ ] 체크인 시간 선택 (checkInTime)
-- [ ] 체크아웃 시간 선택 (checkOutTime)
+- [x] 체크인 시간 선택 (checkInTime)
+- [x] 체크아웃 시간 선택 (checkOutTime)
 
 ### Step 5 — 채널 연결 (선택)
-- [ ] Airbnb iCal URL 입력 + 유효성 검사
-- [ ] Booking.com iCal URL
-- [ ] Naver iCal URL
-- [ ] "나중에 연결할게요" 전체 스킵
-- [ ] URL 유효성 검사는 기존 `validateICalUrl` 활용
+- [x] Airbnb iCal URL 입력 + 유효성 검사
+- [x] Booking.com iCal URL
+- [x] Naver iCal URL
+- [x] "나중에 연결할게요" 전체 스킵
+- [x] URL 유효성 검사는 기존 `validateICalUrl` 활용
 
 ### Step 6 — 완료
-- [ ] 설정 요약 카드 표시
-- [ ] `addProperty()` 호출로 Supabase에 숙소 저장
-- [ ] iCal URL 있으면 `saveSyncChannel()` + 첫 동기화
-- [ ] `setOnboardingCompleted(true)` → persist 저장
-- [ ] "앱 시작하기" → `/` 이동
-- [ ] 완료 후 InstallPrompt 표시 허용
+- [x] 설정 요약 카드 표시
+- [x] `addProperty()` 호출로 Supabase에 숙소 저장
+- [x] iCal URL 있으면 `saveSyncChannel()` 호출
+- [x] `setOnboardingCompleted(true)` → persist 저장
+- [x] `resetOnboarding()` → 드래프트·스텝 초기화
+- [x] "앱 시작하기" → `/` 이동
 
 ### 공통 UX
-- [ ] 상단 진행 바 (Step N / 6)
-- [ ] 뒤로가기 버튼 (Step 1 제외)
-- [ ] 스텝 데이터 Zustand에 임시 저장 (새로고침 복구)
-- [ ] 로딩/저장 중 스피너 + 에러 처리
+- [x] 상단 진행 바 (Step N / 6)
+- [x] 뒤로가기 버튼 (Step 1 제외)
+- [x] 스텝 데이터 Zustand persist 저장 (새로고침 복구)
+- [x] 저장 중 텍스트 상태 + 에러 처리
+- [x] 아이콘 없음, 기존 디자인 토큰 사용 (Login.tsx 동일 inputCls)
+- [x] `OnboardingDraft` 타입 → `types/index.ts`로 이동
+- [x] 하드코딩 없음 — 상수·번역 헬퍼 분리
 
 ---
 
