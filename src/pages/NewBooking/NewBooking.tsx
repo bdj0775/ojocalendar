@@ -7,8 +7,6 @@ import { isHoliday } from '../../utils/holidays';
 import type { Booking } from '../../types';
 
 const NATIONALITIES = ['Korea', 'Taiwan', 'Singapore', 'China', 'Japan', 'Others'];
-const CHANNELS = ['Airbnb', 'Naver', 'Booking.com', 'Direct'];
-const COMMISSIONS = [2, 17];
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 const parseSafeDate = (str: string | undefined | null): Date | null => {
@@ -32,6 +30,7 @@ const NewBookingPage = () => {
   const updateBooking = useStore(s => s.updateBooking);
   const settings = useStore(s => s.settings);
   const properties = useStore(s => s.properties);
+  const channelSettings = useStore(s => s.channelSettings);
   const [selectedPropertyId, setSelectedPropertyId] = useState(() => properties[0]?.id ?? '');
   const property = properties.find(p => p.id === selectedPropertyId) ?? properties[0];
   const { t, language } = useTranslation();
@@ -61,17 +60,19 @@ const NewBookingPage = () => {
   const [channel, setChannel] = useState(editBooking?.channel || 'Airbnb');
   const [amount, setAmount] = useState(_initAmount.value);
   const [isEstimatedAmount, setIsEstimatedAmount] = useState(_initAmount.estimated);
-  const [commission, setCommission] = useState(editBooking?.commission ?? 17);
+  const [commission, setCommission] = useState(() =>
+    editBooking?.commission ?? channelSettings.find(s => s.channel === 'Airbnb')?.commission ?? 0
+  );
   const [isCustomCommission, setIsCustomCommission] = useState(
-    editBooking ? !COMMISSIONS.includes(editBooking.commission) : false
+    editBooking ? !channelSettings.some(s => s.commission === editBooking.commission) : false
   );
   const [errorMsg, setErrorMsg] = useState('');
   const [isAutoCalc, setIsAutoCalc] = useState(!editBooking);
 
   const handleChannelSelect = (c: string) => {
     setChannel(c as 'Airbnb' | 'Naver' | 'Booking.com' | 'Direct');
-    if (c === 'Naver') { setCommission(2); setIsCustomCommission(false); }
-    else if (c === 'Booking.com' || c === 'Airbnb') { setCommission(17); setIsCustomCommission(false); }
+    const rate = channelSettings.find(s => s.channel === c)?.commission;
+    if (rate !== undefined) { setCommission(rate); setIsCustomCommission(false); }
   };
 
   const initialDate = editBooking
@@ -385,8 +386,8 @@ const NewBookingPage = () => {
         <div className="mb-6">
           <label className={labelCls}>{t('booking.channel')}</label>
           <div className="flex flex-wrap gap-2.5">
-            {CHANNELS.map(c => (
-              <button key={c} className={`${chipCls} ${channel === c ? chipActiveCls : ''}`} onClick={() => handleChannelSelect(c)}>{c}</button>
+            {channelSettings.map(s => (
+              <button key={s.channel} className={`${chipCls} ${channel === s.channel ? chipActiveCls : ''}`} onClick={() => handleChannelSelect(s.channel)}>{s.channel}</button>
             ))}
           </div>
         </div>
@@ -419,8 +420,8 @@ const NewBookingPage = () => {
         <div className="mb-6">
           <label className={labelCls}>{t('booking.commission')}</label>
           <div className="flex gap-2.5">
-            {COMMISSIONS.map(c => (
-              <button key={c} className={`${chipBlockCls} ${!isCustomCommission && commission === c ? chipBlockActiveCls : ''}`} onClick={() => { setCommission(c); setIsCustomCommission(false); }}>{c}%</button>
+            {channelSettings.filter(s => s.commission > 0).slice(0, 3).map(s => (
+              <button key={s.channel} className={`${chipBlockCls} ${!isCustomCommission && commission === s.commission ? chipBlockActiveCls : ''}`} onClick={() => { setCommission(s.commission); setIsCustomCommission(false); }}>{s.commission}%</button>
             ))}
             <button className={`${chipBlockCls} ${isCustomCommission ? chipBlockActiveCls : ''}`} onClick={() => setIsCustomCommission(true)}>직접입력</button>
           </div>

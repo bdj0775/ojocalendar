@@ -94,6 +94,8 @@ const CalendarPage = () => {
     visiblePropertyIds, setVisiblePropertyIds,
     propertyOrder, setPropertyOrder,
     setSelectedCalendarDate,
+    activeDesktopTab,
+    channelSettings,
   } = useStore();
 
   const { open: openSidebar } = useSidebar();
@@ -336,8 +338,9 @@ const CalendarPage = () => {
     const { checkIn: ci, checkOut: co, channel, propertyId } = previewDates;
     if (ci >= co) return [];
 
-    // 채널 클래스 결정
+    // 채널 클래스 및 동적 색상 결정
     const channelClass = CHANNEL_STYLES_MAP[channel] ?? 'airbnb';
+    const channelColor = channelSettings.find(s => s.channel === channel)?.color;
 
     // 숙소 슬롯 인덱스 및 색상 결정
     const slotIndex = (() => {
@@ -383,7 +386,7 @@ const CalendarPage = () => {
         id: '__preview__', type: 'booking',
         guestName: '', channel, nationality: undefined,
         guests: 0, nights, span,
-        channelClass, propColor,
+        channelClass, channelColor, propColor,
         left: `calc(${(col / 7) * 100}% + 2px)`,
         width: `calc(${(span / 7) * 100}% - 4px)`,
         top: `${topPx}px`,
@@ -394,7 +397,7 @@ const CalendarPage = () => {
       cur = segEnd + 1;
     }
     return bars;
-  }, [previewDates, currentGrid, visibleProperties]);
+  }, [previewDates, currentGrid, visibleProperties, channelSettings]);
 
   // ── preview와 겹치는 기존 bar 제거 후 합침 ────────────────────────────────
   // 동일 propertyId에서 preview 날짜 범위와 겹치는 기존 bar를 숨기고 preview로 대체
@@ -456,8 +459,9 @@ const CalendarPage = () => {
       return;
     }
 
-    // 데스크탑: 예약이 있는 날짜 클릭 시 예약목록 탭으로 이동
-    if (window.innerWidth >= 1024) {
+    // 데스크탑: 예약목록 탭이 열려있을 때만 해당 날짜 건으로 이동
+    // 대시보드 탭에서는 퀵예약모달을 열어야 하므로 통과
+    if (window.innerWidth >= 1024 && activeDesktopTab === 'bookings') {
       const hasBooking = visibleBookings.some(
         b => b.checkIn <= cell.dateStr && b.checkOut > cell.dateStr,
       );

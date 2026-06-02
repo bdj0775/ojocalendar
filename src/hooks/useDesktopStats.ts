@@ -3,13 +3,6 @@ import { useStore } from '../store/useStore';
 import { getNatColor } from '../utils/colors';
 import type { DesktopStats, MonthlyTrend, PieDataItem, LeadTimeDataPoint, MonthlyTableRow, Booking } from '../types';
 
-const CHANNEL_COLORS: Record<string, string> = {
-  'Airbnb': 'var(--channel-airbnb)',
-  'Booking.com': 'var(--channel-booking)',
-  'Direct': 'var(--channel-direct)',
-  'Naver': 'var(--channel-naver)',
-};
-
 
 const MONTH_LABELS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const MONTH_LABELS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -86,10 +79,15 @@ export const useDesktopStats = (
   tableNatFilter = 'All',
   tableGuestFilter = 'All',
 ): DesktopStats => {
-  const { bookings, currentYear, currentMonth, settings, properties } = useStore();
+  const { bookings, currentYear, currentMonth, settings, properties, channelSettings, selectedDashboardPropertyId } = useStore();
+  const getChannelColor = (ch: string) =>
+    channelSettings.find(s => s.channel === ch)?.color ?? '#94a3b8';
 
   return useMemo(() => {
-    const prop = properties?.[0] ?? {};
+    const activeProp = selectedDashboardPropertyId
+      ? (properties.find(p => p.id === selectedDashboardPropertyId) ?? properties?.[0] ?? {})
+      : (properties?.[0] ?? {});
+    const prop = activeProp;
     const basePricePerNight = Number((prop as { basePrice?: number }).basePrice) || 189000;
     const weekendPricePerNight = Number((prop as { weekendPrice?: number }).weekendPrice) || 229000;
 
@@ -110,7 +108,11 @@ export const useDesktopStats = (
 
     const firstPropId = properties[0]?.id;
     const validBookings: ValidBooking[] = bookings
-      .filter(b => !firstPropId || !b.propertyId || b.propertyId === firstPropId)
+      .filter(b => {
+        if (!selectedDashboardPropertyId) return true; // null = 전체
+        const bPropId = b.propertyId || firstPropId;
+        return !bPropId || bPropId === selectedDashboardPropertyId;
+      })
       .filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed')
       .map(b => {
         const realAmount = Number(b.amount) || 0;
@@ -599,7 +601,7 @@ export const useDesktopStats = (
     });
 
     let channelPieData: PieDataItem[] = Object.keys(channelCounts)
-      .map(ch => ({ name: ch, value: Math.round((channelCounts[ch] / totalChannelBookings) * 100), count: channelCounts[ch], color: CHANNEL_COLORS[ch] || '#94a3b8' }))
+      .map(ch => ({ name: ch, value: Math.round((channelCounts[ch] / totalChannelBookings) * 100), count: channelCounts[ch], color: getChannelColor(ch) }))
       .sort((a, b) => b.value - a.value);
     if (channelPieData.length === 0) channelPieData = [{ name: 'No Data', value: 100, count: 0, color: '#334155' }];
 
@@ -619,7 +621,7 @@ export const useDesktopStats = (
 
     let allTimeChannelPieData: PieDataItem[] = Object.keys(allTimeChanCounts).length > 0
       ? Object.keys(allTimeChanCounts)
-          .map(ch => ({ name: ch, value: Math.round((allTimeChanCounts[ch] / allTimeTotalCount) * 100), count: allTimeChanCounts[ch], color: CHANNEL_COLORS[ch] || '#94a3b8' }))
+          .map(ch => ({ name: ch, value: Math.round((allTimeChanCounts[ch] / allTimeTotalCount) * 100), count: allTimeChanCounts[ch], color: getChannelColor(ch) }))
           .sort((a, b) => b.value - a.value)
       : [{ name: 'No Data', value: 100, count: 0, color: '#334155' }];
 
@@ -750,5 +752,5 @@ export const useDesktopStats = (
       leadTimeScatterData, leadTimeStartX: startX, leadTimeEndX: endX,
       leadTimeNatKeys: [...allLeadTimeNats], monthlyTableData, currencySymbol, annualForecast, annualCumulativeData,
     };
-  }, [bookings, currentYear, currentMonth, settings?.currency, properties, tableChannelFilter, tableNatFilter, tableGuestFilter]);
+  }, [bookings, currentYear, currentMonth, settings?.currency, properties, tableChannelFilter, tableNatFilter, tableGuestFilter, selectedDashboardPropertyId, channelSettings]);
 };

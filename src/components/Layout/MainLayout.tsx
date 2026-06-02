@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { SidebarProvider } from '../../context/SidebarContext';
 import MobileSidebar from './MobileSidebar';
+import BottomNav from './BottomNav';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
 

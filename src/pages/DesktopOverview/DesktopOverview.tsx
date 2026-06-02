@@ -5,6 +5,7 @@ import DesktopDashboard from '../DesktopDashboard/DesktopDashboard';
 import DesktopBookings from '../DesktopBookings/DesktopBookings';
 import DesktopSettings from '../DesktopSettings/DesktopSettings';
 import DesktopTabNav from '../../components/DesktopTabNav/DesktopTabNav';
+import PropertyDropdown from '../../components/DesktopTabNav/PropertyDropdown';
 import type { DesktopTab } from '../../types';
 import { useStore } from '../../store/useStore';
 
@@ -103,6 +104,8 @@ const DesktopOverview = () => {
                   </h1>
                 </div>
                 <div className="flex items-center gap-5">
+                  <PropertyDropdown />
+                  <div className="w-px h-4 bg-border/60" />
                   <DesktopTabNav activeTab={activeTab} onTabChange={setActiveTab} />
                   <div className="w-px h-4 bg-border/60" />
                   <div className="flex items-center gap-2">

@@ -14,12 +14,6 @@ const NATS = [
   { key: 'Western',   label: '서구권' },
 ];
 
-const CHANNELS = [
-  { key: 'Airbnb',      label: '에어비앤비', rate: 17 },
-  { key: 'Booking.com', label: '부킹닷컴',   rate: 17 },
-  { key: 'Naver',       label: '네이버',      rate: 2  },
-  { key: 'Direct',      label: '직접',        rate: 0  },
-];
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────────────
 const addDays = (ds: string, n: number): string => {
@@ -53,7 +47,7 @@ interface Props {
 }
 
 const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }: Props) => {
-  const { properties, bookings, addBooking, showToast } = useStore();
+  const { properties, bookings, addBooking, showToast, channelSettings } = useStore();
 
   // ── 위치 계산 (두 패스: invisible 렌더 → 높이 측정 → visible) ─────────────
   const modalRef              = useRef<HTMLDivElement>(null);
@@ -136,7 +130,9 @@ const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }
   const [amount,       setAmount]       = useState(basePrice);
   const [amountRaw,    setAmountRaw]    = useState(() => basePrice.toLocaleString());
   const [amountCustom, setAmountCustom] = useState(false);
-  const [commRate,     setCommRate]     = useState(17);
+  const [commRate,     setCommRate]     = useState(() =>
+    channelSettings.find(s => s.channel === 'Airbnb')?.commission ?? 0
+  );
   const [commCustom,   setCommCustom]   = useState(false);
   const [memo,         setMemo]         = useState('');
   const [isSaving,     setIsSaving]     = useState(false);
@@ -185,7 +181,7 @@ const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }
   };
   const handleChannel = (ch: string) => {
     setChannel(ch);
-    if (!commCustom) setCommRate(CHANNELS.find(c => c.key === ch)?.rate ?? 0);
+    if (!commCustom) setCommRate(channelSettings.find(s => s.channel === ch)?.commission ?? 0);
   };
 
   // 체크인 스테퍼
@@ -349,8 +345,10 @@ const CompactQuickBookingModal = ({ date, anchorRect, onClose, onPreviewChange }
             ))}
           </div>
           <div className="flex gap-1.5 flex-wrap">
-            {CHANNELS.map(c => (
-              <button key={c.key} className={chip(channel === c.key)} onClick={() => handleChannel(c.key)}>{c.label}</button>
+            {channelSettings.map(s => (
+              <button key={s.channel} className={chip(channel === s.channel)} onClick={() => handleChannel(s.channel)}>
+                {s.channel}
+              </button>
             ))}
           </div>
         </div>

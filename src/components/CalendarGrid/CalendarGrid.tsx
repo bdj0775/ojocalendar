@@ -188,7 +188,9 @@ const CalendarGrid = ({
           className={getBarCls(bar.channelClass, bar.isPast, bar.isPreview)}
           style={{
             top: bar.top, left: bar.left, width: bar.width,
-            ...(eventColorMode === 'property' && { backgroundColor: bar.propColor }),
+            ...(eventColorMode === 'property'
+              ? { backgroundColor: bar.propColor }
+              : bar.channelColor ? { backgroundColor: bar.channelColor } : {}),
           }}
           onClick={bar.isPreview ? undefined : e => onBarClick(e, bar)}
         >

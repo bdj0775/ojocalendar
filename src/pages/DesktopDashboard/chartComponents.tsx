@@ -2,12 +2,20 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 // ── Constants ─────────────────────────────────────────────────
+import { useStore } from '../../store/useStore';
+
 export const CHANNEL_COLORS: Record<string, string> = {
   Airbnb: 'var(--channel-airbnb)',
   'Booking.com': 'var(--channel-booking)',
   Direct: 'var(--channel-direct)',
   Naver: 'var(--channel-naver)',
 };
+
+// 동적 채널 색상 — channelSettings 반영 (차트·도넛용)
+export function getChannelColor(channel: string): string {
+  const settings = useStore.getState().channelSettings;
+  return settings.find(s => s.channel === channel)?.color ?? CHANNEL_COLORS[channel] ?? '#94a3b8';
+}
 
 export const GUEST_COLORS: Record<string, string> = {
   '1': 'var(--muted-foreground)',

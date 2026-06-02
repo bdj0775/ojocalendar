@@ -4,8 +4,15 @@ import { supabase } from '../services/supabaseClient';
 import { validateICalUrl } from '../services/icalSync/icalFetcher';
 import type {
   StoreState, BookingStatus, Settings, SyncNotification, Property, DesktopTab,
-  DesktopBookingsFilter, MobileBookingsFilter, OnboardingDraft,
+  DesktopBookingsFilter, MobileBookingsFilter, OnboardingDraft, ChannelSetting,
 } from '../types';
+
+const DEFAULT_CHANNEL_SETTINGS: ChannelSetting[] = [
+  { id: 'builtin-airbnb',     channel: 'Airbnb',       color: '#e11d48', commission: 3,  isBuiltIn: true },
+  { id: 'builtin-bookingcom', channel: 'Booking.com',  color: '#1e40af', commission: 15, isBuiltIn: true },
+  { id: 'builtin-naver',      channel: 'Naver',        color: '#10b981', commission: 5,  isBuiltIn: true },
+  { id: 'builtin-direct',     channel: 'Direct',       color: '#8b5cf6', commission: 0,  isBuiltIn: true },
+];
 
 const today = new Date();
 
@@ -38,22 +45,28 @@ export const useStore = create<StoreState>()(
         };
 
         supabase.auth.getSession().then(({ data: { session } }) => {
+          const now = new Date();
           set(state => ({
             // Don't downgrade: if onAuthStateChange already set isAuthenticated=true
             // (e.g. PKCE exchange completed mid-flight), preserve it.
             isAuthenticated: state.isAuthenticated || !!session,
             userProfile: state.userProfile ?? (session?.user ?? null),
             authLoading: false,
+            // 앱 로드 시 오늘 날짜 월로 리셋 (퍼시스트된 이전 월 무시)
+            ...(session ? { currentYear: now.getFullYear(), currentMonth: now.getMonth() } : {}),
           }));
           syncName(session?.user ?? null);
           if (session) get().fetchData();
         });
 
         supabase.auth.onAuthStateChange((event, session) => {
+          const now = new Date();
           set({
             isAuthenticated: !!session,
             userProfile: session?.user ?? null,
             authLoading: false,
+            // 새 로그인 시 오늘 날짜 월로 리셋
+            ...(event === 'SIGNED_IN' ? { currentYear: now.getFullYear(), currentMonth: now.getMonth() } : {}),
           });
           syncName(session?.user ?? null);
           if (session) {
@@ -113,8 +126,17 @@ export const useStore = create<StoreState>()(
           supabase.from('bookings').delete().eq('host_id', user.id),
         ]);
         await supabase.from('properties').delete().eq('host_id', user.id);
+        await supabase.from('profiles').delete().eq('id', user.id);
 
-        // 2. 로컬 상태 초기화
+        // 2. auth.users 레코드 삭제 (Edge Function 호출)
+        //    이 단계가 없으면 OAuth 로그인 시 자동 재가입됨
+        const { error: fnErr } = await supabase.functions.invoke('delete-user');
+        if (fnErr) {
+          console.error('Auth 레코드 삭제 실패 (Edge Function):', fnErr);
+          // Edge Function 실패 시에도 로컬 정리는 계속 진행
+        }
+
+        // 3. 로컬 상태 초기화
         get().resetOnboarding();
         set({
           properties: [], bookings: [],
@@ -122,8 +144,11 @@ export const useStore = create<StoreState>()(
           onboardingCompleted: false, showWelcomeHint: false,
         });
 
-        // 3. 로그아웃 (auth 레코드는 Supabase 서비스 키 없이 클라이언트에서 삭제 불가)
-        await supabase.auth.signOut();
+        // 4. Zustand persist 로컬 스토리지 완전 삭제
+        try { localStorage.removeItem('booking-calendar-storage'); } catch { /* SSR 안전 */ }
+
+        // 5. 모든 기기에서 로그아웃
+        await supabase.auth.signOut({ scope: 'global' });
       },
 
       setMonth: (year, month) => set({ currentYear: year, currentMonth: month }),
@@ -153,8 +178,7 @@ export const useStore = create<StoreState>()(
           if (existingProps && existingProps.length > 0) return;
 
           // New user: create a single blank property.
-          // Do NOT auto-insert dummy bookings — real users start with clean data.
-          // Dummy data can be restored via the "샘플 데이터 복구" button in the dashboard.
+          // Users start with clean data — no sample/dummy data is ever auto-inserted.
           const { error: pErr } = await supabase.from('properties').insert({
             host_id: user.id,
             name: '내 숙소',
@@ -183,7 +207,6 @@ export const useStore = create<StoreState>()(
             .from('properties').select('*').eq('host_id', user.id);
           if (pErr) throw pErr;
           // 숙소 없음 → 온보딩 마법사가 숙소 생성을 담당 (자동 생성 제거)
-          // 기존 "샘플 데이터 복구" 버튼은 migrateData()를 직접 호출하므로 유지
           if (pData) {
             const seenNames = new Set<string>();
             const deduped = pData.filter(p => {
@@ -613,6 +636,33 @@ export const useStore = create<StoreState>()(
         if (error) { get().showToast('알림 처리 중 오류가 발생했습니다', 'error'); return; }
         set({ syncNotifications: [], unreadCount: 0 });
       },
+
+      // ── 대시보드/예약목록 숙소 필터 ───────────────────────────────
+      selectedDashboardPropertyId: null,
+      setSelectedDashboardPropertyId: (id) => {
+        set({ selectedDashboardPropertyId: id });
+        // 예약목록 테이블의 숙소 필터도 동기화
+        get().setDesktopBookingsFilter({ prop: id ?? 'all' });
+      },
+
+      // ── 예약채널 설정 ──────────────────────────────────────────
+      channelSettings: DEFAULT_CHANNEL_SETTINGS,
+      addChannelSetting: (setting) => {
+        const id = `custom-${Date.now()}`;
+        set(state => ({
+          channelSettings: [...state.channelSettings, { ...setting, id, isBuiltIn: false }],
+        }));
+      },
+      updateChannelSetting: (id, patch) => {
+        set(state => ({
+          channelSettings: state.channelSettings.map(s => s.id === id ? { ...s, ...patch } : s),
+        }));
+      },
+      deleteChannelSetting: (id) => {
+        set(state => ({
+          channelSettings: state.channelSettings.filter(s => s.id !== id),
+        }));
+      },
     }),
     {
       name: 'booking-calendar-storage',
@@ -629,6 +679,7 @@ export const useStore = create<StoreState>()(
         onboardingCompleted: state.onboardingCompleted,
         onboardingStep: state.onboardingStep,
         onboardingDraft: state.onboardingDraft,
+        channelSettings: state.channelSettings,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

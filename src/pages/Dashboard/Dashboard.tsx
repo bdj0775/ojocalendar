@@ -1,8 +1,9 @@
 import { useState, useMemo, useRef } from 'react';
 import {
-  Bell, ChevronLeft, ChevronRight, TrendingUp,
-  ArrowUpRight, ArrowDownRight, Database, Menu,
+  Bell, ChevronLeft, ChevronRight,
+  ArrowUpRight, ArrowDownRight, Menu,
 } from 'lucide-react';
+import PropertyDropdown from '../../components/DesktopTabNav/PropertyDropdown';
 import { useSidebar } from '../../context/SidebarContext';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
@@ -14,8 +15,7 @@ import { OverlapDetector } from '../../components/OverlapDetector';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useDesktopStats } from '../../hooks/useDesktopStats';
 import { useBookingPace } from '../../hooks/useBookingPace';
-import { supabase } from '../../services/supabaseClient';
-import { DUMMY_BOOKINGS, DUMMY_MAINTENANCE } from '../../utils/dummyData';
+
 import LeadTimeDetailModal from '../../components/Modals/LeadTimeDetailModal';
 import DistributionDetailModal from '../../components/Modals/DistributionDetailModal';
 import { TrendTooltip } from '../DesktopDashboard/chartComponents';
@@ -186,18 +186,16 @@ const DashboardPage = () => {
         <button className="p-1 -ml-1 text-foreground lg:hidden shrink-0" onClick={openSidebar}>
           <Menu size={24} />
         </button>
-        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          <TrendingUp color="var(--primary)" size={18} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-[14px] font-bold leading-tight text-foreground">{t('dashboard.title')}</h1>
-          <div className="flex items-center gap-1.5 mt-0.5 text-muted-foreground">
+        <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+          <h1 className="text-[14px] font-bold leading-tight text-foreground shrink-0">{t('dashboard.title')}</h1>
+          <div className="flex items-center gap-1 text-muted-foreground">
             <button onClick={prevMonth} className="p-0.5 hover:bg-muted rounded-full"><ChevronLeft size={14} /></button>
             <span className="text-[12px] font-bold tracking-wide whitespace-nowrap">
               {new Date(currentYear, currentMonth).toLocaleString(language, { month: 'long' }).toUpperCase()} {currentYear}
             </span>
             <button onClick={nextMonth} className="p-0.5 hover:bg-muted rounded-full"><ChevronRight size={14} /></button>
           </div>
+          <PropertyDropdown />
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button className="w-8 h-8 rounded-full bg-muted/30 border border-border/50 flex items-center justify-center text-muted-foreground"><Bell size={15} /></button>
@@ -209,31 +207,10 @@ const DashboardPage = () => {
         {/* ── 빈 상태 ── */}
         {bookings.length === 0 && (
           <div className="p-5 bg-muted/20 border-2 border-dashed border-primary/20 rounded-2xl text-center w-full">
-            <Database size={28} className="mx-auto text-primary mb-2.5" />
-            <h3 className="text-foreground font-bold mb-1.5 text-[14px]">데이터가 비어있습니다!</h3>
-            <p className="text-muted-foreground text-[11px] mb-4 leading-relaxed">샘플 데이터를 복구하여 대시보드를 미리 확인해보세요.</p>
-            <button
-              className="py-3 px-6 bg-primary text-primary-foreground rounded-xl font-bold text-[13px] w-full"
-              onClick={async () => {
-                if (!userProfile) return;
-                const pId = properties[0]?.id;
-                if (!pId) return;
-                try {
-                  showToast('복구 중...', 'info');
-                  await supabase.from('bookings').insert(DUMMY_BOOKINGS.map(b => ({
-                    host_id: userProfile.id, property_id: pId,
-                    guestname: b.guestName, checkin: b.checkIn, checkout: b.checkOut,
-                    guests: b.guests, infants: b.infants, nationality: b.nationality,
-                    channel: b.channel, status: b.status || 'confirmed',
-                    amount: b.amount || 0, commission: b.commission || 0,
-                  })));
-                  await fetchData();
-                  showToast('완료', 'success');
-                } catch { showToast('오류 발생', 'error'); }
-              }}
-            >
-              샘플 데이터 복구
-            </button>
+            <h3 className="text-foreground font-bold mb-1.5 text-[14px]">아직 예약이 없어요</h3>
+            <p className="text-muted-foreground text-[11px] mb-2 leading-relaxed">
+              캘린더에서 날짜를 클릭해 첫 예약을 추가하거나, 설정에서 채널을 연결해 자동으로 동기화하세요.
+            </p>
           </div>
         )}
 

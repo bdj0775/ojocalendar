@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useStore } from '../../store/useStore';
 import type { Booking, Property } from '../../types';
 
 // 숙소별 색상 — MobileSidebar와 공유
@@ -14,6 +15,7 @@ export interface BookingBar {
   nights: number;
   span: number;
   channelClass: string;
+  channelColor?: string; // 채널 설정에서 가져온 실제 hex 색상 (인라인 스타일로 적용)
   propertyId?: string;
   propColor: string;   // 숙소 고유 색상 (인디케이터용, 이벤트바 bg 아님)
   left: string;
@@ -68,10 +70,11 @@ const MAX_SLOTS = 3;
 
 export function useBookingBars(
   bookings: Booking[],
-  
   calendarGrid: GridCell[],
   properties?: Property[], // 숙소 배열 (순서 + 색상 기준)
 ): BookingBar[] {
+  const channelSettings = useStore(state => state.channelSettings);
+
   return useMemo<BookingBar[]>(() => {
     if (!calendarGrid.length) return [];
 
@@ -152,6 +155,7 @@ export function useBookingBars(
         if (endIdx < startIdx) return;
 
         const channelClass = (CHANNEL_STYLES[item.channel || ''] || 'airbnb');
+        const channelColor = channelSettings.find(s => s.channel === item.channel)?.color;
 
         let cur = startIdx;
         while (cur <= endIdx) {
@@ -175,6 +179,7 @@ export function useBookingBars(
             nights,
             span,
             channelClass,
+            channelColor,
             propertyId:  item.propertyId,
             propColor:   getPropColor(item.propertyId),
             left:     `calc(${(col  / 7) * 100}% + 2px)`,
@@ -192,5 +197,5 @@ export function useBookingBars(
     });
 
     return bars;
-  }, [bookings, calendarGrid, properties]);
+  }, [bookings, calendarGrid, properties, channelSettings]);
 }

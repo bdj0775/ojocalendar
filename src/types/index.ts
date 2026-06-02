@@ -4,6 +4,14 @@
 
 export type BookingStatus = 'confirmed' | 'checked in' | 'pending' | 'completed';
 export type Channel = 'Airbnb' | 'Booking.com' | 'Naver' | 'Direct';
+
+export interface ChannelSetting {
+  id: string;
+  channel: string;
+  color: string;        // hex color
+  commission: number;   // % (0–100)
+  isBuiltIn: boolean;
+}
 export type Nationality = 'Korea' | 'Taiwan' | 'Singapore' | 'China' | 'Japan' | 'Others' | string;
 export type Currency = 'KRW' | 'USD' | 'EUR';
 export type Language = 'ko' | 'en';
@@ -281,6 +289,16 @@ export interface StoreState {
 
   // 회원탈퇴
   deleteAccount: () => Promise<void>;
+
+  // 대시보드/예약목록 숙소 필터
+  selectedDashboardPropertyId: string | null;
+  setSelectedDashboardPropertyId: (id: string | null) => void;
+
+  // 예약채널 설정
+  channelSettings: ChannelSetting[];
+  addChannelSetting: (setting: Omit<ChannelSetting, 'id' | 'isBuiltIn'>) => void;
+  updateChannelSetting: (id: string, patch: Partial<Pick<ChannelSetting, 'channel' | 'color' | 'commission'>>) => void;
+  deleteChannelSetting: (id: string) => void;
 }
 
 // ============================================================

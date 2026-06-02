@@ -3,48 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
 import PropertyDetailModal from '../../components/Modals/PropertyDetailModal';
+import ChannelSettingsSection from '../../components/Settings/ChannelSettingsSection';
 import type { Channel, Property } from '../../types';
 
 const ICAL_CHANNELS: { channel: Channel; label: string; dot: string }[] = [
   { channel: 'Airbnb',      label: 'Airbnb',      dot: 'bg-rose-500'  },
   { channel: 'Booking.com', label: 'Booking.com', dot: 'bg-blue-600'  },
 ];
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-
-// ── Export iCal section ────────────────────────────────────────
-function ExportIcalSection({ hostId, propertyId }: { hostId: string; propertyId: string }) {
-  const [copied, setCopied] = useState(false);
-  const url = `${SUPABASE_URL}/functions/v1/export-ical?host=${hostId}&property=${propertyId}`;
-
-  return (
-    <div className={card}>
-      <div className={`${row} flex-col items-start gap-3`}>
-        <div>
-          <p className={rowLabel}>내 예약 캘린더 URL</p>
-          <p className="text-[12px] text-muted-foreground/80 mt-1 leading-relaxed">
-            이 URL을 각 플랫폼의 "외부 캘린더 가져오기"에 등록하면 교차 차단이 자동 적용됩니다.
-          </p>
-        </div>
-        <div className="flex gap-2 w-full">
-          <div className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-muted/50 text-[12px] text-muted-foreground font-mono truncate border border-border/30 select-all">
-            {url}
-          </div>
-          <button
-            onClick={() => { navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); }); }}
-            className="px-4 py-2 rounded-lg text-[12px] font-bold bg-primary text-white hover:bg-primary/90 transition-colors flex-shrink-0"
-          >
-            {copied ? '복사됨' : '복사'}
-          </button>
-        </div>
-        <div className="w-full space-y-1 px-3 py-2.5 bg-muted/30 rounded-lg text-[11px] text-muted-foreground/80">
-          <p><span className="font-bold text-foreground/70">Airbnb:</span> 캘린더 &gt; 캘린더 가져오기 &gt; URL 붙여넣기</p>
-          <p><span className="font-bold text-foreground/70">Booking.com:</span> Extranet &gt; 객실 &gt; 이용 불가 설정 &gt; iCal</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Shared styles ──────────────────────────────────────────────
 const card     = 'bg-card border border-border/30 rounded-xl overflow-hidden mb-3';
@@ -283,16 +248,9 @@ const DesktopSettings = () => {
           </div>
         )}
 
-        {/* 크로스채널 블로킹 */}
-        {properties[0] && (
-          <>
-            <p className={secHead}>{ko ? '자동 예약 차단' : 'Cross-Channel Blocking'}</p>
-            <ExportIcalSection
-              hostId={useStore.getState().userProfile?.id ?? ''}
-              propertyId={properties[0].id}
-            />
-          </>
-        )}
+        {/* ── 예약채널 설정 ── */}
+        <p className={secHead}>{ko ? '예약채널 설정' : 'Booking Channels'}</p>
+        <ChannelSettingsSection />
 
         {/* ── 이벤트 표시 ── */}
         <p className={secHead}>{ko ? '이벤트 표시' : 'Event Colors'}</p>

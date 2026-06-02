@@ -15,8 +15,7 @@ import { OverlapDetector } from '../../components/OverlapDetector';
 import { useTranslation } from '../../hooks/useTranslation';
 import { useDesktopStats } from '../../hooks/useDesktopStats';
 import { useBookingPace } from '../../hooks/useBookingPace';
-import { supabase } from '../../services/supabaseClient';
-import { DUMMY_BOOKINGS, DUMMY_MAINTENANCE } from '../../utils/dummyData';
+
 import LeadTimeDetailModal from '../../components/Modals/LeadTimeDetailModal';
 import DistributionDetailModal from '../../components/Modals/DistributionDetailModal';
 import { getNatColor } from '../../utils/colors';
@@ -26,6 +25,7 @@ import AnalyticsTable from './AnalyticsTable';
 import PaceChart from './PaceChart';
 import DesktopTabNav from '../../components/DesktopTabNav/DesktopTabNav';
 import type { DesktopTab } from '../../components/DesktopTabNav/DesktopTabNav';
+import PropertyDropdown from '../../components/DesktopTabNav/PropertyDropdown';
 
 interface DesktopDashboardProps {
   activeTab?: DesktopTab;
@@ -66,46 +66,7 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
     Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11,
   };
 
-  const initializeWithDummyData = async () => {
-    try {
-      if (!userProfile) return;
-      await supabase.from('bookings').delete().eq('host_id', userProfile.id);
-      await supabase.from('properties').delete().eq('host_id', userProfile.id);
 
-      const { data: props, error: pErr } = await supabase
-        .from('properties')
-        .insert([{ host_id: userProfile.id, name: '오조록' }])
-        .select();
-      if (pErr) throw pErr;
-
-      const newProp = props[0];
-      const bkRows = DUMMY_BOOKINGS.map(b => ({
-        property_id: newProp.id,
-        host_id: userProfile.id,
-        guestname: b.guestName,
-        checkin: b.checkIn,
-        checkout: b.checkOut,
-        guests: b.guests,
-        infants: b.infants,
-        nationality: b.nationality,
-        channel: b.channel,
-        status: b.status,
-        amount: b.amount,
-        commission: b.commission,
-        bookingdate: b.bookingDate,
-        memo: b.memo,
-      }));
-
-      const { error: bErr } = await supabase.from('bookings').insert(bkRows);
-      if (bErr) throw bErr;
-
-      showToast('샘플 데이터를 복구했습니다.', 'success');
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-      showToast('데이터 복구 중 오류가 발생했습니다.', 'error');
-    }
-  };
 
   // 차트용 데이터 — 실제 오늘 기준으로 점선/배경바/하이라이트 결정
   const chartData = useMemo(() => stats.monthlyTrends.map(d => {
@@ -206,6 +167,8 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
           </div>
         </div>
         <div className="flex items-center gap-5">
+          <PropertyDropdown />
+          <div className="w-px h-4 bg-border/60" />
           <DesktopTabNav activeTab={activeTab} onTabChange={onTabChange ?? (() => {})} />
           <div className="w-px h-4 bg-border/60" />
           <div className="flex items-center gap-2">
@@ -235,12 +198,6 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
                 ? '캘린더에서 날짜를 클릭해 첫 예약을 추가하거나, 설정에서 채널을 연결해 자동으로 동기화하세요.'
                 : 'Click a date on the calendar to add a booking, or connect a channel in settings to auto-sync.'}
             </p>
-            <button
-              className="text-[12px] text-muted-foreground/50 hover:text-muted-foreground transition-colors underline-offset-2 hover:underline"
-              onClick={initializeWithDummyData}
-            >
-              {ko ? '샘플 데이터로 미리보기' : 'Preview with sample data'}
-            </button>
           </div>
         )}
 
