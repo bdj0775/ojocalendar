@@ -3,12 +3,15 @@
 // 새 프로젝트로 추출 시 이 파일만 수정하면 됩니다.
 // ============================================================
 
-export type FeatureIconKey = 'calendar-days' | 'bar-chart-2' | 'smartphone';
+export type FeatureIconKey = 'calendar-days' | 'bar-chart-2' | 'smartphone' | 'trending-up';
 
 export interface FeatureItem {
   icon: FeatureIconKey;
   title: string;
   desc: string;
+  colSpan?: string;
+  bgGradient: string;
+  badge?: string;
 }
 
 export interface NavLink {
@@ -25,34 +28,51 @@ export const CONTENT = {
   },
 
   hero: {
-    badge: '🎉 무료 베타 운영 중',
-    headlineLine1: '하나의 달력으로,',
-    headlineLine2: '더 똑똑하게',
-    tagline: '작은 숙박 업소를 데이터 기반으로 운영하세요',
-    subCopy:
-      '대시보드와 연동된 OZO 캘린더로 여러 채널의 예약을 한번에 판단하세요',
+    badge: '🎉 오조캘린더 오픈',
+    headline: '작은 숙소를 위한 새로운 캘린더',
+    subCopies: [
+      '달력과 연동된 대시보드로, 더 편해진 매출 관리',
+      '예약 현황 한눈에 파악하고, 공실을 채워보세요',
+    ],
     ctaPrimary: '무료로 시작하기',
-    ctaSecondary: '앱으로 설치하기',
+    ctaSecondary: '앱 설치하기',
   },
 
   features: {
-    sectionLabel: '핵심 기능',
-    title: '더 이상 채널마다 따로 열지 않아도 됩니다',
+    sectionLabel: '핵심 가치',
+    title: '숙소 운영의 비효율을 걷어내는 가장 현대적인 레이아웃',
     items: [
       {
         icon: 'calendar-days' as FeatureIconKey,
         title: '통합 예약 달력',
-        desc: '에어비앤비, 부킹닷컴, 네이버 예약이 하나의 달력에. 날짜 클릭 한 번으로 상세 확인과 수정까지.',
+        desc: '에어비앤비, 부킹닷컴, 네이버 예약이 실시간으로 동기화되어 하나의 달력에 표시됩니다. 날짜 클릭 한 번으로 모든 예약의 상세 정보를 한눈에 파악하세요.',
+        colSpan: 'lg:col-span-2',
+        bgGradient: 'from-blue-500/10 via-indigo-500/5 to-transparent border-blue-500/20',
+        badge: 'iCal 실시간 연동',
       },
       {
         icon: 'bar-chart-2' as FeatureIconKey,
-        title: '수익 분석 대시보드',
-        desc: 'ADR, 점유율, 채널별 수익 비중을 자동 집계. 월별 트렌드를 보고 가격 전략을 세우세요.',
+        title: '스마트 매출 분석',
+        desc: '객실별 수익, 평균 객실 요금(ADR), 점유율을 자동으로 집계하여 손쉬운 정산을 돕습니다.',
+        colSpan: 'lg:col-span-1',
+        bgGradient: 'from-emerald-500/10 via-teal-500/5 to-transparent border-emerald-500/20',
+        badge: '자동 정산 리포트',
+      },
+      {
+        icon: 'trending-up' as FeatureIconKey,
+        title: '과거 실적 기반 점유율 예측',
+        desc: '과거 예약 페이스와 편향 교정 알고리즘을 바탕으로 이번 달 예상 점유율과 순수익을 시뮬레이션합니다. 비수기에도 든든한 전략 파트너가 되어 드립니다.',
+        colSpan: 'lg:col-span-1',
+        bgGradient: 'from-amber-500/10 via-orange-500/5 to-transparent border-amber-500/20',
+        badge: '독보적 예측 알고리즘',
       },
       {
         icon: 'smartphone' as FeatureIconKey,
-        title: '앱처럼 설치, 어디서나',
-        desc: '홈 화면에 추가하면 앱스토어 없이 즉시 실행. 체크인 현장에서도 예약을 바로 확인합니다.',
+        title: 'PWA 모바일 앱 지원',
+        desc: '앱스토어 다운로드 없이 홈 화면에 바로 설치하여 네이티브 앱처럼 빠르게 접속할 수 있습니다. 체크인 현장이나 외출 중에도 스마트폰으로 간편하게 관리하세요.',
+        colSpan: 'lg:col-span-2',
+        bgGradient: 'from-purple-500/10 via-fuchsia-500/5 to-transparent border-purple-500/20',
+        badge: '홈 화면에 1초 설치',
       },
     ] satisfies FeatureItem[],
   },

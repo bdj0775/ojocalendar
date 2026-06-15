@@ -469,7 +469,35 @@ export const useDesktopStats = (
       const histOTBforPace = daysUntilStart <= 90 ? (histOTBatSamePoint || undefined) : undefined;
 
       const raw = computeForecastRaw(ty, tm, otb, undefined, histOTBforPace);
-      const correctedOcc = Math.min(100, Math.max(otb.occupancy, Math.round(raw.predictedOcc + bias)));
+      let correctedOcc = Math.min(100, Math.max(otb.occupancy, Math.round(raw.predictedOcc + bias)));
+
+      // 현재 진행 중인 달: 이미 지나간 공실 날짜는 복구 불가 → 물리적 달성 상한 적용
+      // maxAchievableOcc = (과거 확정 박 수 + 남은 일수) / 월 총 일수
+      if (daysUntilStart === 0) {
+        const daysInMonth = new Date(ty, tm + 1, 0).getDate();
+        const elapsed = Math.max(0, Math.floor((todayMs - monthStartMs) / 86400000));
+        if (elapsed > 0) {
+          const todayCutoff = new Date(actualTodayYear, actualTodayMonth, _today.getDate(), 12, 0, 0);
+          const mStart = new Date(ty, tm, 1, 12, 0, 0);
+          const pastOccDates = new Set<string>();
+          validBookings.forEach(b => {
+            const bStart = new Date(b.checkIn + 'T12:00:00');
+            const bEnd   = new Date(b.checkOut + 'T12:00:00');
+            const overlapStart = bStart > mStart ? bStart : mStart;
+            const overlapEnd   = bEnd < todayCutoff ? bEnd : todayCutoff;
+            if (overlapStart >= overlapEnd) return;
+            let cur = new Date(overlapStart);
+            while (cur < overlapEnd) {
+              pastOccDates.add(`${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`);
+              cur.setDate(cur.getDate() + 1);
+            }
+          });
+          const pastOtbNights    = pastOccDates.size;
+          const remainingDays    = daysInMonth - elapsed;
+          const maxAchievableOcc = Math.min(100, Math.round(((pastOtbNights + remainingDays) / daysInMonth) * 100));
+          correctedOcc = Math.min(correctedOcc, maxAchievableOcc);
+        }
+      }
 
       if (correctedOcc === raw.predictedOcc) return raw;
 

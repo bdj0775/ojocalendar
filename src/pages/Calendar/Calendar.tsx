@@ -10,7 +10,6 @@ import { useTranslation } from '../../hooks/useTranslation';
 import BookingEditModal from '../../components/Modals/BookingEditModal';
 import CompactQuickBookingModal from '../../components/Modals/CompactQuickBookingModal';
 
-import YearMonthPickerModal from '../../components/Modals/YearMonthPickerModal';
 import SwipeableCalendar from '../../components/CalendarGrid/SwipeableCalendar';
 import { useBookingBars, PROP_COLORS, BAR_OFFSET_Y, type BookingBar } from '../../components/CalendarGrid/useBookingBars';
 import { Body } from '../../components/ui/Typography';
@@ -102,6 +101,8 @@ const CalendarPage = () => {
 
   const [quickBookingAnchor, setQuickBookingAnchor] = useState<{ date: string; rect: DOMRect } | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [dropdownYear, setDropdownYear] = useState(currentYear);
+  const datePickerRef = useRef<HTMLDivElement>(null);
   const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -152,6 +153,23 @@ const CalendarPage = () => {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // 드롭다운 외부 클릭 닫기
+  useEffect(() => {
+    if (!datePickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+        setDatePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [datePickerOpen]);
+
+  // 드롭다운 열릴 때 현재 연도로 초기화
+  useEffect(() => {
+    if (datePickerOpen) setDropdownYear(currentYear);
+  }, [datePickerOpen, currentYear]);
   // clipH: full mode → row-snap, compact mode → 가용 전체 높이(compact cal=312px이 들어가도록)
 
   // ── 달력 전환 계산 — 3-레이어 슬라이드 + 페이드 ──────────────────
@@ -522,15 +540,66 @@ const CalendarPage = () => {
             <button className="p-1 -ml-1 text-foreground lg:hidden" onClick={openSidebar}>
               <Menu size={24} />
             </button>
-            <h1
-              className="type-section-title flex items-center gap-1 cursor-pointer text-foreground"
-              onClick={() => setDatePickerOpen(true)}
-            >
-              {ko
-                ? `${currentYear}년 ${currentMonth + 1}월`
-                : `${new Date(currentYear, currentMonth).toLocaleString('en', { month: 'long' })} ${currentYear}`}
-              <ChevronDown size={18} className="text-muted-foreground" />
-            </h1>
+            <div ref={datePickerRef} className="relative">
+              <h1
+                className="type-section-title flex items-center gap-1 cursor-pointer text-foreground select-none"
+                onClick={() => setDatePickerOpen(v => !v)}
+              >
+                {ko
+                  ? `${currentYear}년 ${currentMonth + 1}월`
+                  : `${new Date(currentYear, currentMonth).toLocaleString('en', { month: 'long' })} ${currentYear}`}
+                <ChevronDown
+                  size={16}
+                  className={`text-muted-foreground transition-transform duration-150 ${datePickerOpen ? 'rotate-180' : ''}`}
+                />
+              </h1>
+
+              {datePickerOpen && (
+                <div className="absolute left-0 top-full mt-2 z-[200] bg-card border border-border/60 rounded-2xl shadow-tooltip p-3 w-[220px]">
+                  {/* 연도 네비게이션 */}
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <button
+                      onClick={() => setDropdownYear(y => y - 1)}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="text-[13px] font-bold text-foreground">
+                      {ko ? `${dropdownYear}년` : dropdownYear}
+                    </span>
+                    <button
+                      onClick={() => setDropdownYear(y => y + 1)}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+
+                  {/* 월 그리드 */}
+                  <div className="grid grid-cols-4 gap-1">
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const isSelected = dropdownYear === currentYear && i === currentMonth;
+                      const label = ko
+                        ? `${i + 1}월`
+                        : new Date(2000, i).toLocaleString('en', { month: 'short' });
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => { setMonth(dropdownYear, i); setDatePickerOpen(false); }}
+                          className={`py-1.5 rounded-lg text-[12px] font-semibold transition-colors ${
+                            isSelected
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-foreground hover:bg-muted'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex gap-2 items-center shrink-0">
             <NotificationBell />
@@ -771,14 +840,6 @@ const CalendarPage = () => {
           anchorRect={quickBookingAnchor.rect}
           onPreviewChange={handlePreviewChange}
           onClose={handleQuickBookingClose}
-        />
-      )}
-      {datePickerOpen && (
-        <YearMonthPickerModal
-          currentYear={currentYear}
-          currentMonth={currentMonth}
-          onConfirm={(y, m) => setMonth(y, m)}
-          onClose={() => setDatePickerOpen(false)}
         />
       )}
     </div>
