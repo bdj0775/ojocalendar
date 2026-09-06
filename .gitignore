@@ -25,3 +25,7 @@ dist-ssr
 
 # Supabase CLI 로컬 캐시
 supabase/.temp
+
+# 백테스트용 로컬 데이터 (실제 예약 정보 포함 — 커밋하지 않음)
+bookings_latest.csv
+Supabase Snippet*.csv

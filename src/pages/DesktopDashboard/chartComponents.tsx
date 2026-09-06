@@ -3,6 +3,7 @@
 
 // ── Constants ─────────────────────────────────────────────────
 import { useStore } from '../../store/useStore';
+import { LOW_CONFIDENCE_THRESHOLD } from '../../hooks/useDesktopStats';
 
 export const CHANNEL_COLORS: Record<string, string> = {
   Airbnb: 'var(--channel-airbnb)',
@@ -103,8 +104,16 @@ export const TrendTooltip = ({ active, payload, label, sym, isDark, ko, compact 
               {ko ? '월말 예측' : 'Forecast'}
             </span>
             {data.forecastConfidence != null && (
-              <span className="text-[9px] text-muted-foreground/50 tabular-nums">
-                {Math.round(data.forecastConfidence * 100)}%
+              // 신뢰도가 낮으면(먼 미래라 예약이 아직 들어올 시기가 아님) 눈에 띄게 표시.
+              // 이 구간의 예측은 사실상 작년 실적 참조라 참고용임을 알려야 한다.
+              <span
+                className={`text-[9px] tabular-nums ${
+                  data.forecastConfidence < LOW_CONFIDENCE_THRESHOLD
+                    ? 'font-semibold text-amber-500'
+                    : 'text-muted-foreground/50'
+                }`}
+              >
+                {ko ? '신뢰도 ' : 'conf '}{Math.round(data.forecastConfidence * 100)}%
               </span>
             )}
           </div>
@@ -113,6 +122,13 @@ export const TrendTooltip = ({ active, payload, label, sym, isDark, ko, compact 
             <span>{ko ? '예상 점유율' : 'Pred. OCC'}</span>
             <span className="font-bold ml-auto">{data.predictedOcc ?? '–'}%</span>
           </div>
+          {data.forecastConfidence != null && data.forecastConfidence < LOW_CONFIDENCE_THRESHOLD && (
+            <div className="mt-1 text-[9px] leading-snug text-amber-500/90 break-keep">
+              {ko
+                ? '아직 예약이 들어올 시기가 아니라 참고용입니다'
+                : 'Too early for bookings — reference only'}
+            </div>
+          )}
           {/* compact 모드에서는 예상 매출 생략 */}
           {!compact && (
             <div className={rowCls}>

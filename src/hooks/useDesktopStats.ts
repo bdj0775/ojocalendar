@@ -4,6 +4,16 @@ import { getNatColor } from '../utils/colors';
 import type { DesktopStats, MonthlyTrend, PieDataItem, LeadTimeDataPoint, MonthlyTableRow, Booking } from '../types';
 
 
+/**
+ * 예측을 신뢰할 수 있는 최대 시계(일). 이 기간을 넘어가면 신뢰도를 급격히 낮춘다.
+ * 실측 근거: 예약 리드타임 중앙값 31일, D-90 이전 접수 17%, D-180 이전 3%.
+ * 즉 D-120을 넘는 달은 판단 근거가 사실상 없다.
+ */
+export const FORECAST_RELIABLE_HORIZON_DAYS = 120;
+
+/** 이 신뢰도 미만이면 UI에서 '참고용'으로 표시한다 */
+export const LOW_CONFIDENCE_THRESHOLD = 0.3;
+
 const MONTH_LABELS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const MONTH_LABELS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -350,15 +360,31 @@ export const useDesktopStats = (
         ? Math.min(2.0, Math.max(0.6, otb.occupancy / histOTBatSamePoint))
         : 1.0;
 
-      const remainingPickup = histAvgOcc * (1 - curveCompletion) * relPaceRatio;
+      // 만실에 가까울수록 남은 객실은 팔기 어렵다 — 잔여 픽업을 남은 여유(headroom)에
+      // 비례해 줄인다. 이것이 없으면 OTB가 높은 달이 기계적으로 100%로 밀려 올라간다.
+      const headroom = Math.max(0, 100 - otb.occupancy) / 100;
+      const remainingPickup = histAvgOcc * (1 - curveCompletion) * relPaceRatio * headroom;
       const cappedVariance = Math.max(-histAvgOcc * 0.5, Math.min(histAvgOcc * 0.5, paceVariance));
       const rawPace = otb.occupancy + remainingPickup + cappedVariance * 0.5 * (1 - curveCompletion);
       const paceForecast = Math.min(100, Math.max(otb.occupancy, rawPace));
 
-      let weightedSum = 0, totalWeight = 0;
-      if (stlyReliable)   { weightedSum += stly.occupancy   * 40; totalWeight += 40; }
-      if (hist2yReliable) { weightedSum += hist2y.occupancy * 30; totalWeight += 30; }
-      weightedSum += paceForecast * 30; totalWeight += 30;
+      // 동적 가중: 달이 가까워질수록(curveCompletion↑) 실제 예약 속도를 더 신뢰한다.
+      // 고정 30%로 두면 먼 미래든 코앞이든 작년 실적에 70%를 걸게 되어 과대예측이 된다.
+      // 백테스트(실데이터 302건) 결과 MAE 25.2 → 20.4%p, 편향 +13.8 → +7.8%p로 개선.
+      const paceWeight = 30 + 50 * curveCompletion;   // 30 → 80
+      const histWeightTotal = 100 - paceWeight;
+      let weightedSum = paceForecast * paceWeight, totalWeight = paceWeight;
+      const histWeights: number[] = [];
+      if (stlyReliable)   histWeights.push(stly.occupancy);
+      if (hist2yReliable) histWeights.push(hist2y.occupancy);
+      if (histWeights.length > 0) {
+        // STLY와 hist2y가 모두 있으면 STLY에 더 큰 몫(4:3)을 준다
+        const ratios = histWeights.length === 2 ? [4 / 7, 3 / 7] : [1];
+        histWeights.forEach((occ, i) => {
+          const w = histWeightTotal * ratios[i];
+          weightedSum += occ * w; totalWeight += w;
+        });
+      }
 
       const predictedOcc = Math.max(otb.occupancy, Math.round(weightedSum / totalWeight));
 
@@ -375,7 +401,18 @@ export const useDesktopStats = (
 
       const dataScore = Math.min(1, (stlyReliable ? 0.5 : 0) + (historicalOccs.length * 0.25));
       const timeScore = Math.exp(-daysUntilStart / estimatedTau);
-      const forecastConfidence = Math.round((0.4 * dataScore + 0.6 * timeScore) * 100) / 100;
+      let forecastConfidence = Math.round((0.4 * dataScore + 0.6 * timeScore) * 100) / 100;
+
+      // 예약 리드타임 실측: 중앙값 31일, D-90 이전 접수 17%, D-180 이전 3%.
+      // 즉 먼 미래 달은 "아직 안 팔린" 것이 아니라 "팔릴 시기가 오지 않은" 것이라
+      // 판단 근거 자체가 없다. 이 구간의 예측은 사실상 작년 실적 복사이므로
+      // 신뢰도를 크게 낮춰 참고용임을 드러낸다(숫자는 계속 제공).
+      if (daysUntilStart > FORECAST_RELIABLE_HORIZON_DAYS) {
+        const excess = daysUntilStart - FORECAST_RELIABLE_HORIZON_DAYS;
+        forecastConfidence = Math.round(
+          forecastConfidence * Math.max(0.15, Math.exp(-excess / 120)) * 100,
+        ) / 100;
+      }
 
       return { predictedOcc, predictedGross, predictedNet, forecastConfidence };
     };
