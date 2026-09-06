@@ -91,7 +91,9 @@ function predictAt(y, m, asOfMs) {
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
 // ── 검증 대상 달: 데이터가 끝나기 전에 완료된 달 ──
-const lastBooking = Math.max(...ALL.map(b => ms(b.bookingDate)));
+// 접수일이 잘못 입력된 1건이 기준일을 미래로 밀지 않도록 99퍼센타일 사용
+const sortedBd = ALL.map(b => ms(b.bookingDate)).sort((a, b) => a - b);
+const lastBooking = sortedBd[Math.floor(sortedBd.length * 0.99)];
 const monthKeys = [...new Set(ALL.map(b => {
   const d = new Date(b.checkIn + 'T12:00:00'); return d.getFullYear() + ':' + d.getMonth();
 }))].map(k => k.split(':').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
