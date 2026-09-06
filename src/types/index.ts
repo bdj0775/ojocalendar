@@ -344,6 +344,10 @@ export interface MonthlyTrend {
   predictedGross: number | null;
   predictedNet: number | null;
   forecastConfidence: number;
+  /** 최근 달들이 같은 시점 이후 월말까지 추가로 채운 평균 폭(%p). 히스토리 없으면 null (예측 설명용) */
+  expectedPickup: number | null;
+  /** 픽업 평균에 쓰인 히스토리 달 수 (예측 설명용) */
+  histMonthsUsed: number;
   /** 작년 같은 달의 최종 점유율. 자료가 없으면 null (예측 설명용) */
   stlyFinalOcc: number | null;
   /** 작년 같은 달의 "같은 시점"(D일 전) 점유율. 자료가 없으면 null (예측 설명용) */

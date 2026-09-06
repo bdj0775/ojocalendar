@@ -10,22 +10,25 @@ interface ForecastExplainerProps extends ForecastExample {
  *
  * 넣을 수 있는 내용의 기준 (운영자와 합의, 2026-09):
  * 1. 등장하는 숫자는 출처가 이 팝오버 안에 있어야 한다.
- *    (가중치 61:39, 보정 +8%p 같은 내부값은 출처 설명이 더 길어져 제외)
  * 2. 새 개념은 한 줄로 설명되지 않으면 도입하지 않는다.
  * 3. 달마다 다른 변형을 만들지 않고 하나의 틀을 쓴다.
  *
- * 남긴 필수 로직 두 가지:
- * - 작년 같은 시점→최종의 흐름을 남은 기간에 적용한다 (3단계)
- * - 지난 예측 오차를 자동 보정한다 (마무리 한 줄)
+ * 2026-09 알고리즘 교체(픽업6) 후로는 계산 전체가 팝오버 안에서 재현된다:
+ *   지금 점유율(OTB) + 최근 달들의 같은 시점 평균 잔여픽업 = 예상치.
+ * 작년 같은 달 수치는 계산에 쓰이지 않는 참고 정보로만 보여준다.
  *
  * 상세 로직·수치 검증은 FORECAST_SYSTEM.md 참고.
  */
 export const ForecastExplainer = ({
-  monthLabel, otbOcc, predictedOcc,
+  monthLabel, otbOcc, predictedOcc, expectedPickup, histMonthsUsed,
   stlyOccAtSamePoint, stlyFinalOcc, confidence, dLabel, isFallback, ko,
 }: ForecastExplainerProps) => {
   const lowConf = confidence < LOW_CONFIDENCE_THRESHOLD;
   const hasStly = stlyFinalOcc != null && stlyOccAtSamePoint != null;
+  const hasPickup = expectedPickup != null && histMonthsUsed > 0;
+  // 클램프(상한 100%·물리적 상한·바닥 OTB)로 단순 합과 결과가 다를 수 있다
+  const rawSum = hasPickup ? otbOcc + expectedPickup : null;
+  const capped = rawSum != null && predictedOcc !== Math.max(otbOcc, Math.min(100, rawSum));
 
   const stepCls = 'flex gap-2.5';
   const numCls = 'shrink-0 w-4 h-4 rounded-full bg-primary/10 text-primary text-[9px] font-bold flex items-center justify-center mt-[1px]';
@@ -65,53 +68,59 @@ export const ForecastExplainer = ({
           </div>
         </div>
 
-        {/* 2 — 근거: 작년 같은 시점 → 최종 */}
+        {/* 2 — 근거: 최근 달들의 같은 시점 → 최종 */}
         <div className={stepCls}>
           <span className={numCls}>2</span>
           <div>
             <div className={titleCls}>
               {ko
-                ? `작년 같은 시점(${dLabel})과 비교합니다`
-                : `Compare with the same point last year (${dLabel})`}
+                ? `최근 달들의 같은 시점(${dLabel})과 비교합니다`
+                : `Compare with recent months at the same point (${dLabel})`}
             </div>
             <div className={descCls}>
-              {hasStly
+              {hasPickup
                 ? (ko
-                  ? <>작년 {monthLabel}은 이맘때 {stlyOccAtSamePoint}%였고,<br />최종 {stlyFinalOcc}%로 마감됐어요</>
-                  : <>Last {monthLabel} was {stlyOccAtSamePoint}% at this point,<br />and finished at {stlyFinalOcc}%</>)
+                  ? <>최근 {histMonthsUsed}개 달은 이맘때부터 월말까지<br />평균 <span className="font-semibold text-foreground">{expectedPickup}%p</span> 더 채워졌어요</>
+                  : <>Over the last {histMonthsUsed} months, occupancy grew<br />by <span className="font-semibold text-foreground">{expectedPickup}pp</span> on average from this point</>)
                 : (ko
-                  ? '작년 자료가 아직 없어 최근 몇 달의 흐름을 참고해요'
-                  : 'No data from last year yet — recent months are used instead')}
+                  ? '완료된 달의 자료가 아직 없어 최근 흐름으로 근사해요'
+                  : 'No completed months yet — approximating from recent trend')}
             </div>
           </div>
         </div>
 
-        {/* 3 — 결론: 남은 유입량을 계산해 더함. 100%인 달은 상한에 닿았음을 밝힌다 */}
+        {/* 3 — 결론: 그만큼을 더한다. 상한에 닿은 달은 그 사실을 밝힌다 */}
         <div className={stepCls}>
           <span className={numCls}>3</span>
           <div>
             <div className={titleCls}>
-              {ko ? '남은 기간의 유입량을 계산해 더합니다' : 'Add the projected remaining inflow'}
+              {ko ? '그만큼을 더해 예상치를 만듭니다' : 'Add that amount to get the forecast'}
             </div>
             <div className={descCls}>
-              {ko
-                ? (predictedOcc >= 100
-                  ? <>남은 기간에 들어올 예약량을 {hasStly ? '작년 흐름' : '최근 흐름'}으로 계산해 {otbOcc}%에 더해요.<br />계산값이 상한에 이르러 <span className="font-bold text-success">100%</span>로 봐요</>
-                  : <>남은 기간에 들어올 예약량을 {hasStly ? '작년 흐름' : '최근 흐름'}으로 계산해 {otbOcc}%에 더하면 <span className="font-bold text-success">{predictedOcc}%</span>예요</>)
-                : (predictedOcc >= 100
-                  ? <>The remaining inflow, projected from {hasStly ? "last year's" : 'recent'} pattern, is added to {otbOcc}%.<br />It reaches the ceiling, so <span className="font-bold text-success">100%</span></>
-                  : <>The remaining inflow, projected from {hasStly ? "last year's" : 'recent'} pattern, added to {otbOcc}% gives <span className="font-bold text-success">{predictedOcc}%</span></>)}
+              {hasPickup
+                ? (capped || predictedOcc >= 100
+                  ? (ko
+                    ? <>{otbOcc}% + {expectedPickup}%p가 상한에 닿아<br />예상치는 <span className="font-bold text-success">{predictedOcc}%</span>예요</>
+                    : <>{otbOcc}% + {expectedPickup}pp hits the ceiling,<br />so the forecast is <span className="font-bold text-success">{predictedOcc}%</span></>)
+                  : (ko
+                    ? <>{otbOcc}% + {expectedPickup}%p = <span className="font-bold text-success">{predictedOcc}%</span></>
+                    : <>{otbOcc}% + {expectedPickup}pp = <span className="font-bold text-success">{predictedOcc}%</span></>))
+                : (ko
+                  ? <>최근 흐름으로 계산한 예상치는 <span className="font-bold text-success">{predictedOcc}%</span>예요</>
+                  : <>The trend-based forecast is <span className="font-bold text-success">{predictedOcc}%</span></>)}
             </div>
           </div>
         </div>
       </div>
 
       <div className="border-t border-border/60 pt-2.5 flex flex-col gap-1.5">
-        <p className="text-[10px] text-muted-foreground leading-relaxed break-keep">
-          {ko
-            ? '지난 예측이 실제와 어긋났던 만큼은 자동으로 보정하고 있어요.'
-            : 'Past forecast errors are corrected automatically.'}
-        </p>
+        {hasStly && (
+          <p className="text-[10px] text-muted-foreground leading-relaxed break-keep">
+            {ko
+              ? `참고로 작년 ${monthLabel}은 이맘때 ${stlyOccAtSamePoint}%였고, 최종 ${stlyFinalOcc}%로 마감됐어요.`
+              : `For reference, last ${monthLabel} was ${stlyOccAtSamePoint}% at this point and finished at ${stlyFinalOcc}%.`}
+          </p>
+        )}
 
         <div className="flex items-center gap-1.5 text-[10px]">
           <span className="text-muted-foreground">{ko ? '신뢰도' : 'Confidence'}</span>

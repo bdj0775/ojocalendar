@@ -14,6 +14,10 @@ export interface ForecastExample {
   otbOcc: number;
   /** 월말 예상 점유율 */
   predictedOcc: number;
+  /** 최근 달들이 같은 시점 이후 월말까지 추가로 채운 평균 폭(%p). 히스토리 없으면 null */
+  expectedPickup: number | null;
+  /** 픽업 평균에 쓰인 히스토리 달 수 */
+  histMonthsUsed: number;
   /** 작년 같은 달의 같은 시점 점유율 */
   stlyOccAtSamePoint: number | null;
   /** 작년 같은 달의 최종 점유율 */
@@ -62,6 +66,8 @@ export const useForecastExample = (stats: DesktopStats, ko: boolean): ForecastEx
       monthLabel: ko ? t.month : t.monthEn,
       otbOcc: t.otbOcc,
       predictedOcc,
+      expectedPickup: t.expectedPickup,
+      histMonthsUsed: t.histMonthsUsed,
       stlyOccAtSamePoint: t.stlyOccAtSamePoint,
       stlyFinalOcc: t.stlyFinalOcc,
       confidence: t.forecastConfidence,
