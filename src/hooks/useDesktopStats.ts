@@ -24,10 +24,29 @@ interface MonthStats {
   bookingCount: number; daysInMonth: number;
 }
 
-const calcMonthStats = (validBookings: (Booking & { amount: number })[], year: number, month: number): MonthStats => {
+/**
+ * 한 달의 매출·점유율 지표를 계산한다.
+ *
+ * 점유율 = 판매된 객실박 ÷ 판매 가능한 객실박(그 달 일수 × 객실 수)
+ * 숙박업 표준(Occupancy Rate) 정의이며, 객실이 여러 개일 때도 정확하다.
+ *
+ * @param roomCount 분모에 쓸 객실 수. 드롭다운에서 특정 숙소를 선택하면 1,
+ *                  '전체'면 예약이 있는 숙소 수(빈 숙소는 분모를 부풀리므로 제외).
+ */
+const calcMonthStats = (
+  validBookings: (Booking & { amount: number })[],
+  year: number,
+  month: number,
+  roomCount = 1,
+): MonthStats => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // 0으로 나누는 것을 방지 — 숙소가 하나도 없으면 1개로 취급
+  const rooms = Math.max(1, roomCount);
+  const availableRoomNights = daysInMonth * rooms;
   let gross = 0, net = 0, otaComm = 0, bookingCount = 0;
-  const occupiedDates = new Set<string>();
+  // 날짜 Set이 아니라 박수를 그대로 합산한다. Set을 쓰면 같은 날짜에 걸친 예약이
+  // 1박으로 합쳐져, 객실이 여러 개일 때는 물론 중복 예약이 있을 때도 실제보다 낮게 나온다.
+  let soldRoomNights = 0;
 
   validBookings.forEach(b => {
     const totalNights = Math.max(1, Math.round(
@@ -43,13 +62,8 @@ const calcMonthStats = (validBookings: (Booking & { amount: number })[], year: n
     
     if (n > 0) {
       bookingCount++;
-      // Add unique dates to Set
-      let cur = new Date(overlapStart);
-      while (cur < overlapEnd) {
-        occupiedDates.add(`${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`);
-        cur.setDate(cur.getDate() + 1);
-      }
-      
+      soldRoomNights += n;
+
       const gPortion = (b.amount / totalNights) * n;
       const getDefaultCommRate = (ch: string) => ch === 'Airbnb' || ch === 'Booking.com' ? 17 : ch === 'Naver' ? 2 : 0;
       const getEffectiveCommRate = (b: Booking & { amount: number }) => {
@@ -65,10 +79,12 @@ const calcMonthStats = (validBookings: (Booking & { amount: number })[], year: n
     }
   });
   
-  const occNights = occupiedDates.size;
+  const occNights = soldRoomNights;
   return {
-    gross: Math.round(gross), net: Math.round(net), occNights: Math.min(occNights, daysInMonth),
-    occupancy: Math.min(100, Math.round((occNights / daysInMonth) * 100)),
+    gross: Math.round(gross), net: Math.round(net),
+    occNights: Math.min(occNights, availableRoomNights),
+    occupancy: Math.min(100, Math.round((occNights / availableRoomNights) * 100)),
+    // ADR은 "판매된 객실박당 단가" — 판매 박수로 나눠야 객실 수와 무관하게 일정하다
     adr: occNights === 0 ? 0 : Math.round(gross / occNights),
     otaComm: Math.round(otaComm), bookingCount, daysInMonth,
   };
@@ -128,10 +144,19 @@ export const useDesktopStats = (
         };
       });
 
-    const thisMonth = calcMonthStats(validBookings, currentYear, currentMonth);
+    // ── 점유율 분모로 쓸 객실 수 ──────────────────────────────────
+    // 특정 숙소를 선택했으면 1개. '전체'면 예약이 하나라도 있는 숙소만 센다
+    // (테스트용으로 만들어두고 예약이 없는 숙소가 분모를 부풀리는 것을 막는다).
+    const roomCount = selectedDashboardPropertyId
+      ? 1
+      : Math.max(1, new Set(
+          validBookings.map(b => b.propertyId || firstPropId).filter(Boolean),
+        ).size);
+
+    const thisMonth = calcMonthStats(validBookings, currentYear, currentMonth, roomCount);
     let lmYear = currentYear, lmMonth = currentMonth - 1;
     if (lmMonth < 0) { lmYear--; lmMonth = 11; }
-    const lastMonth = calcMonthStats(validBookings, lmYear, lmMonth);
+    const lastMonth = calcMonthStats(validBookings, lmYear, lmMonth, roomCount);
 
     const momBookingsChange = thisMonth.bookingCount - lastMonth.bookingCount;
     const momOccNightsChange = thisMonth.occNights - lastMonth.occNights;
@@ -147,14 +172,14 @@ export const useDesktopStats = (
 
     let yearlyGross = 0, yearlyNights = 0;
     for (let m = 0; m < 12; m++) {
-      const ms = calcMonthStats(validBookings, currentYear, m);
+      const ms = calcMonthStats(validBookings, currentYear, m, roomCount);
       yearlyGross += ms.gross; yearlyNights += ms.occNights;
     }
     const adrYearAvg = yearlyNights === 0 ? 0 : Math.round(yearlyGross / yearlyNights);
 
     let ytdGross = 0, ytdNet = 0, ytdOtaCommission = 0;
     for (let m = 0; m <= currentMonth; m++) {
-      const ms = calcMonthStats(validBookings, currentYear, m);
+      const ms = calcMonthStats(validBookings, currentYear, m, roomCount);
       ytdGross += ms.gross; ytdNet += ms.net; ytdOtaCommission += ms.otaComm;
     }
 
@@ -196,7 +221,7 @@ export const useDesktopStats = (
         while (pm < 0) { pm += 12; py--; }
         // 미래 또는 현재 진행 중인 달은 제외 (OTB를 완료 점유율로 착각하는 버그 방지)
         if (py > actualTodayYear || (py === actualTodayYear && pm >= actualTodayMonth)) continue;
-        const past = calcMonthStats(validBookings, py, pm);
+        const past = calcMonthStats(validBookings, py, pm, roomCount);
         if (past.bookingCount >= MIN_RELIABLE_BOOKINGS) samples.push(past.occupancy);
       }
       return samples.length > 0 ? samples.reduce((s, v) => s + v, 0) / samples.length : 65;
@@ -215,7 +240,7 @@ export const useDesktopStats = (
         let hy = actualTodayYear, hm = actualTodayMonth - offset;
         while (hm < 0) { hm += 12; hy--; }
 
-        const hms = calcMonthStats(validBookings, hy, hm);
+        const hms = calcMonthStats(validBookings, hy, hm, roomCount);
         if (hms.bookingCount < MIN_RELIABLE_BOOKINGS || hms.occNights === 0) continue;
 
         // useBookingPace 와 동일하게 자정 기준 monthStart 사용
@@ -280,8 +305,8 @@ export const useDesktopStats = (
       const daysInMonth = new Date(ty, tm + 1, 0).getDate();
       const monthStartMs = new Date(ty, tm, 1).getTime();
 
-      const stly   = calcMonthStats(validBookings, ty - 1, tm);
-      const hist2y = calcMonthStats(validBookings, ty - 2, tm);
+      const stly   = calcMonthStats(validBookings, ty - 1, tm, roomCount);
+      const hist2y = calcMonthStats(validBookings, ty - 2, tm, roomCount);
 
       const stlyIsRampUp   = ((ty - 1) * 12 + tm) <= openingPeriodEndKey;
       const hist2yIsRampUp = ((ty - 2) * 12 + tm) <= openingPeriodEndKey;
@@ -368,12 +393,12 @@ export const useDesktopStats = (
         while (bm < 0) { bm += 12; by--; }
         if ((by * 12 + bm) <= openingPeriodEndKey) continue;
 
-        const actual = calcMonthStats(validBookings, by, bm);
+        const actual = calcMonthStats(validBookings, by, bm, roomCount);
         if (actual.bookingCount < MIN_RELIABLE_BOOKINGS) continue;
 
         // 이 과거 월의 STLY/hist2y·histAvgOcc를 한 번만 계산
-        const pstly   = calcMonthStats(validBookings, by - 1, bm);
-        const phist2y = calcMonthStats(validBookings, by - 2, bm);
+        const pstly   = calcMonthStats(validBookings, by - 1, bm, roomCount);
+        const phist2y = calcMonthStats(validBookings, by - 2, bm, roomCount);
         const pstlyOk   = ((by-1)*12+bm) > openingPeriodEndKey && pstly.bookingCount   >= MIN_RELIABLE_BOOKINGS;
         const phist2yOk = ((by-2)*12+bm) > openingPeriodEndKey && phist2y.bookingCount >= MIN_RELIABLE_BOOKINGS;
         const poccs: number[] = [];
@@ -406,7 +431,9 @@ export const useDesktopStats = (
           }
           if (bookingCt < 1) continue;
 
-          const occPct = Math.round((occNights / daysInMonth) * 100);
+          // calcMonthStats와 동일한 분모(일수 × 객실 수)를 써야 백테스트 편향 보정이
+          // 실제 점유율과 같은 척도 위에서 계산된다
+          const occPct = Math.round((occNights / (daysInMonth * Math.max(1, roomCount))) * 100);
 
           // 페이스 예측 인라인 (computeForecastRaw와 동일한 공식)
           const cc  = Math.exp(-D / estimatedTau);
@@ -517,7 +544,7 @@ export const useDesktopStats = (
       while (tm > 11) { tm -= 12; ty++; }
       const isFuture = i > 0;
       const isCurrent = i === 0;
-      const ms = calcMonthStats(validBookings, ty, tm);
+      const ms = calcMonthStats(validBookings, ty, tm, roomCount);
 
       let predictedOcc: number | null = null;
       let predictedGross: number | null = null;
@@ -553,7 +580,7 @@ export const useDesktopStats = (
     for (let m = 0; m < 12; m++) {
       const isFutureMo = currentYear > actualTodayYear ||
         (currentYear === actualTodayYear && m >= actualTodayMonth);
-      const ms = calcMonthStats(validBookings, currentYear, m);
+      const ms = calcMonthStats(validBookings, currentYear, m, roomCount);
       if (isFutureMo) {
         const fc = computeForecast(currentYear, m, ms);
         afPredictedGross += fc.predictedGross;
@@ -574,8 +601,8 @@ export const useDesktopStats = (
       const isFutureMo = currentYear > actualTodayYear || (currentYear === actualTodayYear && m > actualTodayMonth);
       const isCurrentMo = (currentYear === actualTodayYear && m === actualTodayMonth);
       
-      const ms = calcMonthStats(validBookings, currentYear, m);
-      const msLY = calcMonthStats(validBookings, currentYear - 1, m);
+      const ms = calcMonthStats(validBookings, currentYear, m, roomCount);
+      const msLY = calcMonthStats(validBookings, currentYear - 1, m, roomCount);
       
       let actualGross: number | null = null;
       let predictedGross: number | null = null;
@@ -708,7 +735,7 @@ export const useDesktopStats = (
     const monthlyTableData: MonthlyTableRow[] = [...allMonthKeys]
       .map(key => {
         const [y, m] = key.split('-').map(Number);
-        const ms = calcMonthStats(tableBookings, y, m);
+        const ms = calcMonthStats(tableBookings, y, m, roomCount);
         const natDist: Record<string, number> = {}, chDist: Record<string, number> = {}, guestBuckets: Record<string, number> = {};
         let totalGuests = 0, guestBookingCount = 0, totalLeadDays = 0, leadCount = 0;
         const adrByNat: Record<string, { gross: number; nights: number }> = {};
@@ -743,7 +770,7 @@ export const useDesktopStats = (
         const adrGuestMap: Record<string, number> = {};
         Object.entries(adrByGuest).forEach(([k, v]) => { adrGuestMap[k] = v.nights === 0 ? 0 : Math.round(v.gross / v.nights); });
 
-        const unfilteredMs = calcMonthStats(validBookings, y, m);
+        const unfilteredMs = calcMonthStats(validBookings, y, m, roomCount);
         const unfilteredTotal = unfilteredMs.bookingCount || 1;
         const natArray = Object.entries(natDist).map(([name, count]) => ({ name, pct: Math.round((count / unfilteredTotal) * 100) })).sort((a, b) => b.pct - a.pct);
         const chArray = Object.entries(chDist).map(([name, count]) => ({ name, pct: Math.round((count / unfilteredTotal) * 100) })).sort((a, b) => b.pct - a.pct);
