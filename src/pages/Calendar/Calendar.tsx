@@ -89,7 +89,7 @@ const CalendarPage = () => {
   const { t, language } = useTranslation();
   const {
     bookings,  currentYear, currentMonth, properties, settings,
-    nextMonth, prevMonth, goToday, setMonth, openBookingModal, openEditMaintModal,
+    nextMonth, prevMonth, goToday, setMonth, openBookingModal,
     visiblePropertyIds, setVisiblePropertyIds,
     propertyOrder, setPropertyOrder,
     setSelectedCalendarDate,
@@ -323,7 +323,6 @@ const CalendarPage = () => {
     });
   }, [bookings, visiblePropertyIds, properties]);
 
-  const visibleMaintenance: any[] = [];
 
   const [prevYear,  prevMonthIdx]  = useMemo(() => offsetMonth(currentYear, currentMonth, -1), [currentYear, currentMonth]);
   const [nextYear,  nextMonthIdx]  = useMemo(() => offsetMonth(currentYear, currentMonth,  1), [currentYear, currentMonth]);
@@ -519,7 +518,6 @@ const CalendarPage = () => {
   const handleBarClick = (e: React.MouseEvent, bar: { type: string; id: string | number }) => {
     e.stopPropagation();
     if (bar.type === 'booking') openBookingModal(String(bar.id));
-    else openEditMaintModal(String(bar.id));
   };
 
   const ko = language === 'ko';

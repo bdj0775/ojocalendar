@@ -6,7 +6,7 @@ export const InteractiveModalDemo = () => {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
-    let timers: NodeJS.Timeout[] = [];
+    let timers: ReturnType<typeof setTimeout>[] = [];
     
     const runSequence = () => {
       setStep(0); // Grid only

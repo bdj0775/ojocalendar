@@ -116,9 +116,13 @@ const BookingsPage = () => {
 
   // filter + sort — 스토어에서 관리하여 탭 전환/리마운트 후에도 유지
   const { year: fYear, channel: fch, props: fProps, search: fsearch, sortKey } = mobileBookingsFilter;
-  const setFYear   = (v: number)          => setMobileBookingsFilter({ year: v });
+  // useState와 동일하게 값과 함수형 업데이트(prev => next)를 모두 받는다.
+  // 함수형을 지원하지 않으면 setFYear(y => y - 1) 같은 호출이 숫자 대신 함수를 저장해버린다.
+  const setFYear   = (v: number | ((prev: number) => number)) =>
+    setMobileBookingsFilter({ year: typeof v === 'function' ? v(fYear) : v });
   const setFCh     = (v: Channel | 'all') => setMobileBookingsFilter({ channel: v });
-  const setFProps  = (v: string[])        => setMobileBookingsFilter({ props: v });
+  const setFProps  = (v: string[] | ((prev: string[]) => string[])) =>
+    setMobileBookingsFilter({ props: typeof v === 'function' ? v(fProps) : v });
   const setFSearch = (v: string)          => setMobileBookingsFilter({ search: v });
   const setSortKey = (v: SortKey)         => setMobileBookingsFilter({ sortKey: v });
   const [sortOpen, setSortOpen] = useState(false);
@@ -217,7 +221,7 @@ const BookingsPage = () => {
         <BookingCard
           guestName={b.guestName} checkIn={b.checkIn} checkOut={b.checkOut}
           guests={b.guests} channel={b.channel} amount={b.amount}
-          commission={b.commission} nights={nights} net={net}
+          nights={nights} net={net}
           propColor={properties.length > 1 ? info?.color : undefined}
           onTap={() => openBookingModal(b.id)}
           ko={ko}

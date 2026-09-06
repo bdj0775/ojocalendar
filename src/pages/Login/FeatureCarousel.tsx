@@ -6,13 +6,13 @@ import CalendarPage from '../Calendar/Calendar';
 // Anonymized demo-only bookings — never written to any database.
 // Purely visual, for the login-page carousel animation.
 const DEMO_BOOKINGS = [
-  { id: 101, guestName: '게스트 A', checkIn: '2025-08-01', checkOut: '2025-08-03', bookingDate: '2025-07-10', guests: 2, infants: 0, nationality: '대한민국', channel: 'Airbnb', status: 'confirmed', amount: 200000, commission: 15 },
-  { id: 102, guestName: 'Guest B', checkIn: '2025-08-05', checkOut: '2025-08-07', bookingDate: '2025-07-15', guests: 3, infants: 0, nationality: 'USA', channel: 'Booking.com', status: 'confirmed', amount: 180000, commission: 18 },
-  { id: 103, guestName: '게스트 C', checkIn: '2025-08-08', checkOut: '2025-08-10', bookingDate: '2025-07-20', guests: 2, infants: 1, nationality: '대한민국', channel: 'Naver', status: 'confirmed', amount: 220000, commission: 3 },
-  { id: 104, guestName: 'Guest D', checkIn: '2025-08-12', checkOut: '2025-08-14', bookingDate: '2025-07-01', guests: 4, infants: 0, nationality: 'Japan', channel: 'Airbnb', status: 'confirmed', amount: 350000, commission: 16 },
-  { id: 105, guestName: '게스트 E', checkIn: '2025-08-15', checkOut: '2025-08-17', bookingDate: '2025-07-25', guests: 2, infants: 0, nationality: '대한민국', channel: 'Direct', status: 'confirmed', amount: 160000, commission: 0 },
-  { id: 106, guestName: 'Guest F', checkIn: '2025-08-19', checkOut: '2025-08-21', bookingDate: '2025-08-01', guests: 2, infants: 0, nationality: 'Singapore', channel: 'Airbnb', status: 'confirmed', amount: 300000, commission: 17 },
-  { id: 107, guestName: '게스트 G', checkIn: '2025-08-22', checkOut: '2025-08-24', bookingDate: '2025-08-05', guests: 3, infants: 0, nationality: '대한민국', channel: 'Naver', status: 'confirmed', amount: 250000, commission: 3 },
+  { id: '101', guestName: '게스트 A', checkIn: '2025-08-01', checkOut: '2025-08-03', bookingDate: '2025-07-10', guests: 2, infants: 0, nationality: '대한민국', channel: 'Airbnb', status: 'confirmed', amount: 200000, commission: 15 },
+  { id: '102', guestName: 'Guest B', checkIn: '2025-08-05', checkOut: '2025-08-07', bookingDate: '2025-07-15', guests: 3, infants: 0, nationality: 'USA', channel: 'Booking.com', status: 'confirmed', amount: 180000, commission: 18 },
+  { id: '103', guestName: '게스트 C', checkIn: '2025-08-08', checkOut: '2025-08-10', bookingDate: '2025-07-20', guests: 2, infants: 1, nationality: '대한민국', channel: 'Naver', status: 'confirmed', amount: 220000, commission: 3 },
+  { id: '104', guestName: 'Guest D', checkIn: '2025-08-12', checkOut: '2025-08-14', bookingDate: '2025-07-01', guests: 4, infants: 0, nationality: 'Japan', channel: 'Airbnb', status: 'confirmed', amount: 350000, commission: 16 },
+  { id: '105', guestName: '게스트 E', checkIn: '2025-08-15', checkOut: '2025-08-17', bookingDate: '2025-07-25', guests: 2, infants: 0, nationality: '대한민국', channel: 'Direct', status: 'confirmed', amount: 160000, commission: 0 },
+  { id: '106', guestName: 'Guest F', checkIn: '2025-08-19', checkOut: '2025-08-21', bookingDate: '2025-08-01', guests: 2, infants: 0, nationality: 'Singapore', channel: 'Airbnb', status: 'confirmed', amount: 300000, commission: 17 },
+  { id: '107', guestName: '게스트 G', checkIn: '2025-08-22', checkOut: '2025-08-24', bookingDate: '2025-08-05', guests: 3, infants: 0, nationality: '대한민국', channel: 'Naver', status: 'confirmed', amount: 250000, commission: 3 },
 ];
 
 const slides = [
@@ -55,7 +55,7 @@ export const FeatureCarousel = () => {
 
   // 오케스트레이션: 모달 오픈 -> 바 생성 -> 대시보드 전환 -> 차트 데이터 갱신 (단일 루프)
   useEffect(() => {
-    let timeouts: NodeJS.Timeout[] = [];
+    let timeouts: ReturnType<typeof setTimeout>[] = [];
     const state = useStore.getState();
     if (state.isAuthenticated) return; // 로그인 후에는 방해하지 않음
 
@@ -71,7 +71,7 @@ export const FeatureCarousel = () => {
 
       // [1.5초] 모달 띄우기 (실제 예약 상세 모달 오픈)
       timeouts.push(setTimeout(() => {
-        useStore.getState().openBookingModal(114);
+        useStore.getState().openBookingModal('104');
       }, 1500));
       
       // [3.0초] 모달 닫기
