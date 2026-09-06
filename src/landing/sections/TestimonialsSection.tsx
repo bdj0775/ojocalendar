@@ -27,17 +27,17 @@ const benefits: { icon: LucideIcon; title: string; desc: string }[] = [
 
 export const TestimonialsSection = () => {
   return (
-    <SectionWrapper className="bg-muted/30 py-24 md:py-32 border-t border-border/40">
+    <SectionWrapper className="bg-muted/30 pt-24 md:pt-32 pb-16 md:pb-20 border-t border-border/40">
       <div className="max-w-7xl mx-auto px-6 flex flex-col gap-16">
         <div className="flex flex-col items-center text-center gap-5">
           <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-1.5 text-xs md:text-sm font-semibold text-primary">
             이런 점이 좋아집니다
           </span>
           <h2 className="text-3xl md:text-5xl font-extrabold text-foreground tracking-tight max-w-3xl leading-[1.3] break-keep">
-            데이터로 판단하고 <br className="hidden md:block" />예약률을 높이세요
+            숙박업 호스트가 <br className="hidden md:block" />직접 만들었습니다.
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground font-medium max-w-2xl break-keep">
-            오조캘린더는 제주도에서 직접 숙박을 운영하는 호스트가 매출관리를 위해 만든 사용자 친화적 웹앱입니다.
+            오조캘린더는 제주에서 숙박업을 운영하는 호스트가 매출관리를 위해 직접 만든 사용자 친화적 웹앱입니다.
           </p>
         </div>
 
