@@ -4,7 +4,7 @@
 > 목적: 오래 방치한 프로젝트를 다시 이어서 개발하기 위한 현황 파악 문서
 > 최초 작성 시 코드는 한 줄도 수정하지 않았습니다(빌드/타입체크/dev 서버 실행만 수행).
 > 이후 2026-09-06에 방치돼 있던 미커밋 작업을 **내용 변경 없이 git 커밋으로만** 정리했습니다(4-2).
-> 함께 읽을 문서: [CLAUDE.md](./CLAUDE.md) · [BILLING_SYSTEM.md](./BILLING_SYSTEM.md) · [MONETIZATION_ROADMAP.md](./MONETIZATION_ROADMAP.md) · [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md) · [FORECAST_ALGORITHM.md](./FORECAST_ALGORITHM.md)
+> 함께 읽을 문서: [CLAUDE.md](./CLAUDE.md) · [BILLING_SYSTEM.md](./BILLING_SYSTEM.md) · [MONETIZATION_ROADMAP.md](./MONETIZATION_ROADMAP.md) · [LAUNCH_CHECKLIST.md](./LAUNCH_CHECKLIST.md) · [FORECAST.md](./FORECAST.md)
 
 ---
 
@@ -120,7 +120,7 @@ supabase/
 └── migrations/                   # 20260619_* 5개가 신규
 ```
 
-**루트의 `.mjs` 스크립트들**(`generate_dummyData.mjs`, `import_csv_to_supabase.mjs`, `restore_june2026.mjs`, `verify_forecast.mjs` 등)은 앱 번들과 무관한 **일회성 데이터 마이그레이션/검증 도구**입니다. 실제 CSV 원본(`오조록 매출_지출 - 시트1.csv`)도 함께 커밋돼 있습니다.
+**루트의 `.mjs` 스크립트들**(`generate_dummyData.mjs`, `import_csv_to_supabase.mjs`, `restore_june2026.mjs` 등)은 앱 번들과 무관한 **일회성 데이터 마이그레이션/검증 도구**입니다. 실제 CSV 원본(`오조록 매출_지출 - 시트1.csv`)도 함께 커밋돼 있습니다.
 
 ---
 
@@ -131,8 +131,8 @@ supabase/
 | **전역 상태 전부** | [src/store/useStore.ts](src/store/useStore.ts) | 인증, 데이터 fetch, CRUD, 동기화, 온보딩, 구독까지 전부 여기. Context 금지 규칙 |
 | **인증 흐름** | `useStore.ts` `initAuth()` (39행~) | ⚠️ 레드라인. OAuth race condition 가드 존재 |
 | **DB 컬럼 매핑** | `useStore.ts` `fetchData()` (205행~) | ⚠️ 레드라인. DB는 snake_case, JS는 camelCase 수동 매핑 |
-| **KPI·예측·차트 계산** | [src/hooks/useDesktopStats.ts](src/hooks/useDesktopStats.ts) | ★ 모바일·데스크탑 공유. `computeForecast()`(456행), `computeForecastRaw()`(275행) |
-| **예측 알고리즘 설명** | [FORECAST_ALGORITHM.md](./FORECAST_ALGORITHM.md) | OTB / τ / STLY / biasCurve. **수정 전 필독** |
+| **KPI·예측·차트 계산** | [src/hooks/useDesktopStats.ts](src/hooks/useDesktopStats.ts) | ★ 모바일·데스크탑 공유. `computeForecast()` — 픽업6, 상세는 FORECAST.md |
+| **예측 알고리즘 설명** | [FORECAST.md](./FORECAST.md) | 픽업6 알고리즘·정확도·점검 절차. **수정 전 필독** |
 | **iCal 동기화** | [src/services/icalSync/syncService.ts](src/services/icalSync/syncService.ts) | ⚠️ 레드라인. 채널 우선순위 순차 실행, `guestname !== '새 예약'` 수동수정 보호 |
 | **달력 예약 바 배치** | [src/components/CalendarGrid/useBookingBars.ts](src/components/CalendarGrid/useBookingBars.ts) | 관리자 미리보기 화면에서도 재사용 |
 | **무료/유료 권한 판별** | [src/hooks/useEntitlements.ts](src/hooks/useEntitlements.ts) | `FREE_PROPERTY_LIMIT = 1` |

@@ -18,10 +18,6 @@ export interface ForecastExample {
   expectedPickup: number | null;
   /** 픽업 평균에 쓰인 히스토리 달 수 */
   histMonthsUsed: number;
-  /** 작년 같은 달의 같은 시점 점유율 */
-  stlyOccAtSamePoint: number | null;
-  /** 작년 같은 달의 최종 점유율 */
-  stlyFinalOcc: number | null;
   confidence: number;
   daysUntilStart: number;
   /** 시점 표기: 미래 달은 'D-25', 진행 중인 달은 'D+6' */
@@ -68,8 +64,6 @@ export const useForecastExample = (stats: DesktopStats, ko: boolean): ForecastEx
       predictedOcc,
       expectedPickup: t.expectedPickup,
       histMonthsUsed: t.histMonthsUsed,
-      stlyOccAtSamePoint: t.stlyOccAtSamePoint,
-      stlyFinalOcc: t.stlyFinalOcc,
       confidence: t.forecastConfidence,
       daysUntilStart: t.daysUntilStart,
       dLabel: t.daysUntilStart > 0

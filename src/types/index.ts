@@ -348,10 +348,6 @@ export interface MonthlyTrend {
   expectedPickup: number | null;
   /** 픽업 평균에 쓰인 히스토리 달 수 (예측 설명용) */
   histMonthsUsed: number;
-  /** 작년 같은 달의 최종 점유율. 자료가 없으면 null (예측 설명용) */
-  stlyFinalOcc: number | null;
-  /** 작년 같은 달의 "같은 시점"(D일 전) 점유율. 자료가 없으면 null (예측 설명용) */
-  stlyOccAtSamePoint: number | null;
   /** 이 달 시작까지 남은 일수. 이미 시작했으면 0 (예측 설명용) */
   daysUntilStart: number;
 }

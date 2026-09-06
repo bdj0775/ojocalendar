@@ -59,7 +59,6 @@ const storeState = {
 };
 
 globalThis.__STORE__ = storeState;
-globalThis.__DBG__ = true;
 
 // ── 훅 실행 ─────────────────────────────────────────────────────
 const mod = await import('./src/hooks/useDesktopStats.ts?' + Date.now());

@@ -314,7 +314,7 @@ export const useDesktopStats = (
     // 2026-09 백테스트(실데이터 301건 · 완료 15개월 · 프로브 174개 + 일단위 2,242개 시점)
     // 에서 이전 방식(페이스 예측 + STLY 동적가중 + 편향보정 커브, MAE 12.8%p)을
     // 7.8%p로 크게 앞섰다. 곱셈 픽업·STLY 앵커·감쇠가중·중앙값 등 20여 개 후보 중
-    // 최고 정확도이면서 수식이 가장 단순했다. 설계 근거·재검증 방법: FORECAST_SYSTEM.md
+    // 최고 정확도이면서 수식이 가장 단순했다. 설계 근거·재검증 방법: FORECAST.md
     //
     // 유의:
     // - 윈도는 "대상월 직전 6개 달력월 ∩ 완료된 달"이다. 먼 미래 달일수록 표본이
@@ -469,35 +469,11 @@ export const useDesktopStats = (
         histMonthsUsed = fc.histMonthsUsed;
       }
 
-      // ── 예측 설명(팝오버)용 참고값 ────────────────────────────
-      // "작년에도 이맘때 N%였고 최종 M%로 끝났다"를 보여주기 위한 값 (계산에는 미사용).
+      // 팝오버의 "같은 시점(D-N)" 표기용
       const monthStartMs = new Date(ty, tm, 1).getTime();
       const daysUntilStart = monthStartMs > todayMs
         ? Math.floor((monthStartMs - todayMs) / 86400000)
         : 0;
-      const stlyMs = calcMonthStats(validBookings, ty - 1, tm, roomCount);
-      const stlyFinalOcc = stlyMs.bookingCount >= MIN_RELIABLE_BOOKINGS ? stlyMs.occupancy : null;
-
-      let stlyOccAtSamePoint: number | null = null;
-      if (stlyFinalOcc != null) {
-        // 작년 같은 달의 "같은 시점"까지 접수됐던 예약만으로 점유율을 재현.
-        // 미래 달이면 시작 D일 전, 진행 중이면 시작 후 경과일만큼 앞으로.
-        // 기준 시각은 정오(T12) — bookingDate가 T12로 파싱되므로 자정 기준을 쓰면
-        // 경계일에 접수된 예약이 통째로 빠진다(2026-11에서 13% vs 30% 불일치 원인).
-        const elapsedDays = monthStartMs > todayMs
-          ? 0
-          : Math.floor((todayMs - monthStartMs) / 86400000);
-        const lyStartMs = new Date(ty - 1, tm, 1, 12, 0, 0).getTime();
-        const cutoff = lyStartMs + (elapsedDays - daysUntilStart) * 86400000;
-        let nights = 0;
-        validBookings.forEach(b => {
-          if (!b.bookingDate) return;
-          if (new Date(b.bookingDate + 'T12:00:00').getTime() > cutoff) return;
-          nights += getOverlapNights(b.checkIn, b.checkOut, ty - 1, tm);
-        });
-        const lyDays = new Date(ty - 1, tm + 1, 0).getDate();
-        stlyOccAtSamePoint = Math.min(100, Math.round((nights / (lyDays * Math.max(1, roomCount))) * 100));
-      }
 
       monthlyTrends.push({
         month: MONTH_LABELS[tm], monthEn: MONTH_LABELS_EN[tm], year: ty,
@@ -505,8 +481,7 @@ export const useDesktopStats = (
         isCurrent, isFuture,
         otbOcc: ms.occupancy, otbGross: ms.gross,
         predictedOcc, predictedGross, predictedNet, forecastConfidence,
-        expectedPickup, histMonthsUsed,
-        stlyFinalOcc, stlyOccAtSamePoint, daysUntilStart,
+        expectedPickup, histMonthsUsed, daysUntilStart,
       });
     }
 
