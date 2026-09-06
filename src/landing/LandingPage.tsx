@@ -3,6 +3,7 @@ import { NavbarSection } from './sections/NavbarSection';
 import { HeroSection } from './sections/HeroSection';
 import { ThreeCardSection } from './sections/ThreeCardSection';
 import { TestimonialsSection } from './sections/TestimonialsSection';
+import { PricingSection } from './sections/PricingSection';
 import { CtaSection } from './sections/CtaSection';
 import { FooterSection } from './sections/FooterSection';
 import { useStore } from '../store/useStore';
@@ -34,18 +35,21 @@ const LandingPage = () => {
       <NavbarSection />
       <BetaFreeBanner />
 
-      {/* 1. 히어로 섹션 */}
+      {/* 1. 히어로 */}
       <HeroSection />
-      
-      {/* 2. 새롭게 작업한 메인 3단 교차 레이아웃 섹션 */}
+
+      {/* 2. 핵심 기능 3단 교차 레이아웃 (달력 / 대시보드 / 모바일) */}
       <ThreeCardSection />
 
-      {/* 4. 고객 신뢰를 위한 후기(Testimonial) 섹션 */}
+      {/* 3. 기능 가치 요약 */}
       <TestimonialsSection />
 
-      {/* 5. 최종 행동 유도(Call to Action) 섹션 */}
+      {/* 4. 요금제 — 베타 무료 안내 */}
+      <PricingSection />
+
+      {/* 5. 최종 행동 유도(CTA) */}
       <CtaSection />
-      
+
       {/* 6. 푸터 */}
       <FooterSection />
     </div>
