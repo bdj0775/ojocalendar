@@ -1,48 +1,29 @@
-import { CONTENT } from '../config/content';
+import { MessageCircle, Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export const FooterSection = () => {
-  const f = CONTENT.footer;
-
   return (
-    <footer className="w-full border-t border-border bg-card px-6 py-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
-
-        {/* 브랜드 */}
-        <div className="flex flex-col gap-2 items-center sm:items-start">
-          <div className="flex items-center gap-2">
-            <img src="/logo-mark.png" alt="OZO Calendar" className="h-7 w-7" />
-            <span className="type-body-strong font-extrabold text-foreground">
-              {f.brand}
-              <span className="font-light text-muted-foreground"> {f.brandSub}</span>
-            </span>
+    <footer className="w-full bg-white border-t border-border/40 py-16">
+      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <div className="flex flex-col gap-5 text-[13px] text-muted-foreground/80 font-medium">
+          <div className="flex items-center gap-4 text-muted-foreground">
+            <Link to="/terms" className="hover:text-foreground transition-colors">이용약관</Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">개인정보 취급방침</Link>
           </div>
-          <p className="type-body text-muted-foreground">{f.tagline}</p>
-        </div>
-
-        {/* 링크·연락처 */}
-        <div className="flex flex-col items-center gap-2 sm:items-end">
-          <a
-            href={`mailto:${f.contact}`}
-            className="type-body text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {f.contact}
-          </a>
-          <div className="flex gap-4">
-            {f.links.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="type-label text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
+          
+          <p>Copyright &copy; OZO Calendar, inc. All right reserved.</p>
+          
+          <p>Contact us at <a href="mailto:support@ozocalendar.com" className="hover:text-foreground transition-colors">support@ozocalendar.com</a></p>
+          
+          <div className="flex items-center gap-3 mt-2">
+            <a href="#" className="w-10 h-10 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
+              <MessageCircle size={18} className="text-muted-foreground" />
+            </a>
+            <a href="#" className="w-10 h-10 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
+              <Mail size={18} className="text-muted-foreground" />
+            </a>
           </div>
         </div>
-      </div>
-
-      <div className="mx-auto mt-8 w-full max-w-6xl border-t border-border pt-6 text-center">
-        <p className="type-caption text-muted-foreground">{f.copyright}</p>
       </div>
     </footer>
   );
