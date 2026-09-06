@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
 import PropertyDetailModal from '../../components/Modals/PropertyDetailModal';
+import PaywallModal from '../../components/Modals/PaywallModal';
 import ChannelSettingsSection from '../../components/Settings/ChannelSettingsSection';
+import { useEntitlements } from '../../hooks/useEntitlements';
 import type { Channel, Property } from '../../types';
+import { ADMIN_EMAIL } from '../../config/admin';
 
 const ICAL_CHANNELS: { channel: Channel; label: string; dot: string }[] = [
   { channel: 'Airbnb',      label: 'Airbnb',      dot: 'bg-rose-500'  },
@@ -46,6 +49,8 @@ const DesktopSettings = () => {
   const [notifications, setNotifications] = useState(settings?.notifications ?? true);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isAddingProperty, setIsAddingProperty] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const { subscription, canAddProperty } = useEntitlements();
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   const toggleDark = () => {
@@ -125,12 +130,17 @@ const DesktopSettings = () => {
 
         {/* 프로필 */}
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-border/30">
-          <div className="min-w-0">
-            <p className="text-[18px] font-bold text-foreground">{settings?.profileName || '오조록 사장님'}</p>
-            <p className="text-[13px] text-muted-foreground/70 mt-0.5">{useStore.getState().userProfile?.email || ''}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[18px] font-bold text-foreground truncate">{settings?.profileName || '오조록 사장님'}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-[13px] text-muted-foreground/70 truncate">{useStore.getState().userProfile?.email || ''}</p>
+              {useStore.getState().userProfile?.email === ADMIN_EMAIL && (
+                <span className="shrink-0 px-2 py-0.5 text-[10px] font-bold tracking-wider text-primary bg-primary/10 rounded-md">ADMIN</span>
+              )}
+            </div>
           </div>
           <span className="text-[11px] font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg flex-shrink-0 ml-4">
-            {settings?.plan === 'pro' ? 'Pro Plan' : 'Basic Plan'}
+            {subscription?.plan === 'pro' ? 'Pro Plan' : subscription?.plan === 'legacy_free' ? 'Beta Free Plan' : 'Basic Plan'}
           </span>
         </div>
 
@@ -147,10 +157,17 @@ const DesktopSettings = () => {
             </button>
           ))}
           {(properties?.length ?? 0) < maxProperties && (
-            <button className={`${row} w-full text-left`} onClick={() => setIsAddingProperty(true)}>
-              <p className={`${rowLabel} text-primary`}>+ {ko ? '객실 추가' : 'Add Property'}</p>
-              <span className={rowSub}>최대 {maxProperties}개</span>
-            </button>
+            canAddProperty ? (
+              <button className={`${row} w-full text-left`} onClick={() => setIsAddingProperty(true)}>
+                <p className={`${rowLabel} text-primary`}>+ {ko ? '객실 추가' : 'Add Property'}</p>
+                <span className={rowSub}>최대 {maxProperties}개</span>
+              </button>
+            ) : (
+              <button className={`${row} w-full text-left`} onClick={() => setShowPaywall(true)}>
+                <p className={`${rowLabel} text-primary`}>+ {ko ? '객실 추가 (Pro)' : 'Add Property (Pro)'}</p>
+                <span className={rowSub}>{ko ? '무료 플랜은 1개까지' : 'Free plan: 1 property'}</span>
+              </button>
+            )
           )}
         </div>
 
@@ -370,6 +387,8 @@ const DesktopSettings = () => {
           onDelete={editingProperty ? () => { deleteProperty(editingProperty.id); setEditingProperty(null); } : undefined}
         />
       )}
+
+      <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} />
     </div>
   );
 };

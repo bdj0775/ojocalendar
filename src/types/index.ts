@@ -99,6 +99,24 @@ export interface Property {
   cleaningFee: number;
 }
 
+// ============================================================
+// Monetization (MONETIZATION_ROADMAP.md)
+// ============================================================
+
+export type SubscriptionPlan = 'legacy_free' | 'free' | 'pro';
+export type SubscriptionStatus = 'active' | 'pending' | 'expired';
+export type PaymentMethod = 'manual' | 'toss';
+
+export interface Subscription {
+  id: string;
+  hostId: string;
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  paymentMethod: PaymentMethod | null;
+  currentPeriodEnd: string | null;
+  createdAt: string;
+}
+
 export interface UserProfile {
   id: string;
   email?: string;
@@ -114,7 +132,6 @@ export interface Settings {
   profileName: string;
   profileRole: string;
   propertyName: string;
-  plan?: string;
   eventColorMode?: 'channel' | 'property';
   peakSeasonStart?: string; // 'MM-DD', e.g. '07-01'
   peakSeasonEnd?: string;   // 'MM-DD', e.g. '08-15'
@@ -174,7 +191,7 @@ export interface MobileBookingsFilter {
 // Store
 // ============================================================
 
-export type DesktopTab = 'dashboard' | 'bookings' | 'settings';
+export type DesktopTab = 'dashboard' | 'bookings' | 'settings' | 'admin';
 
 export interface StoreState {
   // Calendar
@@ -289,6 +306,12 @@ export interface StoreState {
 
   // 회원탈퇴
   deleteAccount: () => Promise<void>;
+
+  // 결제/구독 (MONETIZATION_ROADMAP.md)
+  subscription: Subscription | null;
+  monetizationEnabled: boolean;
+  fetchSubscription: () => Promise<void>;
+  fetchAppSettings: () => Promise<void>;
 
   // 대시보드/예약목록 숙소 필터
   selectedDashboardPropertyId: string | null;

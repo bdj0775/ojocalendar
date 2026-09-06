@@ -74,7 +74,10 @@ export const useStore = create<StoreState>()(
             // 재fetch하면 dataLoading: true → UI 전체 unmount → 탭 상태 초기화 유발
             if (event !== 'TOKEN_REFRESHED') get().fetchData();
           } else {
-            set({ properties: [], bookings: [], settings: { ...get().settings, profileName: '' } });
+            set({
+              properties: [], bookings: [], settings: { ...get().settings, profileName: '' },
+              subscription: null,
+            });
           }
         });
       },
@@ -142,6 +145,7 @@ export const useStore = create<StoreState>()(
           properties: [], bookings: [],
           syncChannels: [], syncNotifications: [], unreadCount: 0,
           onboardingCompleted: false, showWelcomeHint: false,
+          subscription: null,
         });
 
         // 4. Zustand persist 로컬 스토리지 완전 삭제
@@ -239,13 +243,48 @@ export const useStore = create<StoreState>()(
               })),
             });
           }
-          await get().fetchNotifications();
+          await Promise.all([
+            get().fetchNotifications(),
+            get().fetchSubscription(),
+            get().fetchAppSettings(),
+          ]);
         } catch (err) {
           console.error('Fetch Error:', err);
           get().showToast('데이터를 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'error');
         } finally {
           set({ dataLoading: false });
         }
+      },
+
+      // ── 결제/구독 (MONETIZATION_ROADMAP.md) ──────────────────
+      subscription: null,
+      monetizationEnabled: false,
+
+      fetchSubscription: async () => {
+        const user = get().userProfile;
+        if (!user) return;
+        // billing_key는 재청구용 내부 토큰 — 클라이언트로 가져오지 않음
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('id, host_id, plan, status, payment_method, current_period_end, created_at')
+          .eq('host_id', user.id).single();
+        if (error) { console.error('fetchSubscription error:', error); return; }
+        if (data) {
+          set({
+            subscription: {
+              id: data.id, hostId: data.host_id, plan: data.plan, status: data.status,
+              paymentMethod: data.payment_method, currentPeriodEnd: data.current_period_end,
+              createdAt: data.created_at,
+            },
+          });
+        }
+      },
+
+      fetchAppSettings: async () => {
+        const { data, error } = await supabase
+          .from('app_settings').select('monetization_enabled').eq('id', true).single();
+        if (error) { console.error('fetchAppSettings error:', error); return; }
+        if (data) set({ monetizationEnabled: data.monetization_enabled });
       },
 
       updateProperty: async (propId, pd) => {

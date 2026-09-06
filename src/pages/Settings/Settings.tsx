@@ -5,9 +5,11 @@ import { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
 import PropertyDetailModal from '../../components/Modals/PropertyDetailModal';
+import PaywallModal from '../../components/Modals/PaywallModal';
 import ChannelSettingsSection from '../../components/Settings/ChannelSettingsSection';
+import { useEntitlements } from '../../hooks/useEntitlements';
 import type { Channel, Property } from '../../types';
-
+import { ADMIN_EMAIL } from '../../config/admin';
 
 
 const ICAL_CHANNELS: { channel: Channel; label: string; dot: string }[] = [
@@ -51,6 +53,8 @@ const SettingsPage = () => {
   const [notifications, setNotifications] = useState(settings?.notifications ?? true);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isAddingProperty, setIsAddingProperty] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const { subscription, canAddProperty } = useEntitlements();
 
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
@@ -140,12 +144,17 @@ const SettingsPage = () => {
 
         {/* 프로필 */}
         <div className="flex items-center justify-between py-3 mb-2">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-[15px] font-bold text-foreground truncate">{settings?.profileName || '오조록 사장님'}</p>
-            <p className="text-[12px] text-muted-foreground/70 mt-0.5 truncate">{useStore.getState().userProfile?.email || ''}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-[12px] text-muted-foreground/70 truncate">{useStore.getState().userProfile?.email || ''}</p>
+              {useStore.getState().userProfile?.email === ADMIN_EMAIL && (
+                <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-primary bg-primary/10 rounded-sm">ADMIN</span>
+              )}
+            </div>
           </div>
           <span className="text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg flex-shrink-0 ml-3">
-            {settings?.plan === 'pro' ? 'Pro' : 'Basic'}
+            {subscription?.plan === 'pro' ? 'Pro' : subscription?.plan === 'legacy_free' ? 'Beta Free' : 'Basic'}
           </span>
         </div>
 
@@ -163,12 +172,21 @@ const SettingsPage = () => {
             </button>
           ))}
           {(properties?.length ?? 0) < maxProperties && (
-            <button className={`${row} w-full text-left`} onClick={() => setIsAddingProperty(true)}>
-              <div>
-                <p className={`${label} text-primary`}>+ {ko ? '객실 추가' : 'Add Property'}</p>
-                <p className={sub}>최대 {maxProperties}개 등록 가능</p>
-              </div>
-            </button>
+            canAddProperty ? (
+              <button className={`${row} w-full text-left`} onClick={() => setIsAddingProperty(true)}>
+                <div>
+                  <p className={`${label} text-primary`}>+ {ko ? '객실 추가' : 'Add Property'}</p>
+                  <p className={sub}>최대 {maxProperties}개 등록 가능</p>
+                </div>
+              </button>
+            ) : (
+              <button className={`${row} w-full text-left`} onClick={() => setShowPaywall(true)}>
+                <div>
+                  <p className={`${label} text-primary`}>+ {ko ? '객실 추가 (Pro)' : 'Add Property (Pro)'}</p>
+                  <p className={sub}>{ko ? '무료 플랜은 1개까지 등록 가능' : 'Free plan allows 1 property'}</p>
+                </div>
+              </button>
+            )
           )}
         </div>
 
@@ -390,6 +408,8 @@ const SettingsPage = () => {
           onDelete={editingProperty ? () => { deleteProperty(editingProperty.id); setEditingProperty(null); } : undefined}
         />
       )}
+
+      <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} />
     </div>
   );
 };
