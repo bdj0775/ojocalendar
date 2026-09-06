@@ -15,19 +15,24 @@ export const usePaceInsight = (pace: BookingPaceResult, predictedOcc: number | n
     let paceVariancePct = 0;
 
     if (hasEnoughData && currentTarget) {
+      // 오늘과 "같은 시점"(월중이면 같은 경과일)의 과거 3개월 평균과 비교한다.
+      // cutoffDay는 음수(D+)일 수 있고, 배열 인덱스는 leadDay + 30 (useBookingPace 참조).
+      // 예전에는 월중에도 D-0 기준으로 비교해 과거 달의 "최종" 점유율과 비교하는
+      // 버그가 있었다 (월중 6일차 77%를 지난달 최종 100%와 비교 → 과장된 음수).
       const currentLeadDay = currentTarget.cutoffDay;
-      
-      // 1. Pace Variance vs Recent 3-Month Average
-      // Calculate average occupancy at currentLeadDay for the recent valid targets
+
       let sumRecentOccAtLeadDay = 0;
-      
+
       validRecentTargets.forEach(t => {
-        // Accumulate pickup from leadDay 180 down to currentLeadDay
+        // 짧은 달(2월 등)은 자기 월말까지가 한계
+        // 배열 인덱스 = leadDay + (배열길이 - 181): 배열은 D+N..D-180 (useBookingPace 참조)
+        const idxOffset = t.dailyBookedNights.length - 181;
+        const from = Math.max(currentLeadDay, -(t.daysInMonth - 1));
         let pickupNights = 0;
-        for (let d = 180; d >= currentLeadDay; d--) {
-          pickupNights += t.dailyBookedNights[d] || 0;
+        for (let d = 180; d >= from; d--) {
+          pickupNights += t.dailyBookedNights[d + idxOffset] || 0;
         }
-        const occAtLeadDay = (pickupNights / t.daysInMonth) * 100;
+        const occAtLeadDay = Math.min(100, (pickupNights / (t.daysInMonth * pace.roomCount)) * 100);
         sumRecentOccAtLeadDay += occAtLeadDay;
       });
       

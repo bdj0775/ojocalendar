@@ -58,8 +58,9 @@ const PaceDetailsModal = ({ isOpen, onClose }: PaceDetailsModalProps) => {
       const tIdx = currentMonthIdx + offset;
       if (tIdx < 0 || tIdx >= targets.length) return null;
       const t = targets[tIdx];
+      // cutoffDay는 월중이면 음수(D+). 같은 시점끼리 비교하므로 음수도 허용한다.
       const dayToCheck = t.cutoffDay;
-      if (dayToCheck < 0 || dayToCheck > 120) return null;
+      if (dayToCheck < -30 || dayToCheck > 120) return null;
 
       let sumOcc = 0;
       let count = 0;
@@ -117,9 +118,10 @@ const PaceDetailsModal = ({ isOpen, onClose }: PaceDetailsModalProps) => {
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={paceData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="leadDay" type="number" domain={[0, 120]} reversed tickFormatter={v => `D-${v}`} stroke="#94a3b8" fontSize={12} tickCount={13} />
+                {/* 음수 leadDay = 월중(D+). 월말(D+30)까지 표시 */}
+                <XAxis dataKey="leadDay" type="number" domain={[-30, 120]} reversed tickFormatter={v => (v < 0 ? `D+${-v}` : `D-${v}`)} stroke="#94a3b8" fontSize={12} tickCount={16} />
                 <YAxis tickFormatter={v => `${v}%`} stroke="#94a3b8" fontSize={12} />
-                <Tooltip labelFormatter={v => `D-${v}`} formatter={(value: number) => [`${value}%`, '점유율']} />
+                <Tooltip labelFormatter={v => (Number(v) < 0 ? `D+${-Number(v)}` : `D-${v}`)} formatter={(value: number) => [`${value}%`, '점유율']} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 {targets && targets.map((t, idx) => (
                   <Line key={t.key} type="monotone" dataKey={t.key} name={t.label} stroke={COLORS[idx % COLORS.length]} strokeWidth={t.isCurrent ? 3 : 1.5} dot={false} connectNulls />

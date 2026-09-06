@@ -207,9 +207,11 @@ export const PaceTooltip = ({ active, payload, label, isDark, ko, paceMode, sym 
   const pickupItem = payload.find(p => p.dataKey === pickupKey);
   const lines = payload.filter(p => p.dataKey !== 'currentDailyNights' && p.dataKey !== 'currentDailyRev' && p.value != null).sort((a, b) => b.value - a.value);
 
+  // leadDay 표기: 양수 = 달 시작 전(D-N), 음수 = 월중 경과일(D+N)
+  const dl = Number(label);
   return (
     <div className={wrapCls}>
-      <div className={labelCls}>D-{label} {ko ? '누적 페이스' : 'Cumulative Pace'}</div>
+      <div className={labelCls}>{dl < 0 ? `D+${-dl}` : `D-${dl}`} {ko ? '누적 페이스' : 'Cumulative Pace'}</div>
       {pickupItem && pickupItem.value > 0 && (
         <div className="mb-2 bg-primary/10 rounded px-2 py-1 flex items-center justify-between text-xs text-primary font-bold">
           <span>{ko ? '당일 픽업' : 'Daily Pickup'}</span>

@@ -465,7 +465,9 @@ export interface PaceTarget {
   daysInMonth: number;
   startMs: number;
   endMs: number;
+  /** 곡선 관측 하한 leadDay. 양수 = 달 시작 전(D-N), 음수 = 월중 경과일(D+|N|), 지난 달 = -(일수-1) */
   cutoffDay: number;
+  /** 인덱스 = leadDay + 30 (D+30 ~ D-180). useBookingPace의 MAX_ELAPSED 참조 */
   dailyBookedNights: number[];
   dailyRevenue: number[];
 }
@@ -478,9 +480,12 @@ export interface PaceDataPoint {
 export interface BookingPaceResult {
   paceData: PaceDataPoint[];
   targets: PaceTarget[];
+  /** 점유율 분모에 쓴 객실 수 (useDesktopStats와 동일 규칙) */
+  roomCount: number;
   todayStr: string;
   todayOccupancyPct: number;
   todayRevenueVal: number;
+  /** 오늘 위치의 leadDay (월중이면 음수 = D+) */
   todayLeadDay: number;
 }
 

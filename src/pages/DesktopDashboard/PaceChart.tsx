@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, ReferenceDot, Label,
+  ResponsiveContainer, CartesianGrid, ReferenceDot, ReferenceLine, Label,
 } from 'recharts';
 import { PaceTooltip } from './chartComponents';
 import PaceDetailsModal from '../../components/PaceDetailsModal/PaceDetailsModal';
 import { usePaceInsight } from '../../hooks/usePaceInsight';
 import type { BookingPaceResult } from '../../types';
+
+/** leadDay 표기: 양수 = 달 시작 전(D-N), 음수 = 월중 경과일(D+N) */
+export const fmtLeadDay = (v: number) => (v < 0 ? `D+${-v}` : `D-${v}`);
 
 interface PaceChartProps {
   pace: BookingPaceResult;
@@ -37,7 +40,7 @@ const CompactPaceTooltip = ({ active, payload, label, isDark, ko, paceMode, sym 
 
   return (
     <div className={`${bg} backdrop-blur-xl border rounded-lg p-1.5 px-2 shadow-lg`}>
-      <div className="text-[9px] font-bold text-muted-foreground mb-1">D-{label}</div>
+      <div className="text-[9px] font-bold text-muted-foreground mb-1">{fmtLeadDay(Number(label))}</div>
       {lines.map((p: any, i: number) => (
         <div key={i} className="flex items-center gap-1.5 text-[9px] mb-0.5">
           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: p.color || p.stroke }} />
@@ -55,6 +58,20 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false, predicted
   const [paceMode, setPaceMode] = useState<'occ' | 'rev'>('occ');
   const [isPaceModalOpen, setIsPaceModalOpen] = useState(false);
   const insight = usePaceInsight(pace, predictedOcc);
+
+  // ── 예상 마감 경로 — 오늘 지점에서 월말까지 예측값(픽업6)을 점선으로 잇는다
+  const currentTarget = pace.targets.find(t => t.isCurrent);
+  const monthEndDay = currentTarget ? -(currentTarget.daysInMonth - 1) : null;
+  const showForecastPath = predictedOcc != null && monthEndDay != null
+    && pace.todayLeadDay > monthEndDay;
+  const chartData = useMemo(() => {
+    if (!showForecastPath) return pace.paceData;
+    return pace.paceData.map(dp => {
+      if (dp.leadDay === pace.todayLeadDay) return { ...dp, forecastPath: pace.todayOccupancyPct };
+      if (dp.leadDay === monthEndDay) return { ...dp, forecastPath: predictedOcc };
+      return dp;
+    });
+  }, [showForecastPath, pace.paceData, pace.todayLeadDay, pace.todayOccupancyPct, monthEndDay, predictedOcc]);
 
   const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
   const tickColor = isDark ? '#64748b' : '#94a3b8';
@@ -120,15 +137,15 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false, predicted
 
         <div style={{ width: '100%', height: chartHeight }} className={compact ? '-mx-2' : ''}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={pace.paceData} margin={compact ? { top: 25, right: 4, left: -25, bottom: 5 } : { top: 30, right: 16, left: paceMode === 'rev' ? 10 : -20, bottom: 20 }}>
+            <ComposedChart data={chartData} margin={compact ? { top: 25, right: 4, left: -25, bottom: 5 } : { top: 30, right: 16, left: paceMode === 'rev' ? 10 : -20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
               <XAxis
                 dataKey="leadDay"
                 type="category"
                 tick={{ fontSize: compact ? 8 : 11, fill: tickColor, fontWeight: 600 }}
                 tickFormatter={val => {
-                  if (compact) return val % 30 === 0 ? `D-${val}` : '';
-                  return val % 15 === 0 ? `D-${val}` : '';
+                  if (compact) return val % 30 === 0 ? fmtLeadDay(val) : '';
+                  return val % 15 === 0 ? fmtLeadDay(val) : '';
                 }}
                 axisLine={false}
                 tickLine={false}
@@ -151,6 +168,20 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false, predicted
                 }
               />
 
+              {/* 월 시작 경계 — 왼쪽은 사전 예약(D-), 오른쪽은 월중(D+) */}
+              <ReferenceLine
+                yAxisId="pace"
+                x={0}
+                stroke={isDark ? 'rgba(148,163,184,0.35)' : 'rgba(100,116,139,0.3)'}
+                strokeDasharray="4 4"
+                label={compact ? undefined : {
+                  value: ko ? '월 시작' : 'Month start',
+                  position: 'insideTopRight',
+                  fill: tickColorAlt,
+                  fontSize: 10,
+                }}
+              />
+
               <Bar yAxisId="bar" dataKey={paceMode === 'occ' ? 'currentDailyNights' : 'currentDailyRev'} fill="var(--primary)" opacity={0.15} radius={[2, 2, 0, 0]} maxBarSize={compact ? 3 : 4} />
 
               {pace.targets.filter(t => !t.isCurrent).map(t => {
@@ -163,6 +194,23 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false, predicted
                 const key = paceMode === 'occ' ? t.key : `${t.key}_rev`;
                 return <Line yAxisId="pace" key={key} type="monotone" name={t.label} dataKey={key} stroke="var(--primary)" strokeWidth={compact ? 2.5 : 4} dot={false} connectNulls={false} activeDot={{ r: compact ? 4 : 6, fill: 'var(--primary)', stroke: isDark ? '#0f172a' : '#ffffff', strokeWidth: 2 }} />;
               })}
+
+              {/* 예상 마감 경로: 오늘 → 월말 예측값 (점유율 모드에서만) */}
+              {showForecastPath && paceMode === 'occ' && (
+                <Line
+                  yAxisId="pace" type="linear" name={ko ? '예상 마감' : 'Forecast'}
+                  dataKey="forecastPath" stroke="var(--success)"
+                  strokeWidth={compact ? 1.5 : 2} strokeDasharray="6 4"
+                  dot={false} connectNulls activeDot={false}
+                />
+              )}
+              {showForecastPath && paceMode === 'occ' && (
+                <ReferenceDot yAxisId="pace" x={monthEndDay!} y={predictedOcc!} r={compact ? 3 : 4} fill="var(--success)" stroke={isDark ? '#0f172a' : '#ffffff'} strokeWidth={2}>
+                  {!compact && (
+                    <Label value={`${predictedOcc}%`} position="top" fill="var(--success)" fontSize={11} fontWeight={700} offset={8} />
+                  )}
+                </ReferenceDot>
+              )}
 
               {pace.todayLeadDay != null && (
                 <ReferenceDot yAxisId="pace" x={pace.todayLeadDay} y={paceMode === 'occ' ? pace.todayOccupancyPct : pace.todayRevenueVal} r={compact ? 4 : 6} fill="var(--primary)" stroke={isDark ? '#0f172a' : '#ffffff'} strokeWidth={compact ? 2 : 3} isFront>
