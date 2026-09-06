@@ -344,6 +344,12 @@ export interface MonthlyTrend {
   predictedGross: number | null;
   predictedNet: number | null;
   forecastConfidence: number;
+  /** 작년 같은 달의 최종 점유율. 자료가 없으면 null (예측 설명용) */
+  stlyFinalOcc: number | null;
+  /** 작년 같은 달의 "같은 시점"(D일 전) 점유율. 자료가 없으면 null (예측 설명용) */
+  stlyOccAtSamePoint: number | null;
+  /** 이 달 시작까지 남은 일수. 이미 시작했으면 0 (예측 설명용) */
+  daysUntilStart: number;
 }
 
 export interface PieDataItem {

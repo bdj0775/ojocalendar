@@ -637,12 +637,38 @@ export const useDesktopStats = (
         forecastConfidence = fc.forecastConfidence;
       }
 
+      // ── 예측 설명(팝오버)용 참고값 ────────────────────────────
+      // "작년에도 이맘때 N%였고 최종 M%로 끝났다"를 보여주기 위한 값.
+      // histOTBCurve는 과거 12개월 평균이라 특정 달 비교에는 쓸 수 없어 여기서 따로 구한다.
+      const monthStartMs = new Date(ty, tm, 1).getTime();
+      const daysUntilStart = monthStartMs > todayMs
+        ? Math.floor((monthStartMs - todayMs) / 86400000)
+        : 0;
+      const stlyMs = calcMonthStats(validBookings, ty - 1, tm, roomCount);
+      const stlyFinalOcc = stlyMs.bookingCount >= MIN_RELIABLE_BOOKINGS ? stlyMs.occupancy : null;
+
+      let stlyOccAtSamePoint: number | null = null;
+      if (stlyFinalOcc != null) {
+        // 작년 같은 달의 시작 D일 전까지 접수됐던 예약만으로 점유율을 재현
+        const lyStartMs = new Date(ty - 1, tm, 1).getTime();
+        const cutoff = lyStartMs - daysUntilStart * 86400000;
+        let nights = 0;
+        validBookings.forEach(b => {
+          if (!b.bookingDate) return;
+          if (new Date(b.bookingDate + 'T12:00:00').getTime() > cutoff) return;
+          nights += getOverlapNights(b.checkIn, b.checkOut, ty - 1, tm);
+        });
+        const lyDays = new Date(ty - 1, tm + 1, 0).getDate();
+        stlyOccAtSamePoint = Math.min(100, Math.round((nights / (lyDays * Math.max(1, roomCount))) * 100));
+      }
+
       monthlyTrends.push({
         month: MONTH_LABELS[tm], monthEn: MONTH_LABELS_EN[tm], year: ty,
         gross: ms.gross, net: ms.net, adr: ms.adr, occupancy: ms.occupancy,
         isCurrent, isFuture,
         otbOcc: ms.occupancy, otbGross: ms.gross,
         predictedOcc, predictedGross, predictedNet, forecastConfidence,
+        stlyFinalOcc, stlyOccAtSamePoint, daysUntilStart,
       });
     }
 
