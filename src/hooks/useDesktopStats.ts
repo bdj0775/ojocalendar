@@ -649,9 +649,15 @@ export const useDesktopStats = (
 
       let stlyOccAtSamePoint: number | null = null;
       if (stlyFinalOcc != null) {
-        // 작년 같은 달의 시작 D일 전까지 접수됐던 예약만으로 점유율을 재현
-        const lyStartMs = new Date(ty - 1, tm, 1).getTime();
-        const cutoff = lyStartMs - daysUntilStart * 86400000;
+        // 작년 같은 달의 "같은 시점"까지 접수됐던 예약만으로 점유율을 재현.
+        // 미래 달이면 시작 D일 전, 진행 중이면 시작 후 경과일만큼 앞으로.
+        // 기준 시각은 정오(T12) — bookingDate가 T12로 파싱되므로 자정 기준을 쓰면
+        // 경계일에 접수된 예약이 통째로 빠진다(2026-11에서 13% vs 30% 불일치 원인).
+        const elapsedDays = monthStartMs > todayMs
+          ? 0
+          : Math.floor((todayMs - monthStartMs) / 86400000);
+        const lyStartMs = new Date(ty - 1, tm, 1, 12, 0, 0).getTime();
+        const cutoff = lyStartMs + (elapsedDays - daysUntilStart) * 86400000;
         let nights = 0;
         validBookings.forEach(b => {
           if (!b.bookingDate) return;

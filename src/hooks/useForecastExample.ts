@@ -14,14 +14,14 @@ export interface ForecastExample {
   otbOcc: number;
   /** 월말 예상 점유율 */
   predictedOcc: number;
-  /** 앞으로 더 들어올 것으로 보는 양(%p) */
-  pickup: number;
   /** 작년 같은 달의 같은 시점 점유율 */
   stlyOccAtSamePoint: number | null;
   /** 작년 같은 달의 최종 점유율 */
   stlyFinalOcc: number | null;
   confidence: number;
   daysUntilStart: number;
+  /** 시점 표기: 미래 달은 'D-25', 진행 중인 달은 'D+6' */
+  dLabel: string;
   /** 선택한 달에 예측이 없어 다른 달로 대체했는지 (제목에서 달을 분명히 밝히기 위함) */
   isFallback: boolean;
 }
@@ -62,11 +62,13 @@ export const useForecastExample = (stats: DesktopStats, ko: boolean): ForecastEx
       monthLabel: ko ? t.month : t.monthEn,
       otbOcc: t.otbOcc,
       predictedOcc,
-      pickup: Math.max(0, predictedOcc - t.otbOcc),
       stlyOccAtSamePoint: t.stlyOccAtSamePoint,
       stlyFinalOcc: t.stlyFinalOcc,
       confidence: t.forecastConfidence,
       daysUntilStart: t.daysUntilStart,
+      dLabel: t.daysUntilStart > 0
+        ? 'D-' + t.daysUntilStart
+        : 'D+' + Math.max(0, Math.floor((Date.now() - new Date(t.year, picked.idx, 1).getTime()) / 86400000)),
       isFallback: selected == null,
     };
   }, [stats.monthlyTrends, currentYear, currentMonth, ko]);
