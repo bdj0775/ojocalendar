@@ -4,6 +4,7 @@ import CalendarPage from '../Calendar/Calendar';
 import DesktopDashboard from '../DesktopDashboard/DesktopDashboard';
 import DesktopBookings from '../DesktopBookings/DesktopBookings';
 import DesktopSettings from '../DesktopSettings/DesktopSettings';
+import AdminSettings from '../Admin/AdminSettings';
 import DesktopTabNav from '../../components/DesktopTabNav/DesktopTabNav';
 import PropertyDropdown from '../../components/DesktopTabNav/PropertyDropdown';
 import type { DesktopTab } from '../../types';
@@ -100,11 +101,11 @@ const DesktopOverview = () => {
               <header className="flex items-center justify-between mb-4 h-8">
                 <div className="flex items-center gap-3">
                   <h1 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight m-0 ml-2">
-                    {activeTab === 'bookings' ? '예약목록' : '설정'}
+                    {activeTab === 'bookings' ? '예약목록' : activeTab === 'admin' ? '관리자' : '설정'}
                   </h1>
                 </div>
                 <div className="flex items-center gap-5">
-                  <PropertyDropdown />
+                  {activeTab !== 'admin' && <PropertyDropdown />}
                   <div className="w-px h-4 bg-border/60" />
                   <DesktopTabNav activeTab={activeTab} onTabChange={setActiveTab} />
                   <div className="w-px h-4 bg-border/60" />
@@ -121,9 +122,10 @@ const DesktopOverview = () => {
                 </div>
               </header>
             </div>
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden overflow-y-auto">
               {activeTab === 'bookings' && <DesktopBookings />}
               {activeTab === 'settings' && <DesktopSettings />}
+              {activeTab === 'admin' && <AdminSettings />}
             </div>
           </div>
         )}

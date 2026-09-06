@@ -6,6 +6,7 @@ import { GripVertical } from 'lucide-react';
 import type { Booking, Property } from '../../types';
 import PropertyDetailModal from '../Modals/PropertyDetailModal';
 import { PROP_COLORS } from '../CalendarGrid/useBookingBars';
+import { ADMIN_EMAIL } from '../../config/admin';
 
 // ── MiniCalendar ─────────────────────────────────────────────────
 
@@ -296,9 +297,14 @@ const MobileSidebar = () => {
                 OZO <span className="font-light text-muted-foreground">Calendar</span>
               </span>
             </div>
-            <p className="text-[10px] text-muted-foreground/80 truncate">
-              {settings?.profileName || '호스트 이름'} ({userProfile?.email || 'email@example.com'})
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] text-muted-foreground/80 truncate">
+                {settings?.profileName || '호스트 이름'} ({userProfile?.email || 'email@example.com'})
+              </p>
+              {userProfile?.email === ADMIN_EMAIL && (
+                <span className="shrink-0 px-1.5 py-0.5 text-[8px] font-bold tracking-wider text-primary bg-primary/10 rounded-sm">ADMIN</span>
+              )}
+            </div>
           </div>
 
           {/* Properties List */}
@@ -493,6 +499,14 @@ const MobileSidebar = () => {
           >
             설정
           </button>
+          {userProfile?.email === ADMIN_EMAIL && (
+            <button
+              onClick={() => handleNav('/admin')}
+              className="w-full text-left py-2 rounded-lg hover:bg-muted text-primary transition-colors text-[12px] font-medium px-2"
+            >
+              관리자 페이지
+            </button>
+          )}
           <div className="flex items-center justify-between px-2 mt-0.5">
             <button
               onClick={handleLogout}

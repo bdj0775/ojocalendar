@@ -15,6 +15,11 @@ import NewBookingPage from './pages/NewBooking/NewBooking';
 import DesktopOverview from './pages/DesktopOverview/DesktopOverview';
 import OnboardingPage from './pages/Onboarding/Onboarding';
 import LandingPage from './landing/LandingPage';
+import PrivacyPolicy from './pages/Legal/PrivacyPolicy';
+import TermsOfService from './pages/Legal/TermsOfService';
+import BillingSuccess from './pages/Billing/BillingSuccess';
+import BillingFail from './pages/Billing/BillingFail';
+import AdminSettings from './pages/Admin/AdminSettings';
 import { InstallPrompt } from './components/InstallPrompt/InstallPrompt';
 import { SplashScreen } from './components/Splash/SplashScreen';
 import { Loader2 } from 'lucide-react';
@@ -89,12 +94,20 @@ const App = () => {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/billing/success" element={<BillingSuccess />} />
+          <Route path="/billing/fail" element={<BillingFail />} />
           <Route path="/onboarding" element={<OnboardingGuard><OnboardingPage /></OnboardingGuard>} />
           <Route path="/" element={<RootGate />}>
             <Route index element={isDesktop ? <DesktopOverview /> : <CalendarPage />} />
             <Route path="dashboard" element={isDesktop ? <Navigate to="/" replace /> : <DashboardPage />} />
             <Route path="bookings" element={<BookingsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            {/* 데스크탑은 DesktopTabNav의 "관리자" 탭(activeDesktopTab='admin')으로 진입 —
+                같은 셀(캘린더+사이드바) 레이아웃을 유지하기 위해 라우트 이동 대신 탭 전환 사용.
+                직접 /admin 주소로 들어온 데스크탑 사용자는 그 탭 전환 흐름으로 보냄. */}
+            <Route path="admin" element={isDesktop ? <Navigate to="/" replace /> : <AdminSettings />} />
           </Route>
           <Route path="/new-booking" element={<RequireAuth><NewBookingPage /></RequireAuth>} />
         </Routes>
