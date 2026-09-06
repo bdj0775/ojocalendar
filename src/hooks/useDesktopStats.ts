@@ -14,6 +14,21 @@ export const FORECAST_RELIABLE_HORIZON_DAYS = 120;
 /** 이 신뢰도 미만이면 UI에서 '참고용'으로 표시한다 */
 export const LOW_CONFIDENCE_THRESHOLD = 0.3;
 
+/**
+ * 백테스트 편향 보정의 최대 크기(%p). 샘플 수에 따라 정해진다.
+ *
+ * 편향 보정은 샘플이 적을 때 위험하다. 예를 들어 유효 샘플이 여름 성수기 3개월뿐이면
+ * "D-60에 OTB 30%였는데 결국 100%가 됐다"만 학습해 편향이 +40%p까지 치솟고,
+ * 비수기인 10~12월 예측까지 100%로 밀어올린다.
+ * 그래서 샘플이 적으면 거의 보정하지 않고, 쌓일수록 최대 10%p까지 신뢰한다.
+ */
+export const biasClampFor = (sampleCount: number): number => {
+  if (sampleCount < 4) return 2;    // 사실상 보정하지 않음
+  if (sampleCount < 7) return 5;
+  if (sampleCount < 10) return 8;
+  return 10;
+};
+
 const MONTH_LABELS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const MONTH_LABELS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -457,9 +472,12 @@ export const useDesktopStats = (
           }))
           .sort((a, b) => a.bdMs - b.bdMs);
 
-        // D=90 → D=0 incremental sweep
+        // D=90 → D=-31 incremental sweep
+        // 음수 D는 "달이 시작된 뒤 경과일"(D=-5 → 5일차). 달 진행 중에도 조회 시점에 맞는
+        // 편향을 쓰기 위해 필요하다. 예전에는 D=0 하나로 뭉뚱그려, 달 25일차처럼 결과가
+        // 거의 확정된 시점에도 달 시작 시점의 큰 보정값을 그대로 적용하고 있었다.
         let ptr = 0, occNights = 0, bookingCt = 0;
-        for (let D = 90; D >= 0; D--) {
+        for (let D = 90; D >= -31; D--) {
           const cutoff = pastMonthStartMs - D * 86400000;
           while (ptr < rel.length && rel[ptr].bdMs <= cutoff) {
             occNights += rel[ptr].nights;
@@ -472,17 +490,27 @@ export const useDesktopStats = (
           // 실제 점유율과 같은 척도 위에서 계산된다
           const occPct = Math.round((occNights / (daysInMonth * Math.max(1, roomCount))) * 100);
 
-          // 페이스 예측 인라인 (computeForecastRaw와 동일한 공식)
-          const cc  = Math.exp(-D / estimatedTau);
+          // 페이스 예측 인라인 — computeForecastRaw와 반드시 동일한 공식을 써야 한다.
+          // (다르면 "옛 공식의 오차"로 새 공식을 보정하게 되어 예측이 폭주한다)
+          const cc  = D > 0
+            ? Math.exp(-D / estimatedTau)
+            : Math.min(daysInMonth, Math.max(1, -D + 1)) / daysInMonth;
           const pv  = occPct - histAvgOcc * cc;
           const cv  = Math.max(-histAvgOcc * 0.5, Math.min(histAvgOcc * 0.5, pv));
+          const hr  = Math.max(0, 100 - occPct) / 100;          // 만실 체감
           const pf  = Math.min(100, Math.max(occPct,
-            occPct + histAvgOcc * (1 - cc) + cv * 0.5 * (1 - cc),
+            occPct + histAvgOcc * (1 - cc) * hr + cv * 0.5 * (1 - cc),
           ));
-          const ew  = (pstlyOk ? 40 : 0) + (phist2yOk ? 30 : 0) + 30;
-          const en  = (pstlyOk ? pstly.occupancy * 40 : 0)
-                    + (phist2yOk ? phist2y.occupancy * 30 : 0)
-                    + pf * 30;
+          const pW  = 30 + 50 * cc;                              // 동적 가중
+          const hW  = 100 - pW;
+          const hOccs: number[] = [];
+          if (pstlyOk)   hOccs.push(pstly.occupancy);
+          if (phist2yOk) hOccs.push(phist2y.occupancy);
+          let en = pf * pW, ew = pW;
+          if (hOccs.length > 0) {
+            const ratios = hOccs.length === 2 ? [4 / 7, 3 / 7] : [1];
+            hOccs.forEach((o, i) => { const w = hW * ratios[i]; en += o * w; ew += w; });
+          }
           const simPredicted = Math.max(occPct, Math.round(en / ew));
 
           const d = D;
@@ -496,21 +524,27 @@ export const useDesktopStats = (
       // 평균화
       const bc  = new Map<number, number>();
       const hc  = new Map<number, number>();
-      for (let D = 0; D <= 90; D++) {
+      for (let D = -31; D <= 90; D++) {
         const bs = biasAccum.get(D);
         const hs = histOTBAccum.get(D);
         if (bs && bs.length >= 1) {
-          bc.set(D, Math.round((bs.reduce((s, v) => s + v, 0) / bs.length) * 10) / 10);
+          const raw = bs.reduce((s, v) => s + v, 0) / bs.length;
+          // 편향 보정에 상한을 둔다. 과거 예약의 bookingDate가 일괄 임포트 등으로
+          // 실제 접수 시점과 다르면 그 시점 OTB가 과소 재현되어 편향이 +40%p까지
+          // 치솟고, 그대로 더하면 예측이 100%에 고정된다. 샘플이 몇 개뿐일 때도 마찬가지.
+          const clamp = biasClampFor(bs.length);
+          const clamped = Math.max(-clamp, Math.min(clamp, raw));
+          bc.set(D, Math.round(clamped * 10) / 10);
           hc.set(D, Math.round(hs!.reduce((s, v) => s + v, 0) / hs!.length));
         }
       }
 
       // 샘플이 없는 D는 가장 가까운 이웃값으로 채움
-      for (let D = 0; D <= 90; D++) {
+      for (let D = -31; D <= 90; D++) {
         if (bc.has(D)) continue;
-        let nearest = -1, dist = 999;
-        bc.forEach((_, k) => { if (Math.abs(k - D) < dist) { dist = Math.abs(k - D); nearest = k; } });
-        if (nearest >= 0) { bc.set(D, bc.get(nearest)!); hc.set(D, hc.get(nearest) ?? 0); }
+        let nearest = 0, dist = Infinity, found = false;
+        bc.forEach((_, k) => { if (Math.abs(k - D) < dist) { dist = Math.abs(k - D); nearest = k; found = true; } });
+        if (found) { bc.set(D, bc.get(nearest)!); hc.set(D, hc.get(nearest) ?? 0); }
       }
 
       return { biasCurve: bc, histOTBCurve: hc };
@@ -522,7 +556,13 @@ export const useDesktopStats = (
       const daysUntilStart = monthStartMs > todayMs
         ? Math.floor((monthStartMs - todayMs) / 86400000)
         : 0;
-      const D = Math.min(90, daysUntilStart);
+      // 달이 이미 시작됐으면 경과일을 음수 D로 조회한다(D=-5 → 5일차).
+      // 예전에는 전부 D=0으로 조회해, 25일차처럼 결과가 거의 확정된 시점에도
+      // 달 시작 시점의 큰 보정값을 그대로 쓰고 있었다.
+      const elapsedForBias = monthStartMs > todayMs
+        ? 0
+        : Math.min(31, Math.floor((todayMs - monthStartMs) / 86400000));
+      const D = daysUntilStart > 0 ? Math.min(90, daysUntilStart) : -elapsedForBias;
 
       const bias              = biasCurve.get(D)   ?? 0;
       const histOTBatSamePoint = histOTBCurve.get(D) ?? 0;
