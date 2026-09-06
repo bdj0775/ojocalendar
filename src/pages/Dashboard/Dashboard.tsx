@@ -21,6 +21,9 @@ import DistributionDetailModal from '../../components/Modals/DistributionDetailM
 import { TrendTooltip } from '../DesktopDashboard/chartComponents';
 import { useLeadTimeReport } from '../../hooks/useLeadTimeReport';
 import PaceChart from '../DesktopDashboard/PaceChart';
+import { InfoPopover } from '../../components/ui/InfoPopover';
+import { ForecastExplainer } from '../../components/ui/ForecastExplainer';
+import { useForecastExample } from '../../hooks/useForecastExample';
 
 const CHANNELS_FILTER = ['All', 'Airbnb', 'Booking.com', 'Direct', 'Naver'] as const;
 
@@ -47,6 +50,7 @@ const DashboardPage = () => {
   const report = useLeadTimeReport();
 
   const ko = language === 'ko';
+  const forecastExample = useForecastExample(stats, ko);
 
   // ── 포맷 함수 ──────────────────────────────────────────────────
   // 원화 표기 "206,565 원" (통화기호 대신 '원')
@@ -323,7 +327,14 @@ const DashboardPage = () => {
 
         {/* ── 월별 추이 ── */}
         <div className={card}>
-          <span className={chartTitle}>{ko ? '월별 추이 (11개월)' : 'Monthly Trends (11 Months)'}</span>
+          <span className={`${chartTitle} inline-flex items-center gap-1.5`}>
+            {ko ? '월별 추이 (11개월)' : 'Monthly Trends (11 Months)'}
+            {forecastExample && (
+              <InfoPopover label={ko ? '예상 점유율 계산 방식' : 'How the forecast works'} align="left">
+                <ForecastExplainer {...forecastExample} ko={ko} />
+              </InfoPopover>
+            )}
+          </span>
 
           {/* 누적/예상 한 줄 compact */}
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-3 text-[10px] leading-relaxed">

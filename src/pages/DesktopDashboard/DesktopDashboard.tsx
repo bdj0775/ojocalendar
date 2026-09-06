@@ -22,6 +22,9 @@ import { getNatColor } from '../../utils/colors';
 import { CHANNEL_COLORS, TrendTooltip } from './chartComponents';
 import { useLeadTimeReport } from '../../hooks/useLeadTimeReport';
 import AnalyticsTable from './AnalyticsTable';
+import { InfoPopover } from '../../components/ui/InfoPopover';
+import { ForecastExplainer } from '../../components/ui/ForecastExplainer';
+import { useForecastExample } from '../../hooks/useForecastExample';
 import PaceChart from './PaceChart';
 import DesktopTabNav from '../../components/DesktopTabNav/DesktopTabNav';
 import type { DesktopTab } from '../../components/DesktopTabNav/DesktopTabNav';
@@ -52,6 +55,7 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
 
   const sym = stats.currencySymbol;
   const ko = language === 'ko';
+  const forecastExample = useForecastExample(stats, ko);
   const fmt = (v: number) => `${sym}${Math.abs(v).toLocaleString()}`;
   const fmtShort = useMemo(() => (v: number) => {
     if (Math.abs(v) >= 1000000) return `${sym}${(v / 1000000).toFixed(1)}M`;
@@ -420,6 +424,11 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
                 <div className={legendItemCls}>
                   <span style={{ display: 'inline-block', width: 14, height: 0, borderBottom: '2px dashed var(--success)', verticalAlign: 'middle', marginRight: 2 }} />
                   {ko ? '예상 점유율' : 'Pred. OCC'}
+                  {forecastExample && (
+                    <InfoPopover label={ko ? '예상 점유율 계산 방식' : 'How the forecast works'}>
+                      <ForecastExplainer {...forecastExample} ko={ko} />
+                    </InfoPopover>
+                  )}
                 </div>
               </div>
             </div>
