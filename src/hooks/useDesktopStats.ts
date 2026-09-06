@@ -17,10 +17,9 @@ export const LOW_CONFIDENCE_THRESHOLD = 0.3;
 /**
  * 백테스트 편향 보정의 최대 크기(%p). 샘플 수에 따라 정해진다.
  *
- * 편향 보정은 샘플이 적을 때 위험하다. 예를 들어 유효 샘플이 여름 성수기 3개월뿐이면
- * "D-60에 OTB 30%였는데 결국 100%가 됐다"만 학습해 편향이 +40%p까지 치솟고,
- * 비수기인 10~12월 예측까지 100%로 밀어올린다.
- * 그래서 샘플이 적으면 거의 보정하지 않고, 쌓일수록 최대 10%p까지 신뢰한다.
+ * 편향은 과거 예측이 습관적으로 빗나간 폭을 되돌리는 장치라 유용하지만, 샘플이 적으면
+ * 특정 시기의 특성을 전체 규칙으로 오인할 수 있다. 그래서 샘플이 적을수록 보수적으로
+ * 적용하고 쌓일수록 신뢰한다. 현재 데이터에서는 샘플이 11개라 ±10%p가 적용된다.
  */
 export const biasClampFor = (sampleCount: number): number => {
   if (sampleCount < 4) return 2;    // 사실상 보정하지 않음
@@ -375,10 +374,11 @@ export const useDesktopStats = (
         ? Math.min(2.0, Math.max(0.6, otb.occupancy / histOTBatSamePoint))
         : 1.0;
 
-      // 만실에 가까울수록 남은 객실은 팔기 어렵다 — 잔여 픽업을 남은 여유(headroom)에
-      // 비례해 줄인다. 이것이 없으면 OTB가 높은 달이 기계적으로 100%로 밀려 올라간다.
-      const headroom = Math.max(0, 100 - otb.occupancy) / 100;
-      const remainingPickup = histAvgOcc * (1 - curveCompletion) * relPaceRatio * headroom;
+      // 잔여 픽업. 한때 headroom((100-OTB)/100)을 곱해 만실 근처에서 억제했으나,
+      // 실측과 맞지 않아 제거했다 — D-25 기준 실제 픽업이 평균 37%p인데 headroom을
+      // 곱하면 17%p만 예상해 일관되게 과소예측했고, 그 오차를 편향 보정이 되돌리면서
+      // 두 장치가 서로 상쇄됐다. 자세한 근거는 FORECAST_DIAGNOSIS.md 참고.
+      const remainingPickup = histAvgOcc * (1 - curveCompletion) * relPaceRatio;
       const cappedVariance = Math.max(-histAvgOcc * 0.5, Math.min(histAvgOcc * 0.5, paceVariance));
       const rawPace = otb.occupancy + remainingPickup + cappedVariance * 0.5 * (1 - curveCompletion);
       const paceForecast = Math.min(100, Math.max(otb.occupancy, rawPace));
@@ -497,9 +497,8 @@ export const useDesktopStats = (
             : Math.min(daysInMonth, Math.max(1, -D + 1)) / daysInMonth;
           const pv  = occPct - histAvgOcc * cc;
           const cv  = Math.max(-histAvgOcc * 0.5, Math.min(histAvgOcc * 0.5, pv));
-          const hr  = Math.max(0, 100 - occPct) / 100;          // 만실 체감
           const pf  = Math.min(100, Math.max(occPct,
-            occPct + histAvgOcc * (1 - cc) * hr + cv * 0.5 * (1 - cc),
+            occPct + histAvgOcc * (1 - cc) + cv * 0.5 * (1 - cc),
           ));
           const pW  = 30 + 50 * cc;                              // 동적 가중
           const hW  = 100 - pW;
