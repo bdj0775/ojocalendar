@@ -301,7 +301,7 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false, predicted
         )}
       </div>
 
-      {!compact && <PaceDetailsModal isOpen={isPaceModalOpen} onClose={() => setIsPaceModalOpen(false)} />}
+      {!compact && <PaceDetailsModal isOpen={isPaceModalOpen} onClose={() => setIsPaceModalOpen(false)} isDark={isDark} />}
     </>
   );
 };
