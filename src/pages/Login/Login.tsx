@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { supabase } from '../../services/supabaseClient';
 import { FeatureCarousel } from './FeatureCarousel';
+import { HeroSection } from '../../landing/sections/HeroSection';
 
 // ── SVG 로고 ─────────────────────────────────────────────────────
 const GoogleLogo = () => (
@@ -146,19 +147,22 @@ const LoginPage = () => {
   return (
     <div className="flex min-h-screen bg-card">
       {/* Left pane — 데스크탑에서만 */}
-      <div className="hidden md:flex flex-1 bg-background flex-col p-16 relative overflow-hidden">
-        <div className="flex items-center gap-3 mb-6">
-          <img src="/logo-mark.png" alt="OZO Calendar" className="w-11 h-11" />
-          <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
-            OZO <span className="font-light text-muted-foreground">Calendar</span>
-          </h1>
+      <div className="hidden md:flex flex-1 bg-slate-50 flex-col relative overflow-hidden">
+        {/* 로고 영역 */}
+        <div className="flex flex-col p-12 lg:p-16 relative z-30 pointer-events-none">
+          <div className="flex items-center gap-3">
+            <img src="/logo-mark.png" alt="OZO Calendar" className="w-10 h-10" />
+            <h1 className="text-xl font-extrabold text-slate-800 tracking-tight">
+              OZO <span className="font-light text-slate-600">Calendar</span>
+            </h1>
+          </div>
         </div>
-        <p className="type-body text-muted-foreground max-w-xs leading-relaxed">Manage your property bookings elegantly.</p>
 
-        <div className="flex-1 flex items-center justify-center mt-10 relative">
-          <div className="absolute w-[300px] h-[300px] bg-primary-300 rounded-full blur-[60px] opacity-50 top-[10%] left-[10%] animate-[float_8s_ease-in-out_infinite]" />
-          <div className="absolute w-[250px] h-[250px] bg-primary-200 rounded-full blur-[60px] opacity-50 bottom-[20%] right-[10%] animate-[float_8s_ease-in-out_infinite] [animation-delay:-4s]" />
-          <FeatureCarousel />
+        {/* 랜딩페이지 히어로그래픽 그대로 (텍스트, 딤 제외) */}
+        <div className="absolute inset-0 pointer-events-none origin-center scale-[0.8] xl:scale-[0.95] flex items-center justify-center mt-12 -ml-8">
+           <div className="w-full h-full flex items-center justify-center">
+              <HeroSection hideText={true} />
+           </div>
         </div>
       </div>
 

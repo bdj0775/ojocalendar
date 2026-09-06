@@ -500,10 +500,18 @@ const QuickBookingDemo = ({ active }: { active: boolean }) => {
   );
 };
 
-export const HeroSection = () => {
+export const HeroSection = ({ hideText = false }: { hideText?: boolean }) => {
   const [activeStep, setActiveStep] = useState(0);
   const [subCopyIndex, setSubCopyIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -526,7 +534,7 @@ export const HeroSection = () => {
   }, [activeStep]);
 
   return (
-    <section className="relative w-full h-[100dvh] flex flex-col items-center justify-center overflow-hidden bg-background">
+    <section className={`relative w-full ${hideText ? 'h-full' : 'h-[100dvh]'} flex flex-col items-center justify-center ${hideText ? '' : 'overflow-hidden'} ${hideText ? 'bg-transparent' : 'bg-background'}`}>
       <style>{`
         @keyframes popHighlight {
           0% { transform: scale(1); color: inherit; }
@@ -553,9 +561,9 @@ export const HeroSection = () => {
               transform: activeStep === 0 
                 ? 'translateX(0px) scale(1)' 
                 : activeStep === 1 
-                  ? 'translateX(-170px) scale(0.95)'
-                  : 'translateX(-170px) scale(0.95)',
-              opacity: activeStep === 0 ? 1 : activeStep === 1 ? 1 : 0.4,
+                  ? (isMobile ? 'translateX(0px) scale(0.95)' : 'translateX(-170px) scale(0.95)')
+                  : (isMobile ? 'translateX(0px) scale(0.95)' : 'translateX(-170px) scale(0.95)'),
+              opacity: activeStep === 0 ? 1 : activeStep === 1 ? (isMobile ? 0 : 1) : (isMobile ? 0 : 0.4),
               zIndex: activeStep === 0 ? 10 : activeStep === 1 ? 5 : 5
             }}
           >
@@ -670,11 +678,11 @@ export const HeroSection = () => {
             className="absolute w-[300px] h-[540px] sm:w-[320px] sm:h-[580px] rounded-[24px] bg-card text-card-foreground flex flex-col overflow-hidden border border-border/10 transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)]"
             style={{
               transform: activeStep === 0 
-                ? 'translateX(250px) scale(0.85)' 
+                ? (isMobile ? 'translateX(0px) scale(0.85)' : 'translateX(250px) scale(0.85)')
                 : activeStep === 1
-                  ? 'translateX(170px) scale(1)'
-                  : 'translateX(170px) scale(0.95)',
-              opacity: activeStep === 0 ? 0 : activeStep === 1 ? 1 : 0.4,
+                  ? (isMobile ? 'translateX(0px) scale(1)' : 'translateX(170px) scale(1)')
+                  : (isMobile ? 'translateX(0px) scale(0.95)' : 'translateX(170px) scale(0.95)'),
+              opacity: activeStep === 0 ? 0 : activeStep === 1 ? 1 : (isMobile ? 0 : 0.4),
               zIndex: activeStep === 0 ? 1 : activeStep === 1 ? 10 : 5,
               pointerEvents: activeStep === 1 ? 'auto' : 'none'
             }}
@@ -943,10 +951,10 @@ export const HeroSection = () => {
             className="absolute w-[300px] h-[540px] sm:w-[320px] sm:h-[580px] rounded-[24px] bg-card text-card-foreground flex flex-col overflow-hidden border border-border/10 transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-xl"
             style={{
               transform: activeStep === 0 
-                ? 'translateX(0px) scale(0.8) translateY(100px)' 
+                ? (isMobile ? 'translateX(0px) scale(0.8)' : 'translateX(0px) scale(0.8) translateY(100px)')
                 : activeStep === 1
-                  ? 'translateX(0px) scale(0.8) translateY(100px)'
-                  : 'translateX(0px) scale(1) translateY(0px)',
+                  ? (isMobile ? 'translateX(0px) scale(0.8)' : 'translateX(0px) scale(0.8) translateY(100px)')
+                  : (isMobile ? 'translateX(0px) scale(1)' : 'translateX(0px) scale(1) translateY(0px)'),
               opacity: activeStep === 0 ? 0 : activeStep === 1 ? 0 : 1,
               zIndex: activeStep === 2 ? 10 : 3,
               pointerEvents: activeStep === 2 ? 'auto' : 'none'
@@ -958,42 +966,46 @@ export const HeroSection = () => {
         </div>
       </div>
 
-      {/* Scrim / Overlay (배경 딤 처리 기술) 
-          - 이 영역이 바로 배경을 덮어 가독성을 높이는 기술입니다.
-          - 마음에 들지 않으면 이 div 영역만 삭제하시면 됩니다. 
-      */}
-      <div className="absolute inset-0 z-10 bg-slate-300/40 dark:bg-black/50 pointer-events-none transition-all duration-700" />
+      {!hideText && (
+        <>
+          {/* Scrim / Overlay (배경 딤 처리 기술) */}
+          <div className="absolute inset-0 z-10 bg-slate-300/40 dark:bg-black/50 pointer-events-none transition-all duration-700" />
 
-      {/* 2. 전면 콘텐츠 영역 */}
-      <div className="relative z-10 w-full max-w-4xl px-6 flex flex-col items-center text-center gap-7 pt-12">
-        
-        {/* 메인 슬로건 */}
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.12] drop-shadow-sm select-none">
-          {CONTENT.hero.headline}
-        </h1>
+          {/* 2. 전면 콘텐츠 영역 */}
+          <div className="relative z-10 w-full max-w-4xl px-6 flex flex-col items-center text-center gap-3 pt-12">
+            {/* 텍스트 가독성을 위한 미약하고 작은 화이트 음영 (배경 글로우) */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] sm:w-[60%] h-[120%] bg-white/30 blur-[40px] rounded-full pointer-events-none -z-10" />
+            
+            {/* 메인 슬로건 */}
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.12] drop-shadow-[0_0_12px_rgba(255,255,255,0.4)] select-none whitespace-pre-line text-center">
+              <span className="hidden md:inline">{CONTENT.hero.headlineDesktop}</span>
+              <span className="inline md:hidden">{CONTENT.hero.headlineMobile}</span>
+            </h1>
 
-        {/* 번갈아 바뀌는 서브 카피 */}
-        <div className="h-16 flex items-center justify-center">
-          <p
-            className={`text-lg sm:text-2xl font-medium text-muted-foreground leading-relaxed transition-all duration-500 transform ${
-              isFading ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
-            }`}
+            {/* 번갈아 바뀌는 서브 카피 */}
+            <div className="h-16 flex items-center justify-center">
+              <p
+                className={`text-lg sm:text-2xl font-medium text-muted-foreground leading-relaxed drop-shadow-[0_0_8px_rgba(255,255,255,0.4)] transition-all duration-500 transform ${
+                  isFading ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
+                }`}
+              >
+                {CONTENT.hero.subCopies[subCopyIndex]}
+              </p>
+            </div>
+          </div>
+
+          {/* 아래로 스크롤 유도 인디케이터 */}
+          <div 
+            onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-muted-foreground animate-bounce cursor-pointer z-10 opacity-70 hover:opacity-100 transition-opacity"
           >
-            {CONTENT.hero.subCopies[subCopyIndex]}
-          </p>
-        </div>
-      </div>
-
-      {/* 아래로 스크롤 유도 인디케이터 */}
-      <div 
-        onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-muted-foreground animate-bounce cursor-pointer z-10 opacity-70 hover:opacity-100 transition-opacity"
-      >
-        <span className="text-xs tracking-wider uppercase font-semibold">더 알아보기</span>
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-        </svg>
-      </div>
+            <span className="text-xs tracking-wider uppercase font-semibold">더 알아보기</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </div>
+        </>
+      )}
     </section>
   );
 };

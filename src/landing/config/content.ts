@@ -29,7 +29,8 @@ export const CONTENT = {
 
   hero: {
     badge: '🎉 오조캘린더 오픈',
-    headline: '작은 숙소를 위한 새로운 캘린더',
+    headlineDesktop: '작은 숙소를 위한 새로운 캘린더',
+    headlineMobile: '작은 숙소를 위한\n새로운 캘린더',
     subCopies: [
       '달력과 연동된 대시보드로, 더 편해진 매출 관리',
       '예약 현황 한눈에 파악하고, 공실을 채워보세요',
