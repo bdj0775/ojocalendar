@@ -12,8 +12,23 @@ export const LEAD_TIME_BUCKET_DEFS = [
 /** 히스토그램 구간 (일). 마지막은 상한 없음 */
 export const HISTOGRAM_BINS = [0, 7, 14, 21, 30, 45, 60, 90, 120, 180] as const;
 
-/** 기준선 계산에 쓸 완료된 달 수 */
-const BASELINE_MONTHS = 6;
+/**
+ * 기준선(비교 잣대)에 쓸 "완료된 달" 수.
+ *
+ * 2026-09 실측으로 결정. "직전 N개월 중앙값으로 다음 달 중앙값 맞히기"를
+ * 워크포워드 백테스트한 결과 (완료 15개월 · 12개 시점):
+ *   N=3   MAE 21.0일 · 달마다 변동 8.8일  (표본이 적어 크게 출렁임)
+ *   N=6   MAE 18.3일 · 변동 4.1일
+ *   N=9   MAE 17.2일 · 변동 3.3일   ← 채택
+ *   N=12  MAE 17.0일 · 변동 3.0일  (9와 사실상 동률이나 오픈 초기를 오래 물고 감)
+ *
+ * 9와 12가 동률이라 최신 추세를 더 반영하는 9를 택했다.
+ *
+ * 참고: 어느 N을 써도 편향이 -6일 안팎이다. 이 숙소는 리드타임이 길어지는
+ * 추세(25년 20일대 → 26년 40일대)라 과거 기준선이 구조적으로 낮게 나온다.
+ * 기준선은 "예측값"이 아니라 "비교 잣대"이므로 보정하지 않고 그대로 둔다.
+ */
+const BASELINE_MONTHS = 9;
 /** 이 건수 미만인 달은 통계에서 제외 (우연 방지) */
 const MIN_MONTH_BOOKINGS = 3;
 
@@ -184,8 +199,16 @@ export const useLeadTimeReport = (): LeadTimeReport => {
     const completeRecs: Rec[] = completeKeys.flatMap(k => byMonthKey.get(k)!);
     const completeLeads = completeRecs.map(r => r.lead);
 
-    // 기준선 = 완료된 달 중 최근 6개
-    const baselineKeys = completeKeys.slice(-BASELINE_MONTHS);
+    // 기준선 = "보고 있는 달 직전"의 완료된 N개월.
+    // 선택 월을 따라 움직여야 그 달을 그 시점의 정상 범위와 비교하게 된다.
+    // (오늘 기준으로 고정하면 7월을 봐도 12월을 봐도 같은 값이 나와 비교가 무의미)
+    const selectedKey = currentYear * 12 + currentMonth;
+    const priorKeys = completeKeys.filter(k => k < selectedKey);
+    // 오픈 직후처럼 앞선 완료 달이 없으면 가장 이른 완료 달들로 대신한다
+    // (빈 기준선을 보여주느니 "가장 가까운 참고치"라도 주는 편이 낫다)
+    const baselineKeys = priorKeys.length > 0
+      ? priorKeys.slice(-BASELINE_MONTHS)
+      : completeKeys.slice(0, BASELINE_MONTHS);
     const baselineRecs: Rec[] = baselineKeys.flatMap(k => byMonthKey.get(k)!);
     const baselineLeads = baselineRecs.map(r => r.lead);
 

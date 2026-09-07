@@ -640,31 +640,35 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
             </button>
           </div>
 
-          {/* 기준 리드타임 — 완료된 달만 써서 생존 편향을 없앤다.
-              아직 끝나지 않은 달은 임박 예약이 안 들어와 리드타임이 길게 보인다. */}
-          <div className="mb-3">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-[22px] font-extrabold text-foreground leading-none tabular-nums">{report.baselineMedian}</span>
-              <span className="text-[11px] text-muted-foreground">{ko ? '일 전 예약 (중앙값)' : 'days before (median)'}</span>
-              <span className="text-[10px] text-muted-foreground/50 ml-auto">
-                {ko ? `완료 ${report.baselineMonths}개월 · ${report.baselineTotal}건` : `${report.baselineMonths}mo · ${report.baselineTotal}`}
-              </span>
-            </div>
-            {report.currentMonthTotal > 0 && (
-              <div className="flex items-baseline gap-1 mt-1 text-[10px] text-muted-foreground">
-                <span>{ko ? '이번 달' : 'This month'}</span>
-                <span className="font-bold text-foreground tabular-nums">
-                  {report.currentMonthMedian}{ko ? '일' : 'd'}
+          {/* 메인 = 선택한 달. 서브 = 그 달 직전 완료 N개월 기준선(비교 잣대).
+              아직 끝나지 않은 달은 임박 예약이 안 들어와 길게 보이므로 "집계 중"을 밝힌다. */}
+          {report.currentMonthTotal > 0 ? (
+            <div className="mb-3">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[22px] font-extrabold text-foreground leading-none tabular-nums">{report.currentMonthMedian}</span>
+                <span className="text-[11px] text-muted-foreground">{ko ? '일 전 예약 (중앙값)' : 'days before (median)'}</span>
+                <span className="text-[10px] text-muted-foreground/50 ml-auto">
+                  {ko ? `${report.currentMonthTotal}건` : `${report.currentMonthTotal}`}
+                  {!report.currentMonthIsComplete && (
+                    <span className="text-amber-500 font-semibold ml-1">{ko ? '집계 중' : 'in progress'}</span>
+                  )}
                 </span>
-                <span className="text-muted-foreground/60">({report.currentMonthTotal}{ko ? '건' : ''})</span>
-                {!report.currentMonthIsComplete && (
-                  <span className="text-amber-500 font-semibold ml-0.5">
-                    {ko ? '· 집계 중' : '· in progress'}
-                  </span>
-                )}
               </div>
-            )}
-          </div>
+              {report.baselineTotal > 0 && (
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  {ko
+                    ? `직전 ${report.baselineMonths}개월 평소 ${report.baselineMedian}일`
+                    : `Prior ${report.baselineMonths}mo: ${report.baselineMedian}d`}
+                  <span className={`ml-1 font-semibold ${report.currentMonthMedian >= report.baselineMedian ? 'text-success' : 'text-warning'}`}>
+                    ({report.currentMonthMedian >= report.baselineMedian ? '+' : ''}
+                    {report.currentMonthMedian - report.baselineMedian}{ko ? '일' : 'd'})
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground/50 mb-3">{ko ? '이 달 예약 없음' : 'No bookings this month'}</p>
+          )}
 
           {/* 구간별 가로 막대 */}
           <div className="flex flex-col gap-2 flex-1">

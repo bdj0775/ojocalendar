@@ -98,7 +98,9 @@ const LeadTimeDetailModal = ({ onClose, isDark = false }: LeadTimeDetailModalPro
               {/* ── ① 핵심 지표 ── */}
               <div className="rounded-card border border-primary/25 bg-primary/[0.06] p-5 max-[640px]:p-4">
                 <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-3">
-                  {ko ? `완료된 최근 ${r.baselineMonths}개월 기준` : `Last ${r.baselineMonths} completed months`}
+                  {ko
+                    ? `보고 있는 달 직전, 이미 끝난 ${r.baselineMonths}개월 기준`
+                    : `The ${r.baselineMonths} finished months before the selected month`}
                 </div>
                 <div className="grid grid-cols-3 gap-4 max-[480px]:grid-cols-1 max-[480px]:gap-3">
                   <div>
