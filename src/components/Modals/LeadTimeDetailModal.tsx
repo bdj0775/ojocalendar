@@ -108,9 +108,9 @@ const LeadTimeDetailModal = ({ onClose, isDark = false }: LeadTimeDetailModalPro
                       <span className="text-[28px] font-bold text-foreground tabular-nums leading-none">{r.baselineMedian}</span>
                       <span className="text-[12px] font-semibold text-muted-foreground">{ko ? '일' : 'd'}</span>
                     </div>
-                    <div className="text-[10px] font-semibold text-foreground mt-1">{ko ? '중앙값' : 'Median'}</div>
+                    <div className="text-[10px] font-semibold text-foreground mt-1">{ko ? '보통' : 'Typical'}</div>
                     <div className="text-[10px] text-muted-foreground leading-snug break-keep">
-                      {ko ? '절반은 이보다 일찍 예약' : 'Half book earlier than this'}
+                      {ko ? '손님 절반은 이보다 일찍 예약해요' : 'Half of guests book earlier than this'}
                     </div>
                   </div>
                   <div>
@@ -118,9 +118,9 @@ const LeadTimeDetailModal = ({ onClose, isDark = false }: LeadTimeDetailModalPro
                       <span className="text-[28px] font-bold text-foreground tabular-nums leading-none">{r.baselineAvg}</span>
                       <span className="text-[12px] font-semibold text-muted-foreground">{ko ? '일' : 'd'}</span>
                     </div>
-                    <div className="text-[10px] font-semibold text-foreground mt-1">{ko ? '평균' : 'Average'}</div>
+                    <div className="text-[10px] font-semibold text-foreground mt-1">{ko ? '단순 평균' : 'Mean'}</div>
                     <div className="text-[10px] text-muted-foreground leading-snug break-keep">
-                      {ko ? '아주 이른 예약에 끌려 올라감' : 'Pulled up by very early bookings'}
+                      {ko ? '아주 일찍 잡힌 예약 때문에 더 길게 나와요' : 'Stretched by a few very early bookings'}
                     </div>
                   </div>
                   <div>
@@ -178,7 +178,7 @@ const LeadTimeDetailModal = ({ onClose, isDark = false }: LeadTimeDetailModalPro
                     <h3 className={titleCls}>{ko ? '그룹별 비교' : 'By group'}</h3>
                     <p className={descCls}>
                       {ko
-                        ? '막대 = 중앙값, 옅은 부분 = 상위 10% 지점까지'
+                        ? '막대 = 평균, 옅은 부분 = 가장 이르게 예약하는 10%까지'
                         : 'Bar = median, lighter part extends to the 90th percentile'}
                     </p>
                   </div>
@@ -236,7 +236,7 @@ const LeadTimeDetailModal = ({ onClose, isDark = false }: LeadTimeDetailModalPro
                   <h3 className={titleCls}>{ko ? '월별 추이' : 'Monthly trend'}</h3>
                   <p className={descCls}>
                     {ko
-                      ? '체크인 월별 리드타임 중앙값. 손님들이 점점 일찍 예약하는지 볼 수 있습니다'
+                      ? '체크인 월별 평균 리드타임. 손님들이 점점 일찍 예약하는지 볼 수 있습니다'
                       : 'Median lead time by check-in month — whether guests are booking earlier over time'}
                   </p>
                 </div>

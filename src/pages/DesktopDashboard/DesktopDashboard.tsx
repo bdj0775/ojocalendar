@@ -645,8 +645,9 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
           {report.currentMonthTotal > 0 ? (
             <div className="mb-3">
               <div className="flex items-baseline gap-1.5">
+                <span className="text-[11px] text-muted-foreground">{ko ? '평균' : 'Avg'}</span>
                 <span className="text-[22px] font-extrabold text-foreground leading-none tabular-nums">{report.currentMonthMedian}</span>
-                <span className="text-[11px] text-muted-foreground">{ko ? '일 전 예약 (중앙값)' : 'days before (median)'}</span>
+                <span className="text-[11px] text-muted-foreground">{ko ? '일 전 예약' : 'days before'}</span>
                 <span className="text-[10px] text-muted-foreground/50 ml-auto">
                   {ko ? `${report.currentMonthTotal}건` : `${report.currentMonthTotal}`}
                   {!report.currentMonthIsComplete && (
@@ -655,14 +656,19 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
                 </span>
               </div>
               {report.baselineTotal > 0 && (
-                <div className="text-[10px] text-muted-foreground mt-1">
-                  {ko
-                    ? `직전 ${report.baselineMonths}개월 평소 ${report.baselineMedian}일`
-                    : `Prior ${report.baselineMonths}mo: ${report.baselineMedian}d`}
-                  <span className={`ml-1 font-semibold ${report.currentMonthMedian >= report.baselineMedian ? 'text-success' : 'text-warning'}`}>
-                    ({report.currentMonthMedian >= report.baselineMedian ? '+' : ''}
-                    {report.currentMonthMedian - report.baselineMedian}{ko ? '일' : 'd'})
-                  </span>
+                <div className="mt-1">
+                  <div className="text-[10px] text-muted-foreground">
+                    {ko
+                      ? `최근 ${report.baselineMonths}개월 평균 ${report.baselineMedian}일 전`
+                      : `Last ${report.baselineMonths} months: ${report.baselineMedian} days before`}
+                  </div>
+                  {report.currentMonthMedian !== report.baselineMedian && (
+                    <div className="text-[10px] text-foreground/80 mt-0.5 break-keep">
+                      {ko
+                        ? `이번 달 손님이 ${Math.abs(report.currentMonthMedian - report.baselineMedian)}일 ${report.currentMonthMedian > report.baselineMedian ? '먼저' : '늦게'} 예약하고 있어요`
+                        : `Guests are booking ${Math.abs(report.currentMonthMedian - report.baselineMedian)} days ${report.currentMonthMedian > report.baselineMedian ? 'earlier' : 'later'} this month`}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
