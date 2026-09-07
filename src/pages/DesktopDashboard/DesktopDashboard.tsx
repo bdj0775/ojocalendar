@@ -656,19 +656,13 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
                 </span>
               </div>
               {report.baselineTotal > 0 && (
-                <div className="mt-1">
-                  <div className="text-[10px] text-muted-foreground">
-                    {ko
-                      ? `최근 ${report.baselineMonths}개월 평균 ${report.baselineMedian}일 전`
-                      : `Last ${report.baselineMonths} months: ${report.baselineMedian} days before`}
-                  </div>
-                  {report.currentMonthMedian !== report.baselineMedian && (
-                    <div className="text-[10px] text-foreground/80 mt-0.5 break-keep">
-                      {ko
-                        ? `이번 달 손님이 ${Math.abs(report.currentMonthMedian - report.baselineMedian)}일 ${report.currentMonthMedian > report.baselineMedian ? '먼저' : '늦게'} 예약하고 있어요`
-                        : `Guests are booking ${Math.abs(report.currentMonthMedian - report.baselineMedian)} days ${report.currentMonthMedian > report.baselineMedian ? 'earlier' : 'later'} this month`}
-                    </div>
-                  )}
+                <div className="text-[10px] text-muted-foreground mt-1 break-keep">
+                  {ko
+                    ? `최근 ${report.baselineMonths}개월 평균 ${report.baselineMedian}일 전`
+                    : `Last ${report.baselineMonths} months: ${report.baselineMedian} days before`}
+                  {report.currentMonthMedian !== report.baselineMedian && (ko
+                    ? ` · 이번 달 손님이 ${Math.abs(report.currentMonthMedian - report.baselineMedian)}일 ${report.currentMonthMedian > report.baselineMedian ? '먼저' : '늦게'} 예약하고 있어요`
+                    : ` · Guests are booking ${Math.abs(report.currentMonthMedian - report.baselineMedian)} days ${report.currentMonthMedian > report.baselineMedian ? 'earlier' : 'later'} this month`)}
                 </div>
               )}
             </div>
