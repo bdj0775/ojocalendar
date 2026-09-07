@@ -640,23 +640,36 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
             </button>
           </div>
 
-          {/* 평균 리드타임 */}
-          {report.currentMonthTotal > 0 ? (
-            <div className="flex items-baseline gap-1.5 mb-3">
-              <span className="text-[22px] font-extrabold text-foreground leading-none tabular-nums">{report.currentMonthAvgDays}</span>
-              <span className="text-[11px] text-muted-foreground">{ko ? '일 전 평균 예약' : 'days avg lead time'}</span>
+          {/* 기준 리드타임 — 완료된 달만 써서 생존 편향을 없앤다.
+              아직 끝나지 않은 달은 임박 예약이 안 들어와 리드타임이 길게 보인다. */}
+          <div className="mb-3">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-[22px] font-extrabold text-foreground leading-none tabular-nums">{report.baselineMedian}</span>
+              <span className="text-[11px] text-muted-foreground">{ko ? '일 전 예약 (중앙값)' : 'days before (median)'}</span>
               <span className="text-[10px] text-muted-foreground/50 ml-auto">
-                {ko ? `이번 달 ${report.currentMonthTotal}건` : `${report.currentMonthTotal} this month`}
+                {ko ? `완료 ${report.baselineMonths}개월 · ${report.baselineTotal}건` : `${report.baselineMonths}mo · ${report.baselineTotal}`}
               </span>
             </div>
-          ) : (
-            <p className="text-[11px] text-muted-foreground/50 mb-3">{ko ? '이번 달 예약 없음' : 'No bookings this month'}</p>
-          )}
+            {report.currentMonthTotal > 0 && (
+              <div className="flex items-baseline gap-1 mt-1 text-[10px] text-muted-foreground">
+                <span>{ko ? '이번 달' : 'This month'}</span>
+                <span className="font-bold text-foreground tabular-nums">
+                  {report.currentMonthMedian}{ko ? '일' : 'd'}
+                </span>
+                <span className="text-muted-foreground/60">({report.currentMonthTotal}{ko ? '건' : ''})</span>
+                {!report.currentMonthIsComplete && (
+                  <span className="text-amber-500 font-semibold ml-0.5">
+                    {ko ? '· 집계 중' : '· in progress'}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* 구간별 가로 막대 */}
           <div className="flex flex-col gap-2 flex-1">
             {report.currentMonthBuckets.map((cm, i) => {
-              const overall = report.buckets[i];
+              const overall = report.baselineBuckets[i];
               return (
                 <div key={cm.key}>
                   <div className="flex items-baseline justify-between mb-1">
@@ -693,7 +706,9 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-1 rounded-full bg-muted-foreground/30" />
-              <span className="text-[10px] font-semibold text-muted-foreground">{ko ? '전체 평균' : 'Overall avg'}</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">
+                {ko ? `완료 ${report.baselineMonths}개월` : `Last ${report.baselineMonths}mo`}
+              </span>
             </div>
           </div>
         </div>

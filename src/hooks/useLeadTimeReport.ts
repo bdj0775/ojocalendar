@@ -9,6 +9,14 @@ export const LEAD_TIME_BUCKET_DEFS = [
   { key: 'early',      label: '얼리버드 (91일+)', labelEn: 'Early bird (91d+)',   min: 91, max: Infinity, color: 'var(--success)' },
 ] as const;
 
+/** 히스토그램 구간 (일). 마지막은 상한 없음 */
+export const HISTOGRAM_BINS = [0, 7, 14, 21, 30, 45, 60, 90, 120, 180] as const;
+
+/** 기준선 계산에 쓸 완료된 달 수 */
+const BASELINE_MONTHS = 6;
+/** 이 건수 미만인 달은 통계에서 제외 (우연 방지) */
+const MIN_MONTH_BOOKINGS = 3;
+
 export interface LeadTimeBucket {
   key: string;
   label: string;
@@ -16,6 +24,25 @@ export interface LeadTimeBucket {
   count: number;
   pct: number;
   color: string;
+}
+
+export interface LeadTimeGroupStat {
+  key: string;
+  count: number;
+  median: number;
+  avg: number;
+  p90: number;
+}
+
+export interface LeadTimeMonthPoint {
+  year: number;
+  month: number;
+  label: string;
+  count: number;
+  median: number;
+  avg: number;
+  /** 그 달이 이미 지났는가 — false면 아직 예약이 더 들어올 수 있어 리드타임이 과대 */
+  isComplete: boolean;
 }
 
 export interface LeadTimeReport {
@@ -30,140 +57,233 @@ export interface LeadTimeReport {
   currentMonthBuckets: LeadTimeBucket[];
   currentMonthTotal: number;
   currentMonthAvgDays: number;
-  /** 전체 기간(8개월+3개월) 기준 구간 비중 — 비교용 회색 바 */
+  /** 선택 월 중앙값 */
+  currentMonthMedian: number;
+  /** 선택 월이 이미 끝났는가. false면 "집계 중"으로 표시해야 한다 */
+  currentMonthIsComplete: boolean;
+
+  /** ── 기준선: 완료된 최근 6개월 (생존 편향 없음) ── */
+  baselineMedian: number;
+  baselineAvg: number;
+  baselineP90: number;
+  baselineTotal: number;
+  /** 기준선에 포함된 달 수 */
+  baselineMonths: number;
+  baselineBuckets: LeadTimeBucket[];
+
+  /** 전체 기간(윈도 무관, 완료된 달) 기준 구간 비중 — 비교용 */
   buckets: LeadTimeBucket[];
   totalBookings: number;
   overallAvgDays: number;
+  overallMedian: number;
+
+  /** 히스토그램 (완료된 달 전체) */
+  histogram: Array<{ label: string; labelEn: string; count: number; pct: number }>;
+  /** 채널·국적·인원별 통계 (완료된 달 기준) */
+  byChannel: LeadTimeGroupStat[];
+  byNationality: LeadTimeGroupStat[];
+  byGuests: LeadTimeGroupStat[];
+  /** 체크인 월별 추이 (미완료 달 포함, isComplete로 구분) */
+  monthlyTrend: LeadTimeMonthPoint[];
+
+  /** 하위 호환 (기존 카드가 참조) */
   avgChannel: Array<{ key: string; avg: number }>;
   avgNat: Array<{ key: string; avg: number }>;
   avgGuest: Array<{ key: string; avg: number }>;
 }
 
+const median = (arr: number[]): number => {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return Math.round(s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2);
+};
+const mean = (arr: number[]): number =>
+  arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+const percentile = (arr: number[], p: number): number => {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.floor(s.length * p))];
+};
+
 export const useLeadTimeReport = (): LeadTimeReport => {
-  const { bookings, properties, currentYear, currentMonth } = useStore();
+  const { bookings, properties, currentYear, currentMonth, selectedDashboardPropertyId } = useStore();
 
   return useMemo(() => {
     const startX = new Date(currentYear, currentMonth - 8, 1).getTime();
     const endX   = new Date(currentYear, currentMonth + 3, 0, 23, 59, 59).getTime();
 
-    const overallFreq = new Array(151).fill(0);
-    const channelFreq: Record<string, number[]> = {};
-    const natFreq:     Record<string, number[]> = {};
-    const guestFreq:   Record<string, number[]> = {};
-    const allNats = new Set<string>();
+    const today = new Date();
+    const todayMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
     const firstPropId = properties[0]?.id;
     const validBookings = bookings
-      .filter(b => !firstPropId || !b.propertyId || b.propertyId === firstPropId)
+      // 대시보드에서 선택한 숙소 기준 (미선택 시 전체)
+      .filter(b => {
+        if (!selectedDashboardPropertyId) return true;
+        const pid = b.propertyId || firstPropId;
+        return !pid || pid === selectedDashboardPropertyId;
+      })
       .filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed');
 
+    /** 리드타임(일). 접수일이 없으면 null — 통계에서 제외한다 */
+    const leadOf = (b: { checkIn: string; bookingDate?: string | null }): number | null => {
+      if (!b.bookingDate) return null;
+      const ci = new Date(b.checkIn + 'T12:00:00').getTime();
+      const bd = new Date(b.bookingDate + 'T12:00:00').getTime();
+      return Math.max(0, Math.round((ci - bd) / 86400000));
+    };
+    /** 그 달이 이미 끝났는가 */
+    const monthComplete = (y: number, m: number) =>
+      new Date(y, m + 1, 1).getTime() <= todayMs;
+
+    // ── 체크인 월별 그룹핑 ──────────────────────────────────────
+    type Rec = { lead: number; channel: string; nat: string; guestKey: string };
+    const byMonthKey = new Map<number, Rec[]>();
+    const allNats = new Set<string>();
+
+    validBookings.forEach(b => {
+      const lead = leadOf(b);
+      if (lead == null) return;
+      const d = new Date(b.checkIn + 'T12:00:00');
+      const key = d.getFullYear() * 12 + d.getMonth();
+      const nat = (b.nationality || '').trim() || 'Unknown';
+      const g = b.guests || 2;
+      allNats.add(nat);
+      const rec: Rec = {
+        lead,
+        channel: (b.channel || '').trim() || 'Direct',
+        nat,
+        guestKey: g >= 5 ? '5+' : `${g}`,
+      };
+      if (!byMonthKey.has(key)) byMonthKey.set(key, []);
+      byMonthKey.get(key)!.push(rec);
+    });
+
+    const sortedKeys = [...byMonthKey.keys()].sort((a, b) => a - b);
+
+    // ── 월별 추이 (미완료 달 포함) ──────────────────────────────
+    const monthlyTrend: LeadTimeMonthPoint[] = sortedKeys.map(k => {
+      const y = Math.floor(k / 12), m = k % 12;
+      const leads = byMonthKey.get(k)!.map(r => r.lead);
+      return {
+        year: y, month: m,
+        label: `${String(y).slice(-2)}.${String(m + 1).padStart(2, '0')}`,
+        count: leads.length,
+        median: median(leads),
+        avg: mean(leads),
+        isComplete: monthComplete(y, m),
+      };
+    });
+
+    // ── 완료된 달만 모은 표본 (편향 없는 통계의 기반) ────────────
+    const completeKeys = sortedKeys.filter(k => {
+      const y = Math.floor(k / 12), m = k % 12;
+      return monthComplete(y, m) && byMonthKey.get(k)!.length >= MIN_MONTH_BOOKINGS;
+    });
+    const completeRecs: Rec[] = completeKeys.flatMap(k => byMonthKey.get(k)!);
+    const completeLeads = completeRecs.map(r => r.lead);
+
+    // 기준선 = 완료된 달 중 최근 6개
+    const baselineKeys = completeKeys.slice(-BASELINE_MONTHS);
+    const baselineRecs: Rec[] = baselineKeys.flatMap(k => byMonthKey.get(k)!);
+    const baselineLeads = baselineRecs.map(r => r.lead);
+
+    const toBuckets = (leads: number[]): LeadTimeBucket[] => {
+      const counts = LEAD_TIME_BUCKET_DEFS.map(() => 0);
+      leads.forEach(L => {
+        const i = LEAD_TIME_BUCKET_DEFS.findIndex(d => L >= d.min && L <= d.max);
+        if (i >= 0) counts[i]++;
+      });
+      return LEAD_TIME_BUCKET_DEFS.map((def, i) => ({
+        key: def.key, label: def.label, labelEn: def.labelEn,
+        count: counts[i],
+        pct: leads.length ? Math.round((counts[i] / leads.length) * 100) : 0,
+        color: def.color,
+      }));
+    };
+
+    // ── 히스토그램 (완료된 달 전체) ─────────────────────────────
+    const histogram = HISTOGRAM_BINS.map((from, i) => {
+      const to = HISTOGRAM_BINS[i + 1];
+      const count = completeLeads.filter(L => (to == null ? L >= from : L >= from && L < to)).length;
+      return {
+        label: to == null ? `${from}일+` : `${from}~${to - 1}일`,
+        labelEn: to == null ? `${from}d+` : `${from}–${to - 1}d`,
+        count,
+        pct: completeLeads.length ? Math.round((count / completeLeads.length) * 100) : 0,
+      };
+    });
+
+    // ── 그룹별 통계 (완료된 달 기준) ────────────────────────────
+    const groupStats = (pick: (r: Rec) => string): LeadTimeGroupStat[] => {
+      const dict = new Map<string, number[]>();
+      completeRecs.forEach(r => {
+        const k = pick(r);
+        if (!dict.has(k)) dict.set(k, []);
+        dict.get(k)!.push(r.lead);
+      });
+      return [...dict.entries()]
+        .map(([key, leads]) => ({
+          key, count: leads.length,
+          median: median(leads), avg: mean(leads), p90: percentile(leads, 0.9),
+        }))
+        .sort((a, b) => b.count - a.count);
+    };
+    const byChannel     = groupStats(r => r.channel);
+    const byNationality = groupStats(r => r.nat);
+    const byGuests      = groupStats(r => r.guestKey).sort((a, b) => a.key.localeCompare(b.key));
+
+    // ── 선택 월 ────────────────────────────────────────────────
+    const cmKey = currentYear * 12 + currentMonth;
+    const cmLeads = (byMonthKey.get(cmKey) ?? []).map(r => r.lead);
+
+    // ── 산점도 (모달 보조용, 기존 윈도 유지) ────────────────────
     const scatterData = validBookings.map(b => {
       const ciTime = new Date(b.checkIn + 'T12:00:00').getTime();
       if (ciTime < startX || ciTime > endX) return null;
-
-      let leadDays = 0;
-      if (b.bookingDate) {
-        leadDays = Math.max(0, Math.round(
-          (ciTime - new Date(b.bookingDate + 'T12:00:00').getTime()) / 86400000,
-        ));
-      } else {
-        // bookingDate 없는 iCal 예약은 제외 (통계 오염 방지)
-        return null;
-      }
-      leadDays = Math.min(150, leadDays);
-
+      const lead = leadOf(b);
+      if (lead == null) return null;
       const nights = Math.max(1, Math.round(
         (new Date(b.checkOut + 'T12:00:00').getTime() - ciTime) / 86400000,
       ));
-      const ch       = (b.channel     || '').trim() || 'Direct';
-      const nat      = (b.nationality || '').trim() || 'Unknown';
-      const guestsN  = b.guests || 2;
-      const guestKey = guestsN >= 5 ? '5+' : `${guestsN}`;
-
-      allNats.add(nat);
-      overallFreq[leadDays]++;
-
-      if (!channelFreq[ch])       channelFreq[ch]       = new Array(151).fill(0);
-      if (!natFreq[nat])          natFreq[nat]           = new Array(151).fill(0);
-      if (!guestFreq[guestKey])   guestFreq[guestKey]    = new Array(151).fill(0);
-      channelFreq[ch][leadDays]++;
-      natFreq[nat][leadDays]++;
-      guestFreq[guestKey][leadDays]++;
-
-      return { x: ciTime, y: leadDays, nights, channel: ch, nationality: nat, guests: guestsN, guestName: b.guestName || '' };
+      const g = b.guests || 2;
+      return {
+        x: ciTime, y: Math.min(180, lead), nights,
+        channel: (b.channel || '').trim() || 'Direct',
+        nationality: (b.nationality || '').trim() || 'Unknown',
+        guests: g, guestName: b.guestName || '',
+      };
     }).filter((v): v is NonNullable<typeof v> => v !== null);
-
-    // 평균 계산 헬퍼
-    const calcAvg = (freqArr: number[]) => {
-      let days = 0, cnt = 0;
-      freqArr.forEach((c, d) => { days += c * d; cnt += c; });
-      return cnt === 0 ? 0 : Math.round(days / cnt);
-    };
-    const groupAvgs = (dict: Record<string, number[]>) =>
-      Object.keys(dict)
-        .map(key => ({ key, avg: calcAvg(dict[key]) }))
-        .filter(i => dict[i.key].some(c => c > 0))
-        .sort((a, b) => b.avg - a.avg);
-
-    // 구간별 집계
-    let total = 0, weightedDays = 0;
-    const bucketCounts = LEAD_TIME_BUCKET_DEFS.map(() => 0);
-    overallFreq.forEach((c, d) => {
-      total += c;
-      weightedDays += c * d;
-      const idx = LEAD_TIME_BUCKET_DEFS.findIndex(b => d >= b.min && d <= b.max);
-      if (idx >= 0) bucketCounts[idx] += c;
-    });
-
-    const buckets: LeadTimeBucket[] = LEAD_TIME_BUCKET_DEFS.map((def, i) => ({
-      key:     def.key,
-      label:   def.label,
-      labelEn: def.labelEn,
-      count:   bucketCounts[i],
-      pct:     total > 0 ? Math.round((bucketCounts[i] / total) * 100) : 0,
-      color:   def.color,
-    }));
-
-    // ── 선택 월(currentYear/currentMonth) 체크인 예약만 따로 집계 ──
-    const cmStart = new Date(currentYear, currentMonth, 1).getTime();
-    const cmEnd   = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).getTime();
-    const cmCounts = LEAD_TIME_BUCKET_DEFS.map(() => 0);
-    let cmTotal = 0, cmWeighted = 0;
-
-    validBookings.forEach(b => {
-      if (!b.bookingDate) return;
-      const ciTime = new Date(b.checkIn + 'T12:00:00').getTime();
-      if (ciTime < cmStart || ciTime > cmEnd) return;
-      const leadDays = Math.min(150, Math.max(0, Math.round(
-        (ciTime - new Date(b.bookingDate + 'T12:00:00').getTime()) / 86400000,
-      )));
-      const idx = LEAD_TIME_BUCKET_DEFS.findIndex(def => leadDays >= def.min && leadDays <= def.max);
-      if (idx >= 0) cmCounts[idx]++;
-      cmTotal++;
-      cmWeighted += leadDays;
-    });
-
-    const currentMonthBuckets: LeadTimeBucket[] = LEAD_TIME_BUCKET_DEFS.map((def, i) => ({
-      key:     def.key,
-      label:   def.label,
-      labelEn: def.labelEn,
-      count:   cmCounts[i],
-      pct:     cmTotal > 0 ? Math.round((cmCounts[i] / cmTotal) * 100) : 0,
-      color:   def.color,
-    }));
 
     return {
       scatterData, startX, endX,
       natKeys: [...allNats],
-      currentMonthBuckets,
-      currentMonthTotal:   cmTotal,
-      currentMonthAvgDays: cmTotal > 0 ? Math.round(cmWeighted / cmTotal) : 0,
-      buckets,
-      totalBookings:  total,
-      overallAvgDays: total > 0 ? Math.round(weightedDays / total) : 0,
-      avgChannel: groupAvgs(channelFreq),
-      avgNat:     groupAvgs(natFreq),
-      avgGuest:   groupAvgs(guestFreq),
+
+      currentMonthBuckets: toBuckets(cmLeads),
+      currentMonthTotal:   cmLeads.length,
+      currentMonthAvgDays: mean(cmLeads),
+      currentMonthMedian:  median(cmLeads),
+      currentMonthIsComplete: monthComplete(currentYear, currentMonth),
+
+      baselineMedian: median(baselineLeads),
+      baselineAvg:    mean(baselineLeads),
+      baselineP90:    percentile(baselineLeads, 0.9),
+      baselineTotal:  baselineLeads.length,
+      baselineMonths: baselineKeys.length,
+      baselineBuckets: toBuckets(baselineLeads),
+
+      buckets:        toBuckets(completeLeads),
+      totalBookings:  completeLeads.length,
+      overallAvgDays: mean(completeLeads),
+      overallMedian:  median(completeLeads),
+
+      histogram, byChannel, byNationality, byGuests, monthlyTrend,
+
+      // 하위 호환
+      avgChannel: byChannel.map(g => ({ key: g.key, avg: g.avg })),
+      avgNat:     byNationality.map(g => ({ key: g.key, avg: g.avg })),
+      avgGuest:   byGuests.map(g => ({ key: g.key, avg: g.avg })),
     };
-  }, [bookings, currentYear, currentMonth]);
+  }, [bookings, properties, currentYear, currentMonth, selectedDashboardPropertyId]);
 };
