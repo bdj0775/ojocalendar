@@ -150,21 +150,21 @@ const PaceDetailsModal = ({ isOpen, onClose, isDark = false }: PaceDetailsModalP
     };
   };
 
-  const sectionCls = 'bg-card border border-border rounded-card p-5 shadow-card-xs';
+  const sectionCls = 'bg-card border border-border rounded-card p-4 max-[640px]:p-3.5 sm:p-5 shadow-card-xs';
   const sectionTitleCls = 'text-[13px] font-bold text-foreground';
   const sectionDescCls = 'text-[11px] text-muted-foreground mt-0.5 break-keep';
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-overlay flex justify-center items-center p-4 opacity-0 animate-[fadeIn_0.25s_forwards]"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-overlay flex justify-center items-center p-4 max-[640px]:p-0 opacity-0 animate-[fadeIn_0.25s_forwards]"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-[980px] max-h-[88vh] bg-background border border-border rounded-sheet shadow-modal flex flex-col overflow-hidden translate-y-4 animate-[slideUp_0.35s_cubic-bezier(0.16,1,0.3,1)_forwards]"
+        className="w-full max-w-[980px] max-h-[88vh] max-[640px]:max-h-full max-[640px]:h-full max-[640px]:rounded-none bg-background border border-border rounded-sheet shadow-modal flex flex-col overflow-hidden translate-y-4 animate-[slideUp_0.35s_cubic-bezier(0.16,1,0.3,1)_forwards]"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-border flex-shrink-0">
+        <div className="flex items-start justify-between gap-4 px-6 max-[640px]:px-4 pt-5 pb-4 border-b border-border flex-shrink-0">
           <div>
             <h2 className="text-[15px] font-bold text-foreground">
               {ko ? '예약 속도 분석' : 'Booking Pace Analysis'}
@@ -184,14 +184,14 @@ const PaceDetailsModal = ({ isOpen, onClose, isDark = false }: PaceDetailsModalP
           </button>
         </div>
 
-        <div className="px-6 py-5 overflow-y-auto flex flex-col gap-5 dashboard-scroll">
+        <div className="px-6 max-[640px]:px-4 py-5 max-[640px]:py-4 overflow-y-auto flex flex-col gap-5 max-[640px]:gap-4 dashboard-scroll">
           {/* ── ① 한 줄 진단 ── */}
           {current && (
-            <div className="rounded-card border border-primary/25 bg-primary/[0.06] p-5">
+            <div className="rounded-card border border-primary/25 bg-primary/[0.06] p-5 max-[640px]:p-4">
               <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2">
                 {ko ? '이번 달 진단' : "This month"}
               </div>
-              <p className="text-[16px] font-bold text-foreground leading-snug break-keep">
+              <p className="text-[16px] max-[640px]:text-[14px] font-bold text-foreground leading-snug break-keep">
                 {current.diff == null
                   ? (ko
                     ? `${current.target.label}은 현재 ${current.otb.toFixed(1)}% 예약됐어요`
@@ -340,7 +340,7 @@ const PaceDetailsModal = ({ isOpen, onClose, isDark = false }: PaceDetailsModalP
 
           {/* ── ④ 월별 상세 ── */}
           <div className={`${sectionCls} p-0 overflow-hidden`}>
-            <div className="px-5 pt-5 pb-3.5">
+            <div className="px-5 max-[640px]:px-3.5 pt-5 max-[640px]:pt-4 pb-3.5">
               <h3 className={sectionTitleCls}>{ko ? '월별 상세' : 'Monthly detail'}</h3>
               <p className={sectionDescCls}>
                 {ko

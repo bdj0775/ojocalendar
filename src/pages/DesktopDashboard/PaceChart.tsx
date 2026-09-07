@@ -108,14 +108,12 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false, predicted
               <button className={`${toggleBtnCls} ${paceMode === 'occ' ? toggleBtnActiveCls : ''}`} onClick={() => setPaceMode('occ')}>{ko ? '점유율' : 'OCC'}</button>
               <button className={`${toggleBtnCls} ${paceMode === 'rev' ? toggleBtnActiveCls : ''}`} onClick={() => setPaceMode('rev')}>{ko ? '매출' : 'Rev'}</button>
             </div>
-            {!compact && (
-              <button
-                className="bg-primary/10 text-primary border border-primary/20 py-1 px-2.5 rounded-chip text-xs font-semibold cursor-pointer transition-colors hover:bg-primary/15"
-                onClick={() => setIsPaceModalOpen(true)}
-              >
-                {ko ? '자세히 보기 >' : 'View Details >'}
-              </button>
-            )}
+            <button
+              className={`bg-primary/10 text-primary border border-primary/20 rounded-chip font-semibold cursor-pointer transition-colors hover:bg-primary/15 ml-auto whitespace-nowrap ${compact ? 'py-0.5 px-2 text-[9px]' : 'py-1 px-2.5 text-xs ml-0'}`}
+              onClick={() => setIsPaceModalOpen(true)}
+            >
+              {ko ? '자세히 보기 >' : 'View Details >'}
+            </button>
           </div>
 
           {/* Legend */}
@@ -301,7 +299,7 @@ const PaceChart = ({ pace, isDark, ko, sym, fmtShort, compact = false, predicted
         )}
       </div>
 
-      {!compact && <PaceDetailsModal isOpen={isPaceModalOpen} onClose={() => setIsPaceModalOpen(false)} isDark={isDark} />}
+      <PaceDetailsModal isOpen={isPaceModalOpen} onClose={() => setIsPaceModalOpen(false)} isDark={isDark} />
     </>
   );
 };
