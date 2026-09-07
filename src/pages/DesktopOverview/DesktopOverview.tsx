@@ -4,6 +4,7 @@ import CalendarPage from '../Calendar/Calendar';
 import DesktopDashboard from '../DesktopDashboard/DesktopDashboard';
 import DesktopBookings from '../DesktopBookings/DesktopBookings';
 import DesktopSettings from '../DesktopSettings/DesktopSettings';
+import DesktopPricing from '../DesktopPricing/DesktopPricing';
 import AdminSettings from '../Admin/AdminSettings';
 import DesktopTabNav from '../../components/DesktopTabNav/DesktopTabNav';
 import PropertyDropdown from '../../components/DesktopTabNav/PropertyDropdown';
@@ -101,7 +102,7 @@ const DesktopOverview = () => {
               <header className="flex items-center justify-between mb-4 h-8">
                 <div className="flex items-center gap-3">
                   <h1 className="text-base font-bold text-slate-800 dark:text-slate-200 tracking-tight m-0 ml-2">
-                    {activeTab === 'bookings' ? '예약목록' : activeTab === 'admin' ? '관리자' : '설정'}
+                    {activeTab === 'bookings' ? '예약목록' : activeTab === 'pricing' ? '가격' : activeTab === 'admin' ? '관리자' : '설정'}
                   </h1>
                 </div>
                 <div className="flex items-center gap-5">
@@ -124,6 +125,7 @@ const DesktopOverview = () => {
             </div>
             <div className="flex-1 overflow-hidden overflow-y-auto">
               {activeTab === 'bookings' && <DesktopBookings />}
+              {activeTab === 'pricing' && <DesktopPricing isDark={isDark} />}
               {activeTab === 'settings' && <DesktopSettings />}
               {activeTab === 'admin' && <AdminSettings />}
             </div>

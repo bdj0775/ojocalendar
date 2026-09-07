@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { supabase } from '../services/supabaseClient';
 import { validateICalUrl } from '../services/icalSync/icalFetcher';
 import type {
-  StoreState, BookingStatus, Settings, SyncNotification, Property, DesktopTab,
+  StoreState, BookingStatus, Settings, SyncNotification, Property, DesktopTab, PricingAction,
   DesktopBookingsFilter, MobileBookingsFilter, OnboardingDraft, ChannelSetting,
 } from '../types';
 
@@ -126,6 +126,7 @@ export const useStore = create<StoreState>()(
         await Promise.all([
           supabase.from('sync_notifications').delete().eq('host_id', user.id),
           supabase.from('sync_channels').delete().eq('host_id', user.id),
+          supabase.from('pricing_actions').delete().eq('host_id', user.id),
           supabase.from('bookings').delete().eq('host_id', user.id),
         ]);
         await supabase.from('properties').delete().eq('host_id', user.id);
@@ -247,6 +248,7 @@ export const useStore = create<StoreState>()(
             get().fetchNotifications(),
             get().fetchSubscription(),
             get().fetchAppSettings(),
+            get().fetchPricingActions(),
           ]);
         } catch (err) {
           console.error('Fetch Error:', err);
@@ -674,6 +676,59 @@ export const useStore = create<StoreState>()(
           .eq('is_read', false);
         if (error) { get().showToast('알림 처리 중 오류가 발생했습니다', 'error'); return; }
         set({ syncNotifications: [], unreadCount: 0 });
+      },
+
+      // ── 빈방 레이더 결정 기록 (pricing_actions · PRICING_ROADMAP.md) ──
+      pricingActions: [],
+      fetchPricingActions: async () => {
+        const user = get().userProfile;
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('pricing_actions')
+          .select('*')
+          .eq('host_id', user.id)
+          .order('stay_date', { ascending: false })
+          .limit(500);
+        // 테이블이 아직 없으면(마이그레이션 전) 조용히 빈 목록 — 레이더 자체는 동작해야 한다
+        if (error) { set({ pricingActions: [] }); return; }
+        set({
+          pricingActions: (data ?? []).map((r): PricingAction => ({
+            id: r.id, hostId: r.host_id, propertyId: r.property_id ?? null,
+            stayDate: r.stay_date, action: r.action, discountPct: r.discount_pct ?? null,
+            daysBefore: r.days_before ?? null, predictedP: r.predicted_p ?? null,
+            advice: r.advice ?? null, createdAt: r.created_at,
+          })),
+        });
+      },
+      savePricingAction: async (input) => {
+        const user = get().userProfile;
+        if (!user) return;
+        // 같은 밤의 이전 결정은 덮어쓴다 (UNIQUE host_id, property_id, stay_date)
+        const { data, error } = await supabase
+          .from('pricing_actions')
+          .upsert({
+            host_id: user.id, property_id: input.propertyId, stay_date: input.stayDate,
+            action: input.action, discount_pct: input.discountPct, days_before: input.daysBefore,
+            predicted_p: input.predictedP, advice: input.advice,
+          }, { onConflict: 'host_id,property_id,stay_date' })
+          .select('*')
+          .single();
+        if (error || !data) { get().showToast('결정을 저장하지 못했습니다', 'error'); return; }
+        const saved: PricingAction = {
+          id: data.id, hostId: data.host_id, propertyId: data.property_id ?? null,
+          stayDate: data.stay_date, action: data.action, discountPct: data.discount_pct ?? null,
+          daysBefore: data.days_before ?? null, predictedP: data.predicted_p ?? null,
+          advice: data.advice ?? null, createdAt: data.created_at,
+        };
+        set(state => ({
+          pricingActions: [saved, ...state.pricingActions.filter(a =>
+            !(a.propertyId === saved.propertyId && a.stayDate === saved.stayDate))],
+        }));
+      },
+      deletePricingAction: async (id) => {
+        const { error } = await supabase.from('pricing_actions').delete().eq('id', id);
+        if (error) { get().showToast('결정을 지우지 못했습니다', 'error'); return; }
+        set(state => ({ pricingActions: state.pricingActions.filter(a => a.id !== id) }));
       },
 
       // ── 대시보드/예약목록 숙소 필터 ───────────────────────────────

@@ -191,7 +191,7 @@ export interface MobileBookingsFilter {
 // Store
 // ============================================================
 
-export type DesktopTab = 'dashboard' | 'bookings' | 'settings' | 'admin';
+export type DesktopTab = 'dashboard' | 'bookings' | 'pricing' | 'settings' | 'admin';
 
 export interface StoreState {
   // Calendar
@@ -276,6 +276,12 @@ export interface StoreState {
   fetchNotifications: () => Promise<void>;
   markNotificationRead: (notificationId: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
+
+  // 빈방 레이더 결정 기록 (pricing_actions)
+  pricingActions: PricingAction[];
+  fetchPricingActions: () => Promise<void>;
+  savePricingAction: (input: Omit<PricingAction, 'id' | 'hostId' | 'createdAt'>) => Promise<void>;
+  deletePricingAction: (id: string) => Promise<void>;
 
   // 달력 셀 클릭 → 예약목록 연동
   selectedCalendarDate: string | null;
@@ -499,4 +505,147 @@ export interface PaceInsight {
   summaryText: string;         // 1줄 요약 (한국어)
   summaryTextEn: string;       // 1줄 요약 (영어)
   hasEnoughData: boolean;      // 데이터 충분 여부
+}
+
+// ============================================================
+// 빈방 레이더 (가격 탭 · PRICING_ROADMAP.md 3~5장)
+// ============================================================
+
+/** 요일 묶음 — 일~목 밤 / 금·토·공휴일 전날 밤 */
+export type RadarDowGroup = 'weekday' | 'weekend';
+/** 기준 기간 — 최근 6개월 / 최근 12개월 */
+export type RadarWindow = '6m' | '12m';
+/**
+ * 할인 검토 여부 — 여유 / 관심 / 검토 / 강력검토 / 표본 부족.
+ * 기준은 50% 선 하나와 통계적 확신(Wilson 95% 구간)이다:
+ *   여유 = 구간 하한이 50% 이상 (열에 다섯은 팔린다고 확신)
+ *   관심 = 추정치는 50% 이상이지만 하한이 50% 미만 (아마 괜찮지만 불확실)
+ *   검토 = 추정치가 50% 미만이지만 상한이 50% 이상 (아마 필요하지만 불확실)
+ *   강력검토 = 구간 상한이 50% 미만 (열에 다섯도 안 된다고 확신)
+ */
+export type RadarAdvice = 'easy' | 'watch' | 'review' | 'strong' | 'unknown';
+
+export interface FillCurvePoint {
+  /** 남은 날수 D (0 = 당일) */
+  daysBefore: number;
+  /** D일 전에 비어 있던 박 중 결국 팔린 비율 (0~100). 표본 부족이면 null */
+  probability: number | null;
+  /** D일 전에 비어 있던 박 수 (표본) */
+  n: number;
+  sold: number;
+  /** Wilson 95% 구간 (0~100) */
+  ciLow: number | null;
+  ciHigh: number | null;
+  /** 팔린 밤들의 단가와 "그 달 보통 단가 대비 %" (금액 있는 것만) */
+  soldSamples: Array<{ adr: number; pct: number | null }>;
+}
+
+export interface FillCurve {
+  group: RadarDowGroup;
+  window: RadarWindow;
+  /** D = 0..21 모든 정수 */
+  points: FillCurvePoint[];
+  /** 팔릴 가능성이 처음 50% 아래로 떨어지는 D. null = 당일까지 50% 위 */
+  decisionDay: number | null;
+  /** 이 곡선에 들어간 밤 수 (전체) */
+  totalNights: number;
+}
+
+export interface RadarRow {
+  date: string;              // YYYY-MM-DD
+  dow: number;               // 0=일
+  daysBefore: number;        // 오늘 = 0
+  propertyId: string | null;
+  propertyName: string;
+  group: RadarDowGroup;
+  isHolidayEve: boolean;
+  probability: number | null;
+  ciLow: number | null;
+  ciHigh: number | null;
+  /** 표본: D일 전에 비어 있던 밤 수 / 그중 팔린 밤 수 */
+  n: number;
+  sold: number;
+  windowUsed: RadarWindow | null;
+  /** 이 요일 묶음의 결정 시점 (null = 당일까지 여유) */
+  decisionDay: number | null;
+  /** 아직 결정 시점 전인가 */
+  beforeDecision: boolean;
+  /** 지금 판단이 필요한가 — 결정 시점을 지났거나, 틈 때문에 할인 권장이 붙은 경우 */
+  needsAction: boolean;
+  advice: RadarAdvice;
+  /** 이 밤에 이미 남긴 결정 (없으면 null) */
+  action: PricingAction | null;
+  /** 설정의 기본/주말 요금으로 본 현재 가격 (없으면 null) */
+  currentPrice: number | null;
+  /** 같은 상황에서 임박 예약된 밤들의 실제 거래가 요약 (없으면 null) */
+  soldPrices: { count: number; median: number; min: number; max: number; discounted: number; atOrAbove: number } | null;
+  reason: string;
+  reasonEn: string;
+}
+
+export interface RadarStripCell {
+  date: string;
+  dow: number;
+  daysBefore: number;
+  /** 이 날 빈 객실 수 / 전체 객실 수 */
+  emptyCount: number;
+  totalCount: number;
+  /** 이 날 빈 객실 중 가장 급한 권장 */
+  advice: RadarAdvice | null;
+  /** '이 날은 빼기'로 제외한 객실 수 (휴무 등) */
+  excludedCount: number;
+}
+
+export interface LastMinuteRadarResult {
+  today: string;
+  horizonDays: number;
+  rows: RadarRow[];
+  strip: RadarStripCell[];
+  summary: {
+    emptyNights: number;
+    /** 지금 판단이 필요한 빈 밤 수 */
+    needsAction: number;
+    /** 요일 묶음별 결정 시점 (표시용) */
+    decisionDay: Record<RadarDowGroup, number | null>;
+  };
+  /** 4개: (일~목, 금·토) × (6개월, 12개월) */
+  curves: FillCurve[];
+  /** 7일 이내에 팔린 밤의 단가가 그 달 보통 단가와 얼마나 달랐나 (%) */
+  lateSale: { avgPct: number | null; n: number; points: number[] };
+  /** 지난 결정과 그 결과 (최근 것부터) */
+  decisionHistory: DecisionRecord[];
+  dataQuality: {
+    completedMonths: number;
+    pricedBookings: number;
+    /** 기준 기간 예약 중 자동 연동(접수일 = 동기화일) 비중 (0~100) */
+    autoSyncedShare: number;
+    enough: boolean;
+    /** enough가 false일 때 안내용 — 데이터 시작 월 */
+    firstMonth: string | null;
+  };
+}
+
+/** 빈방 레이더 결정 기록 — 호스트가 빈 날에 내린 결정 (pricing_actions 테이블) */
+export type PricingActionKind = 'discount' | 'hold' | 'exclude';
+
+export interface PricingAction {
+  id: string;
+  hostId: string;
+  propertyId: string | null;
+  stayDate: string;            // YYYY-MM-DD
+  action: PricingActionKind;
+  discountPct: number | null;
+  daysBefore: number | null;
+  predictedP: number | null;   // 결정 당시 팔릴 가능성 (0~100)
+  advice: RadarAdvice | null;
+  createdAt: string;
+}
+
+/** 지난 결정 하나의 결과 — "내 결정이 맞았나" */
+export interface DecisionRecord {
+  action: PricingAction;
+  /** 그 밤이 결국 팔렸나 (아직 오지 않은 날은 pending) */
+  outcome: 'sold' | 'unsold' | 'pending';
+  /** 팔렸다면 그 밤 단가가 그 달 보통 단가 대비 몇 % (금액 없으면 null) */
+  adrPct: number | null;
 }

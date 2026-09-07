@@ -15,7 +15,16 @@ const FIELD_LABEL: Record<string, string> = {
   amount:      '금액',
   guests:      '인원',
   nationality: '국적',
+  bookingDate: '접수일',
 };
+
+/**
+ * 자동 연동 예약은 접수일이 "동기화한 날"로 적힌다 (eventMapper). 손님이 실제 예약한 날을
+ * 받아야 리드타임·예상 점유율·빈방 레이더가 정확해지므로 입력 요청 목록에 항상 접수일을 붙인다.
+ * (DB의 missing_fields 자체는 syncService가 만들며 여기서는 표시만 보탠다)
+ */
+const withBookingDate = (fields: string[]) =>
+  fields.includes('bookingDate') ? fields : [...fields, 'bookingDate'];
 
 export default function NotificationBell() {
   const {
@@ -132,7 +141,7 @@ export default function NotificationBell() {
                     </p>
                     {notif.missingFields.length > 0 && (
                       <p className="text-xs text-amber-600 font-medium mt-0.5">
-                        {notif.missingFields.map(f => FIELD_LABEL[f] ?? f).join(' · ')} 입력 필요
+                        {withBookingDate(notif.missingFields).map(f => FIELD_LABEL[f] ?? f).join(' · ')} 입력 필요
                       </p>
                     )}
                   </div>

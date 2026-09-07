@@ -417,6 +417,12 @@ const BookingEditModal = () => {
                   리드타임: {leadTime > 0 ? `${leadTime}일 전` : '당일'}
                 </span>
               )}
+              {booking?.isAutoSynced && (
+                // 자동 연동 예약의 예약일은 "동기화한 날"이다 (eventMapper) — 실제 접수일로 바꿔 달라는 안내
+                <span className="text-[10px] text-warning font-medium break-keep normal-case tracking-normal">
+                  자동 연동 예약은 동기화한 날이 적혀 있어요. 손님이 실제 예약한 날로 바꿔 주세요.
+                </span>
+              )}
             </div>
             
             <div className="flex items-center gap-2">

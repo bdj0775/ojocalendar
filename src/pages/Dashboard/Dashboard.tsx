@@ -24,13 +24,16 @@ import PaceChart from '../DesktopDashboard/PaceChart';
 import { InfoPopover } from '../../components/ui/InfoPopover';
 import { ForecastExplainer } from '../../components/ui/ForecastExplainer';
 import { useForecastExample } from '../../hooks/useForecastExample';
+import { useLastMinuteRadar } from '../../hooks/useLastMinuteRadar';
+import LastMinuteRadarCard from '../DesktopPricing/LastMinuteRadarCard';
+import LastMinuteRadarModal from '../../components/Modals/LastMinuteRadarModal';
 
 const CHANNELS_FILTER = ['All', 'Airbnb', 'Booking.com', 'Direct', 'Naver'] as const;
 
 const DashboardPage = () => {
   const { t, language } = useTranslation();
   const { open: openSidebar } = useSidebar();
-  const { bookings, nextMonth, prevMonth, userProfile, properties, fetchData, showToast, currentYear, currentMonth } = useStore();
+  const { bookings, nextMonth, prevMonth, userProfile, properties, fetchData, showToast, currentYear, currentMonth, settings } = useStore();
 
   const [tableChannel, setTableChannel] = useState('All');
   const [isLeadTimeModalOpen, setIsLeadTimeModalOpen] = useState(false);
@@ -48,6 +51,9 @@ const DashboardPage = () => {
   const stats  = useDesktopStats(tableChannel, 'All', 'All');
   const pace   = useBookingPace();
   const report = useLeadTimeReport();
+  // 빈방 레이더 (가격 탭 카드 ①의 축약형 — PRICING_ROADMAP.md)
+  const radar  = useLastMinuteRadar();
+  const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
 
   const ko = language === 'ko';
   const forecastExample = useForecastExample(stats, ko);
@@ -561,6 +567,18 @@ const DashboardPage = () => {
         {/* ── 예약 속도 추이 (채널분포 바로 아래) ── */}
         <PaceChart pace={pace} isDark={isDark} ko={ko} sym={sym} fmtShort={fmtShort} compact predictedOcc={predictedOcc} />
 
+        {/* ── 빈방 레이더 (임박 할인 판단) ── */}
+        <div className={card}>
+          <LastMinuteRadarCard
+            radar={radar}
+            ko={ko}
+            compact
+            currency={settings.currency}
+            showProperty={false}
+            onOpenDetail={() => setIsRadarModalOpen(true)}
+          />
+        </div>
+
         {/* ── 리드타임 구간별 비중 ── */}
         <div className={card}>
           <div className="flex items-center justify-between gap-2 mb-3">
@@ -832,6 +850,7 @@ const DashboardPage = () => {
       </div>
 
       {isLeadTimeModalOpen && <LeadTimeDetailModal isDark={isDark} onClose={() => setIsLeadTimeModalOpen(false)} />}
+      {isRadarModalOpen && <LastMinuteRadarModal radar={radar} isDark={isDark} onClose={() => setIsRadarModalOpen(false)} />}
       {isChannelDetailOpen && <DistributionDetailModal mode="channel" isDark={isDark} onClose={() => setIsChannelDetailOpen(false)} />}
       {isNatDetailOpen && <DistributionDetailModal mode="nationality" isDark={isDark} onClose={() => setIsNatDetailOpen(false)} />}
     </div>
