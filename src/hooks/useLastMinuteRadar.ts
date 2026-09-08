@@ -29,8 +29,12 @@ const MIN_SAMPLE = 10;
 const DECISION_THRESHOLD = 50;
 /** 할인 검토 여부의 기준선 하나 — 50% (그냥 두면 안 팔릴 확률이 더 높아지는 지점). 나머지는 통계적 확신으로 나눈다 */
 const REVIEW_LINE = 50;
+/** 이 아래면 확신 여부와 무관하게 적극검토 — "하던 대로 하면 열에 일곱은 안 팔리는 선" (PRICING_ROADMAP 10-5) */
+const STRONG_LINE = 30;
 /** "그 달 보통 단가보다 이만큼 싸면 할인 판매로 본다" (%) */
 const DISCOUNT_MARK = -5;
+/** 가격 신호: 과거 임박 거래가 이만큼은 있어야 "현재가 이상 거래 0박"을 근거로 쓴다 */
+const PRICE_SIGNAL_MIN_SAMPLE = 8;
 /** 임박 판매 단가 기준선에 쓰는 "임박" 정의 (며칠 이내에 팔린 밤) */
 const LATE_SALE_DAYS = 7;
 /** 기록이 이만큼은 있어야 가능성을 보여준다 */
@@ -72,6 +76,7 @@ interface NightRecord {
   key: string;          // propId|date
   date: string;
   group: RadarDowGroup;
+  bookingId: string | null;
   /** 팔린 밤이면 접수일→그 밤까지 남은 날수 (≥0). 안 팔린 밤이면 null */
   lead: number | null;
   /** 그 밤의 단가 (금액 있는 단기 예약만). 없으면 null */
@@ -118,8 +123,9 @@ export const computeRadar = (
   const propName = (id: string | null) => properties.find(p => p.id === id)?.name ?? '';
 
   // ── 예약 → 밤 (숙소|날짜 단위). 같은 밤에 예약이 겹치면 가장 일찍 접수된 것 ───
-  const soldNights = new Map<string, { lead: number; adr: number | null; autoSynced: boolean; bookingDateMs: number }>();
+  const soldNights = new Map<string, { lead: number; adr: number | null; autoSynced: boolean; bookingDateMs: number; bookingId: string }>();
   let firstMonth: string | null = null;
+  let firstCheckIn: string | null = null;
   let pricedBookings = 0;
 
   bookings.forEach(b => {
@@ -132,6 +138,7 @@ export const computeRadar = (
     if (amt > 0) pricedBookings++;
     const monthKey = b.checkIn.slice(0, 7);
     if (!firstMonth || monthKey < firstMonth) firstMonth = monthKey;
+    if (!firstCheckIn || b.checkIn < firstCheckIn) firstCheckIn = b.checkIn;
     // 접수일 정규화: 없거나 체크인보다 늦으면 체크인일 (FORECAST·pace와 동일)
     const bdRaw = b.bookingDate ? parse(b.bookingDate).getTime() : ci.getTime();
     const bdMs = Math.min(bdRaw, ci.getTime());
@@ -142,13 +149,17 @@ export const computeRadar = (
       const lead = Math.max(0, Math.round((d.getTime() - bdMs) / DAY));
       const prev = soldNights.get(key);
       if (!prev || prev.bookingDateMs > bdMs) {
-        soldNights.set(key, { lead, adr, autoSynced: !!b.isAutoSynced, bookingDateMs: bdMs });
+        soldNights.set(key, { lead, adr, autoSynced: !!b.isAutoSynced, bookingDateMs: bdMs, bookingId: b.id });
       }
     }
   });
 
   // ── 과거 12개월 밤 목록 (어제까지) ─────────────────────────────────
-  const historyStart = addDays(today, -WINDOW_DAYS['12m']);
+  // 기록이 12개월 미만이면 첫 예약일부터. 그 전의 날들은 "안 팔린 밤"이 아니라 영업 전이다 —
+  // 여기서 잘라내지 않으면 새 사용자의 팔릴 가능성이 크게 낮게 나온다.
+  const windowStart = addDays(today, -WINDOW_DAYS['12m']);
+  const firstCheckInDate = firstCheckIn ? parse(firstCheckIn as string) : null;
+  const historyStart = firstCheckInDate && firstCheckInDate.getTime() > windowStart.getTime() ? firstCheckInDate : windowStart;
   const history: NightRecord[] = [];
   const monthAdr = new Map<string, number[]>();
   for (let t = historyStart.getTime(); t < today.getTime(); t += DAY) {
@@ -158,7 +169,7 @@ export const computeRadar = (
     scopeProps.forEach(p => {
       const s = soldNights.get(`${p.id}|${iso}`);
       history.push({
-        key: `${p.id}|${iso}`, date: iso, group: g,
+        key: `${p.id}|${iso}`, date: iso, group: g, bookingId: s?.bookingId ?? null,
         lead: s ? s.lead : null, adr: s?.adr ?? null, autoSynced: s?.autoSynced ?? false,
       });
       if (s?.adr != null) {
@@ -194,7 +205,12 @@ export const computeRadar = (
         const ci = n >= MIN_SAMPLE ? wilson(sold, n) : null;
         const soldSamples = nights
           .filter(h => h.lead !== null && h.lead <= D && h.adr !== null)
-          .map(h => { const med = monthMedian.get(h.date.slice(0, 7)); return { adr: h.adr as number, pct: med ? Math.round(((h.adr as number) / med - 1) * 100) : null }; });
+          .map(h => {
+            const med = monthMedian.get(h.date.slice(0, 7)) ?? null;
+            const adr = h.adr as number;
+            return { date: h.date, dow: parse(h.date).getDay(), bookingId: h.bookingId ?? h.key, adr, lead: h.lead as number, monthMedian: med, pct: med ? Math.round((adr / med - 1) * 100) : null };
+          })
+          .sort((a, b) => a.adr - b.adr);
         points.push({
           daysBefore: D,
           probability: n >= MIN_SAMPLE ? Math.round((sold / n) * 100) : null,
@@ -291,12 +307,23 @@ export const computeRadar = (
       if (p !== null && pt && pt.ciLow !== null && pt.ciHigh !== null) {
         advice = pt.ciLow >= REVIEW_LINE ? 'easy'
           : p >= REVIEW_LINE ? 'watch'
-          : pt.ciHigh >= REVIEW_LINE ? 'review'
-          : 'strong';
+          : (p < STRONG_LINE || pt.ciHigh < REVIEW_LINE) ? 'strong'
+          : 'review';
       }
-      const needsAction = advice === 'review' || advice === 'strong';
 
       const currentPrice = currentPriceOf(prop, d, iso);
+      // 가격 신호 — 가능성은 "하던 대로(임박 할인 포함) 했을 때"의 값이다. 지금 가격이
+      // 과거 임박 거래가 전부보다 높으면 그 가능성을 그대로 기대할 근거가 없다.
+      // 효과 크기를 주장하지 않고 "이 가격 이상 팔린 전례가 없다"는 사실만 쓴다.
+      const priceSamples = pt?.soldSamples ?? [];
+      const soldAtCurrentPrice = currentPrice !== null && priceSamples.length >= PRICE_SIGNAL_MIN_SAMPLE
+        ? priceSamples.filter(x => x.adr >= currentPrice).length
+        : null;
+      const priceOutOfRange = soldAtCurrentPrice === 0;
+      // 최대 한 단계, 검토까지만 (적극검토는 가능성이 이미 50% 미만일 때만)
+      if (priceOutOfRange && (advice === 'easy' || advice === 'watch')) advice = 'review';
+
+      const needsAction = advice === 'review' || advice === 'strong';
       const soldPrices = (() => {
         const list = pt?.soldSamples ?? [];
         if (!list.length) return null;
@@ -308,6 +335,7 @@ export const computeRadar = (
           max: Math.round(Math.max(...adrs)),
           discounted: list.filter(x => x.pct !== null && x.pct <= DISCOUNT_MARK).length,
           atOrAbove: list.filter(x => x.pct !== null && x.pct >= 0).length,
+          samples: list,
         };
       })();
       // 띠 달력 색은 "지금 판단이 필요한" 칸에만 — 여유 있는 빈 칸은 테두리만
@@ -327,6 +355,10 @@ export const computeRadar = (
         const dLeftKo = D === 0 ? '당일' : `${D}일 남은`;
         parts.push(`${winKo}, ${dLeftKo} ${gLabelKo} 공실은 ${p}% 확률로 팔렸어요 (총 ${pt.n}개 중 ${pt.sold}박 임박예약 성공)`);
         partsEn.push(`Over the ${winEn}, ${gLabelEn} nights still empty ${dEn} sold ${p}% of the time (${pt.sold} of ${pt.n})`);
+        if (priceOutOfRange && soldPrices) {
+          parts.push(`임박에 팔린 ${soldPrices.count}박은 모두 지금 가격보다 낮았어요`);
+          partsEn.push(`All ${soldPrices.count} late bookings went below your current price`);
+        }
       } else if (!enough) {
         parts.push('아직 기록이 적어 가능성을 계산할 수 없어요');
         partsEn.push('Not enough history yet to estimate');
@@ -340,7 +372,8 @@ export const computeRadar = (
         propertyId: prop.id, propertyName: propName(prop.id),
         group: g, isHolidayEve: holidayEve,
         probability: p, ciLow: pt?.ciLow ?? null, ciHigh: pt?.ciHigh ?? null, n: pt?.n ?? 0, sold: pt?.sold ?? 0,
-        windowUsed: window, decisionDay, beforeDecision, needsAction, advice, action: act, currentPrice, soldPrices,
+        windowUsed: window, decisionDay, beforeDecision, needsAction, advice, action: act,
+        currentPrice, soldPrices, soldAtCurrentPrice, priceOutOfRange,
         reason: parts.join(' · '), reasonEn: partsEn.join(' · '),
       });
     });

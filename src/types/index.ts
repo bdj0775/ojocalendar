@@ -521,7 +521,7 @@ export type RadarWindow = '6m' | '12m';
  *   여유 = 구간 하한이 50% 이상 (열에 다섯은 팔린다고 확신)
  *   관심 = 추정치는 50% 이상이지만 하한이 50% 미만 (아마 괜찮지만 불확실)
  *   검토 = 추정치가 50% 미만이지만 상한이 50% 이상 (아마 필요하지만 불확실)
- *   강력검토 = 구간 상한이 50% 미만 (열에 다섯도 안 된다고 확신)
+ *   적극검토 = 구간 상한이 50% 미만이거나, 추정치가 30% 미만
  */
 export type RadarAdvice = 'easy' | 'watch' | 'review' | 'strong' | 'unknown';
 
@@ -536,8 +536,20 @@ export interface FillCurvePoint {
   /** Wilson 95% 구간 (0~100) */
   ciLow: number | null;
   ciHigh: number | null;
-  /** 팔린 밤들의 단가와 "그 달 보통 단가 대비 %" (금액 있는 것만) */
-  soldSamples: Array<{ adr: number; pct: number | null }>;
+  /** 팔린 밤들 (금액 있는 것만): 날짜 · 1박 단가 · 최종 예약일(D-n) · 그 달 보통 단가 · 대비 % */
+  soldSamples: SoldNightSample[];
+}
+
+export interface SoldNightSample {
+  date: string;
+  dow: number;
+  /** 같은 예약의 밤들을 묶기 위한 예약 id */
+  bookingId: string;
+  adr: number;
+  /** 며칠 전에 예약됐나 (0 = 당일) */
+  lead: number;
+  monthMedian: number | null;
+  pct: number | null;
 }
 
 export interface FillCurve {
@@ -577,8 +589,12 @@ export interface RadarRow {
   action: PricingAction | null;
   /** 설정의 기본/주말 요금으로 본 현재 가격 (없으면 null) */
   currentPrice: number | null;
-  /** 같은 상황에서 임박 예약된 밤들의 실제 거래가 요약 (없으면 null) */
-  soldPrices: { count: number; median: number; min: number; max: number; discounted: number; atOrAbove: number } | null;
+  /** 같은 상황에서 임박 예약된 밤들의 실제 거래가 (없으면 null). samples는 단가 오름차순 */
+  soldPrices: { count: number; median: number; min: number; max: number; discounted: number; atOrAbove: number; samples: SoldNightSample[] } | null;
+  /** 과거 임박 거래 중 현재가 이상에서 팔린 밤 수. 현재가·표본이 없으면 null */
+  soldAtCurrentPrice: number | null;
+  /** 현재가 이상 거래가 하나도 없어 한 단계 올렸는가 */
+  priceOutOfRange: boolean;
   reason: string;
   reasonEn: string;
 }
