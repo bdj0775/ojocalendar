@@ -8,6 +8,7 @@ import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
 import { CHANNEL_COLORS } from '../../pages/DesktopDashboard/chartComponents';
 import { getNatColor } from '../../utils/colors';
+import { isAnalyticsBooking, makeRoomsFor } from '../../utils/analyticsBookings';
 
 const MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -26,15 +27,21 @@ interface Props {
 }
 
 export default function DistributionDetailModal({ mode, isDark, onClose }: Props) {
-  const { bookings, properties } = useStore();
+  const { bookings, properties, selectedDashboardPropertyId } = useStore();
   const { language } = useTranslation();
   const ko = language === 'ko';
 
   const { chartData, keys, colorMap } = useMemo(() => {
-    const pid = properties[0]?.id;
+    // 대시보드에서 선택한 숙소 기준 (미선택 시 전체) — useDesktopStats와 동일 규칙.
+    // 예전에는 항상 첫 번째 숙소만 봐서, 숙소가 여럿이면 나머지 예약이 빠졌다.
+    const firstPropId = properties[0]?.id;
     const vb = bookings
-      .filter(b => !pid || !b.propertyId || b.propertyId === pid)
-      .filter(b => ['confirmed', 'checked in', 'completed'].includes(b.status))
+      .filter(b => {
+        if (!selectedDashboardPropertyId) return true;
+        const pid = b.propertyId || firstPropId;
+        return !pid || pid === selectedDashboardPropertyId;
+      })
+      .filter(isAnalyticsBooking)
       .map(b => ({
         ...b,
         nat: (b.nationality || '').trim() || 'Unknown',
@@ -42,6 +49,7 @@ export default function DistributionDetailModal({ mode, isDark, onClose }: Props
       }));
 
     if (!vb.length) return { chartData: [], keys: [], colorMap: {} };
+    const roomsFor = makeRoomsFor(vb, firstPropId, !!selectedDashboardPropertyId);
 
     // 전체 날짜 범위
     let minY = 9999, minM = 11;
@@ -100,8 +108,8 @@ export default function DistributionDetailModal({ mode, isDark, onClose }: Props
       const totalNights = skeys.reduce((s, k) => s + (r[k] || 0), 0);
       if (totalNights === 0) return null;
 
-      // OCC% = 총 숙박박수 / 해당월 일수 × 100 → 막대 높이와 정확히 비례
-      const occPct = Math.min(100, Math.round((r.occNights / r.days) * 100));
+      // OCC% = 총 숙박박수 / (해당월 일수 × 객실 수) × 100 — 대시보드 점유율과 같은 정의
+      const occPct = Math.min(100, Math.round((r.occNights / (r.days * roomsFor(y, m))) * 100));
 
       const prev = i > 0 ? mdata.get(`${months[i - 1].y}-${months[i - 1].m}`) : null;
       const prevTotalCount = prev ? prev.totalCount : 0;
@@ -122,7 +130,7 @@ export default function DistributionDetailModal({ mode, isDark, onClose }: Props
     }).filter(Boolean) as Record<string, unknown>[];
 
     return { chartData: cd, keys: skeys, colorMap: cmap };
-  }, [bookings, properties, mode]);
+  }, [bookings, properties, selectedDashboardPropertyId, mode]);
 
   const barW = Math.max(26, Math.min(54, Math.floor(760 / Math.max(chartData.length, 1))));
   const scrollW = Math.max(760, chartData.length * (barW + 10) + 80);

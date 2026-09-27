@@ -53,7 +53,7 @@ const PaceDetailsModal = ({ isOpen, onClose, isDark = false }: PaceDetailsModalP
   const { language } = useTranslation();
   const ko = language === 'ko';
 
-  const { targets, roomCount } = pace;
+  const { targets } = pace;
 
   /** 예측(픽업6) 값을 월 라벨로 찾아온다 */
   const predOf = useMemo(() => {
@@ -73,7 +73,7 @@ const PaceDetailsModal = ({ isOpen, onClose, isDark = false }: PaceDetailsModalP
     const from = Math.max(leadDay, -(t.daysInMonth - 1));
     let nights = 0;
     for (let d = 180; d >= from; d--) nights += t.dailyBookedNights[d + idxOffset] || 0;
-    return Math.min(100, (nights / (t.daysInMonth * roomCount)) * 100);
+    return Math.min(100, (nights / (t.daysInMonth * t.rooms)) * 100);
   };
 
   /** 완료된 달인가 (월말이 이미 지났는가) */
@@ -101,13 +101,13 @@ const PaceDetailsModal = ({ isOpen, onClose, isDark = false }: PaceDetailsModalP
         predictedOcc: predOf(t),
       };
     });
-  }, [targets, roomCount, predOf]);
+  }, [targets, predOf]);
 
   const current = signals[0];
   const currentTarget = targets.find(t => t.isCurrent);
   /** 진행 중인 달의 남은 공실 일수 (예상 마감 기준) */
   const emptyDays = current && current.predictedOcc != null && currentTarget
-    ? Math.max(0, Math.round(((100 - current.predictedOcc) / 100) * currentTarget.daysInMonth))
+    ? Math.max(0, Math.round(((100 - current.predictedOcc) / 100) * currentTarget.daysInMonth * currentTarget.rooms))
     : null;
 
   // ── ③ 픽업 히트맵 ────────────────────────────────────────────
@@ -129,7 +129,7 @@ const PaceDetailsModal = ({ isOpen, onClose, isDark = false }: PaceDetailsModalP
       });
     const max = Math.max(1, ...rows.flatMap(r => r.cells));
     return { rows, max };
-  }, [targets, roomCount]);
+  }, [targets]);
 
   if (!isOpen) return null;
 

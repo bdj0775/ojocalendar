@@ -93,8 +93,7 @@ const DashboardPage = () => {
   const predictedOcc     = currentTrend?.predictedOcc ?? null;
   const predictedNet     = currentTrend?.predictedNet ?? null;
   const forecastConf     = currentTrend != null ? Math.round(currentTrend.forecastConfidence * 100) : null;
-  const daysInMonth      = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const predictedNights  = predictedOcc != null ? Math.round(predictedOcc / 100 * daysInMonth) : null;
+  const predictedNights  = predictedOcc != null ? Math.round(predictedOcc / 100 * stats.availableNights) : null;
   const additionalNights = predictedNights != null ? predictedNights - stats.occupiedNights : null;
 
   // 차트 데이터

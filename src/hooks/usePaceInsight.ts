@@ -32,7 +32,7 @@ export const usePaceInsight = (pace: BookingPaceResult, predictedOcc: number | n
         for (let d = 180; d >= from; d--) {
           pickupNights += t.dailyBookedNights[d + idxOffset] || 0;
         }
-        const occAtLeadDay = Math.min(100, (pickupNights / (t.daysInMonth * pace.roomCount)) * 100);
+        const occAtLeadDay = Math.min(100, (pickupNights / (t.daysInMonth * t.rooms)) * 100);
         sumRecentOccAtLeadDay += occAtLeadDay;
       });
       

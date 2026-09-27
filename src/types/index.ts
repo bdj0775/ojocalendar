@@ -426,6 +426,8 @@ export interface DesktopStats {
   momBookingsChange: number;
   momOccNightsChange: number;
   daysInMonth: number;
+  /** 이번 달 판매 가능한 객실박 (일수 × 객실 수) — 점유율의 분모 */
+  availableNights: number;
   adrThisMonth: number;
   adrYearAvg: number;
   otaCommission: number;
@@ -469,6 +471,8 @@ export interface PaceTarget {
   auc: number;
   finalOcc: number;
   daysInMonth: number;
+  /** 이 달 점유율 분모의 객실 수 (useDesktopStats와 동일 규칙 — makeRoomsFor) */
+  rooms: number;
   startMs: number;
   endMs: number;
   /** 곡선 관측 하한 leadDay. 양수 = 달 시작 전(D-N), 음수 = 월중 경과일(D+|N|), 지난 달 = -(일수-1) */
@@ -486,7 +490,7 @@ export interface PaceDataPoint {
 export interface BookingPaceResult {
   paceData: PaceDataPoint[];
   targets: PaceTarget[];
-  /** 점유율 분모에 쓴 객실 수 (useDesktopStats와 동일 규칙) */
+  /** 선택 월의 점유율 분모 객실 수. 달마다 다를 수 있으니 달별 계산엔 PaceTarget.rooms를 쓸 것 */
   roomCount: number;
   todayStr: string;
   todayOccupancyPct: number;

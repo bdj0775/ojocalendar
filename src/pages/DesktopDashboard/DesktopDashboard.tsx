@@ -244,7 +244,7 @@ const DesktopDashboard = ({ activeTab = 'dashboard', onTabChange, isDark = false
             <div className="flex items-center justify-between mb-2">
               <div className={kpiLabelCls}>{ko ? '객실 가동률' : 'OCCUPANCY RATE'}</div>
               <span className={`type-micro font-bold py-0.5 px-2 rounded-full ${stats.occupancyRate >= 70 ? badgeUpCls : badgeDownCls}`}>
-                {stats.occupiedNights}/{stats.daysInMonth} {ko ? '박' : 'nights'}
+                {stats.occupiedNights}/{stats.availableNights} {ko ? '박' : 'nights'}
               </span>
             </div>
             <div className="flex items-baseline gap-2 mb-6">

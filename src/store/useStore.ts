@@ -357,6 +357,9 @@ export const useStore = create<StoreState>()(
             syncChannels: state.syncChannels.filter(c => c.propertyId !== propId),
             visiblePropertyIds:
               filtered === null || filtered.length === allRemainingIds.length ? null : filtered,
+            // 대시보드에서 보고 있던 숙소를 지우면 '전체'로 — 그대로 두면 모든 지표가 0으로 보인다
+            selectedDashboardPropertyId:
+              state.selectedDashboardPropertyId === propId ? null : state.selectedDashboardPropertyId,
           };
         });
 

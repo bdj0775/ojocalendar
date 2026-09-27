@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { getNatColor } from '../utils/colors';
+import { isAnalyticsBooking, makeRoomsFor } from '../utils/analyticsBookings';
 import type { DesktopStats, MonthlyTrend, PieDataItem, LeadTimeDataPoint, MonthlyTableRow, Booking } from '../types';
 
 
@@ -42,7 +43,7 @@ interface MonthStats {
  * 숙박업 표준(Occupancy Rate) 정의이며, 객실이 여러 개일 때도 정확하다.
  *
  * @param roomCount 분모에 쓸 객실 수. 드롭다운에서 특정 숙소를 선택하면 1,
- *                  '전체'면 예약이 있는 숙소 수(빈 숙소는 분모를 부풀리므로 제외).
+ *                  '전체'면 그 달까지 첫 체크인이 있었던 숙소 수 (makeRoomsFor).
  */
 const calcMonthStats = (
   validBookings: (Booking & { amount: number })[],
@@ -140,7 +141,8 @@ export const useDesktopStats = (
         const bPropId = b.propertyId || firstPropId;
         return !bPropId || bPropId === selectedDashboardPropertyId;
       })
-      .filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed')
+      // 유효 상태 + iCal 판매 차단 블록 제외 (금액 0원 'Not available' 장기 블록)
+      .filter(isAnalyticsBooking)
       .map(b => {
         const realAmount = Number(b.amount) || 0;
         const isEstimated = realAmount === 0;
@@ -155,19 +157,15 @@ export const useDesktopStats = (
         };
       });
 
-    // ── 점유율 분모로 쓸 객실 수 ──────────────────────────────────
-    // 특정 숙소를 선택했으면 1개. '전체'면 예약이 하나라도 있는 숙소만 센다
-    // (테스트용으로 만들어두고 예약이 없는 숙소가 분모를 부풀리는 것을 막는다).
-    const roomCount = selectedDashboardPropertyId
-      ? 1
-      : Math.max(1, new Set(
-          validBookings.map(b => b.propertyId || firstPropId).filter(Boolean),
-        ).size);
+    // ── 점유율 분모로 쓸 객실 수 (월별) ──────────────────────────────
+    // 특정 숙소를 선택했으면 1개. '전체'면 그 달까지 첫 체크인이 있었던 숙소만 센다
+    // (예약이 없는 숙소, 아직 영업 전인 숙소가 분모를 부풀리는 것을 막는다).
+    const roomsFor = makeRoomsFor(validBookings, firstPropId, !!selectedDashboardPropertyId);
 
-    const thisMonth = calcMonthStats(validBookings, currentYear, currentMonth, roomCount);
+    const thisMonth = calcMonthStats(validBookings, currentYear, currentMonth, roomsFor(currentYear, currentMonth));
     let lmYear = currentYear, lmMonth = currentMonth - 1;
     if (lmMonth < 0) { lmYear--; lmMonth = 11; }
-    const lastMonth = calcMonthStats(validBookings, lmYear, lmMonth, roomCount);
+    const lastMonth = calcMonthStats(validBookings, lmYear, lmMonth, roomsFor(lmYear, lmMonth));
 
     const momBookingsChange = thisMonth.bookingCount - lastMonth.bookingCount;
     const momOccNightsChange = thisMonth.occNights - lastMonth.occNights;
@@ -183,14 +181,14 @@ export const useDesktopStats = (
 
     let yearlyGross = 0, yearlyNights = 0;
     for (let m = 0; m < 12; m++) {
-      const ms = calcMonthStats(validBookings, currentYear, m, roomCount);
+      const ms = calcMonthStats(validBookings, currentYear, m, roomsFor(currentYear, m));
       yearlyGross += ms.gross; yearlyNights += ms.occNights;
     }
     const adrYearAvg = yearlyNights === 0 ? 0 : Math.round(yearlyGross / yearlyNights);
 
     let ytdGross = 0, ytdNet = 0, ytdOtaCommission = 0;
     for (let m = 0; m <= currentMonth; m++) {
-      const ms = calcMonthStats(validBookings, currentYear, m, roomCount);
+      const ms = calcMonthStats(validBookings, currentYear, m, roomsFor(currentYear, m));
       ytdGross += ms.gross; ytdNet += ms.net; ytdOtaCommission += ms.otaComm;
     }
 
@@ -232,7 +230,7 @@ export const useDesktopStats = (
         while (pm < 0) { pm += 12; py--; }
         // 미래 또는 현재 진행 중인 달은 제외 (OTB를 완료 점유율로 착각하는 버그 방지)
         if (py > actualTodayYear || (py === actualTodayYear && pm >= actualTodayMonth)) continue;
-        const past = calcMonthStats(validBookings, py, pm, roomCount);
+        const past = calcMonthStats(validBookings, py, pm, roomsFor(py, pm));
         if (past.bookingCount >= MIN_RELIABLE_BOOKINGS) samples.push(past.occupancy);
       }
       return samples.length > 0 ? samples.reduce((s, v) => s + v, 0) / samples.length : 65;
@@ -251,7 +249,7 @@ export const useDesktopStats = (
         let hy = actualTodayYear, hm = actualTodayMonth - offset;
         while (hm < 0) { hm += 12; hy--; }
 
-        const hms = calcMonthStats(validBookings, hy, hm, roomCount);
+        const hms = calcMonthStats(validBookings, hy, hm, roomsFor(hy, hm));
         if (hms.bookingCount < MIN_RELIABLE_BOOKINGS || hms.occNights === 0) continue;
 
         // useBookingPace 와 동일하게 자정 기준 monthStart 사용
@@ -344,7 +342,7 @@ export const useDesktopStats = (
         const hy = Math.floor(hk / 12), hm = hk % 12;
         const hDays = new Date(hy, hm + 1, 0).getDate();
         if (new Date(hy, hm + 1, 1).getTime() > todayMs) continue;   // 아직 완료되지 않은 달
-        const hms = calcMonthStats(validBookings, hy, hm, roomCount);
+        const hms = calcMonthStats(validBookings, hy, hm, roomsFor(hy, hm));
         if (hms.bookingCount < MIN_RELIABLE_BOOKINGS) continue;      // 표본 부족한 달은 제외
         if (probeOffset > 0 && probeOffset >= hDays) { pickups.push(0); continue; } // 그 시점엔 이미 마감
 
@@ -363,7 +361,7 @@ export const useDesktopStats = (
           if (bdMs > cutoff) return;
           nights += getOverlapNights(b.checkIn, b.checkOut, hy, hm);
         });
-        const otbThen = Math.min(100, Math.round((nights / (hDays * Math.max(1, roomCount))) * 100));
+        const otbThen = Math.min(100, Math.round((nights / (hDays * roomsFor(hy, hm))) * 100));
         pickups.push(hms.occupancy - otbThen);
       }
 
@@ -408,13 +406,14 @@ export const useDesktopStats = (
       }
 
       // ── 매출 환산(기존 방식 유지): ADR은 작년 같은 달 → 현재 OTB → 기본요금 순
-      const stly = calcMonthStats(validBookings, ty - 1, tm, roomCount);
+      const stly = calcMonthStats(validBookings, ty - 1, tm, roomsFor(ty - 1, tm));
       const stlyIsRampUp = ((ty - 1) * 12 + tm) <= openingPeriodEndKey;
       const stlyReliable = !stlyIsRampUp && stly.bookingCount >= MIN_RELIABLE_BOOKINGS;
       const predictedAdr = stlyReliable && stly.adr > 0 ? stly.adr
         : otb.adr > 0 ? otb.adr
         : basePricePerNight;
-      const predictedOccNights = Math.round((predictedOcc / 100) * daysInMonth);
+      // 객실박 기준 — 숙소가 여러 개면 객실 수만큼 곱해야 예상 매출이 맞다
+      const predictedOccNights = Math.round((predictedOcc / 100) * daysInMonth * roomsFor(ty, tm));
       const predictedGross = Math.round(predictedOccNights * predictedAdr);
       const commRate = otb.gross > 0 ? Math.max(0, Math.min(0.3, (otb.gross - otb.net) / otb.gross)) : 0.12;
       const predictedNet = Math.round(predictedGross * (1 - commRate));
@@ -448,7 +447,7 @@ export const useDesktopStats = (
       while (tm > 11) { tm -= 12; ty++; }
       const isFuture = i > 0;
       const isCurrent = i === 0;
-      const ms = calcMonthStats(validBookings, ty, tm, roomCount);
+      const ms = calcMonthStats(validBookings, ty, tm, roomsFor(ty, tm));
 
       let predictedOcc: number | null = null;
       let predictedGross: number | null = null;
@@ -495,7 +494,7 @@ export const useDesktopStats = (
     for (let m = 0; m < 12; m++) {
       const isFutureMo = currentYear > actualTodayYear ||
         (currentYear === actualTodayYear && m >= actualTodayMonth);
-      const ms = calcMonthStats(validBookings, currentYear, m, roomCount);
+      const ms = calcMonthStats(validBookings, currentYear, m, roomsFor(currentYear, m));
       if (isFutureMo) {
         const fc = computeForecast(currentYear, m, ms);
         afPredictedGross += fc.predictedGross;
@@ -516,8 +515,8 @@ export const useDesktopStats = (
       const isFutureMo = currentYear > actualTodayYear || (currentYear === actualTodayYear && m > actualTodayMonth);
       const isCurrentMo = (currentYear === actualTodayYear && m === actualTodayMonth);
       
-      const ms = calcMonthStats(validBookings, currentYear, m, roomCount);
-      const msLY = calcMonthStats(validBookings, currentYear - 1, m, roomCount);
+      const ms = calcMonthStats(validBookings, currentYear, m, roomsFor(currentYear, m));
+      const msLY = calcMonthStats(validBookings, currentYear - 1, m, roomsFor(currentYear - 1, m));
       
       let actualGross: number | null = null;
       let predictedGross: number | null = null;
@@ -650,7 +649,7 @@ export const useDesktopStats = (
     const monthlyTableData: MonthlyTableRow[] = [...allMonthKeys]
       .map(key => {
         const [y, m] = key.split('-').map(Number);
-        const ms = calcMonthStats(tableBookings, y, m, roomCount);
+        const ms = calcMonthStats(tableBookings, y, m, roomsFor(y, m));
         const natDist: Record<string, number> = {}, chDist: Record<string, number> = {}, guestBuckets: Record<string, number> = {};
         let totalGuests = 0, guestBookingCount = 0, totalLeadDays = 0, leadCount = 0;
         const adrByNat: Record<string, { gross: number; nights: number }> = {};
@@ -685,7 +684,7 @@ export const useDesktopStats = (
         const adrGuestMap: Record<string, number> = {};
         Object.entries(adrByGuest).forEach(([k, v]) => { adrGuestMap[k] = v.nights === 0 ? 0 : Math.round(v.gross / v.nights); });
 
-        const unfilteredMs = calcMonthStats(validBookings, y, m, roomCount);
+        const unfilteredMs = calcMonthStats(validBookings, y, m, roomsFor(y, m));
         const unfilteredTotal = unfilteredMs.bookingCount || 1;
         const natArray = Object.entries(natDist).map(([name, count]) => ({ name, pct: Math.round((count / unfilteredTotal) * 100) })).sort((a, b) => b.pct - a.pct);
         const chArray = Object.entries(chDist).map(([name, count]) => ({ name, pct: Math.round((count / unfilteredTotal) * 100) })).sort((a, b) => b.pct - a.pct);
@@ -713,6 +712,7 @@ export const useDesktopStats = (
       occupancyRate: thisMonth.occupancy, occupiedNights: thisMonth.occNights,
       totalBookings: thisMonth.bookingCount, momBookingsChange, momOccNightsChange,
       daysInMonth: thisMonth.daysInMonth,
+      availableNights: thisMonth.daysInMonth * roomsFor(currentYear, currentMonth),
       adrThisMonth: thisMonth.adr, adrYearAvg,
       otaCommission: thisMonth.otaComm, otaCommPct: Math.round(otaCommPct * 10) / 10,
       ytdGross, ytdNet, ytdOtaCommission,

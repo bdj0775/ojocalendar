@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
+import { isAnalyticsBooking } from '../utils/analyticsBookings';
 
 export const LEAD_TIME_BUCKET_DEFS = [
   { key: 'lastMinute', label: '초단기 (0~7일)',   labelEn: 'Last-min (0–7d)',    min: 0,  max: 7,        color: 'var(--destructive)' },
@@ -139,7 +140,8 @@ export const useLeadTimeReport = (): LeadTimeReport => {
         const pid = b.propertyId || firstPropId;
         return !pid || pid === selectedDashboardPropertyId;
       })
-      .filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed');
+      // 유효 상태 + iCal 판매 차단 블록 제외 (useDesktopStats와 동일)
+      .filter(isAnalyticsBooking);
 
     /** 리드타임(일). 접수일이 없으면 null — 통계에서 제외한다 */
     const leadOf = (b: { checkIn: string; bookingDate?: string | null }): number | null => {

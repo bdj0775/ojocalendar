@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
+import { isAnalyticsBooking, makeRoomsFor } from '../utils/analyticsBookings';
 import type { BookingPaceResult, PaceTarget, PaceDataPoint } from '../types';
 
 // X축 범위: 달 시작 180일 전(D-180) ~ 월말(최대 D+30).
@@ -35,7 +36,7 @@ export const useBookingPace = (): BookingPaceResult => {
         label: `${yy}년 ${date.getMonth() + 1}월`,
         isCurrent: offset === 0,
         revenue: 0, profit: 0, auc: 0, finalOcc: 0,
-        daysInMonth, startMs, endMs, cutoffDay,
+        daysInMonth, rooms: 1, startMs, endMs, cutoffDay,
         dailyBookedNights: new Array(MAX_LEAD + MAX_ELAPSED + 1).fill(0),
         dailyRevenue: new Array(MAX_LEAD + MAX_ELAPSED + 1).fill(0),
       };
@@ -49,14 +50,13 @@ export const useBookingPace = (): BookingPaceResult => {
         const pid = b.propertyId || firstPropId;
         return !pid || pid === selectedDashboardPropertyId;
       })
-      .filter(b => b.status === 'confirmed' || b.status === 'checked in' || b.status === 'completed');
+      // 유효 상태 + iCal 판매 차단 블록 제외 (useDesktopStats와 동일)
+      .filter(isAnalyticsBooking);
 
-    // 점유율 분모 객실 수 — 예약이 있는 숙소만 센다 (useDesktopStats와 동일)
-    const roomCount = selectedDashboardPropertyId
-      ? 1
-      : Math.max(1, new Set(
-          validBookings.map(b => b.propertyId || firstPropId).filter(Boolean),
-        ).size);
+    // 점유율 분모 객실 수 — 달마다 그 달까지 영업을 시작한 숙소만 센다 (useDesktopStats와 동일)
+    const roomsFor = makeRoomsFor(validBookings, firstPropId, !!selectedDashboardPropertyId);
+    targets.forEach(t => { t.rooms = roomsFor(t.date.getFullYear(), t.date.getMonth()); });
+    const roomCount = roomsFor(currentYear, currentMonth);
 
     const todayNoonMs = todayMs + DAY / 2;
 
@@ -110,7 +110,7 @@ export const useBookingPace = (): BookingPaceResult => {
         // 곡선은 관측 하한(cutoffDay)까지만. 그보다 짧은 달(D+29짜리 2월 등)도
         // 자기 월말에서 자연스럽게 끝난다.
         if (day >= t.cutoffDay) {
-          const occ = Math.min(100, Number(((accumulatorsNights[i] / (t.daysInMonth * roomCount)) * 100).toFixed(1)));
+          const occ = Math.min(100, Number(((accumulatorsNights[i] / (t.daysInMonth * t.rooms)) * 100).toFixed(1)));
           dataPoint[t.key] = occ;
           dataPoint[`${t.key}_rev`] = Math.round(accumulatorsRev[i]);
           t.auc += occ;
