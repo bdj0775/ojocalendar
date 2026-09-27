@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { getNatColor } from '../utils/colors';
-import { isAnalyticsBooking, makeRoomsFor } from '../utils/analyticsBookings';
+import { makeRoomsFor, selectDashboardBookings } from '../utils/analyticsBookings';
 import type { DesktopStats, MonthlyTrend, PieDataItem, LeadTimeDataPoint, MonthlyTableRow, Booking } from '../types';
 
 
@@ -135,14 +135,8 @@ export const useDesktopStats = (
     type ValidBooking = Booking & { amount: number; isEstimated: boolean; originalAmount: number };
 
     const firstPropId = properties[0]?.id;
-    const validBookings: ValidBooking[] = bookings
-      .filter(b => {
-        if (!selectedDashboardPropertyId) return true; // null = 전체
-        const bPropId = b.propertyId || firstPropId;
-        return !bPropId || bPropId === selectedDashboardPropertyId;
-      })
-      // 유효 상태 + iCal 판매 차단 블록 제외 (금액 0원 'Not available' 장기 블록)
-      .filter(isAnalyticsBooking)
+    // 선택 숙소 · 유효 상태 · 판매 차단 제외 · 테스트 숙소 제외 (analyticsBookings.ts)
+    const validBookings: ValidBooking[] = selectDashboardBookings(bookings, firstPropId, selectedDashboardPropertyId)
       .map(b => {
         const realAmount = Number(b.amount) || 0;
         const isEstimated = realAmount === 0;

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { isAnalyticsBooking, makeRoomsFor } from '../utils/analyticsBookings';
+import { makeRoomsFor, selectDashboardBookings } from '../utils/analyticsBookings';
 import type { BookingPaceResult, PaceTarget, PaceDataPoint } from '../types';
 
 // X축 범위: 달 시작 180일 전(D-180) ~ 월말(최대 D+30).
@@ -43,15 +43,8 @@ export const useBookingPace = (): BookingPaceResult => {
     });
 
     const firstPropId = properties[0]?.id;
-    const validBookings = bookings
-      // 대시보드에서 선택한 숙소 기준 (미선택 시 전체) — useDesktopStats와 동일 규칙
-      .filter(b => {
-        if (!selectedDashboardPropertyId) return true;
-        const pid = b.propertyId || firstPropId;
-        return !pid || pid === selectedDashboardPropertyId;
-      })
-      // 유효 상태 + iCal 판매 차단 블록 제외 (useDesktopStats와 동일)
-      .filter(isAnalyticsBooking);
+    // 선택 숙소 · 유효 상태 · 판매 차단 제외 · 테스트 숙소 제외 (analyticsBookings.ts)
+    const validBookings = selectDashboardBookings(bookings, firstPropId, selectedDashboardPropertyId);
 
     // 점유율 분모 객실 수 — 달마다 그 달까지 영업을 시작한 숙소만 센다 (useDesktopStats와 동일)
     const roomsFor = makeRoomsFor(validBookings, firstPropId, !!selectedDashboardPropertyId);

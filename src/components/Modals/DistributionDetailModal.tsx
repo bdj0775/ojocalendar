@@ -8,7 +8,7 @@ import { useStore } from '../../store/useStore';
 import { useTranslation } from '../../hooks/useTranslation';
 import { CHANNEL_COLORS } from '../../pages/DesktopDashboard/chartComponents';
 import { getNatColor } from '../../utils/colors';
-import { isAnalyticsBooking, makeRoomsFor } from '../../utils/analyticsBookings';
+import { makeRoomsFor, selectDashboardBookings } from '../../utils/analyticsBookings';
 
 const MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -35,13 +35,8 @@ export default function DistributionDetailModal({ mode, isDark, onClose }: Props
     // 대시보드에서 선택한 숙소 기준 (미선택 시 전체) — useDesktopStats와 동일 규칙.
     // 예전에는 항상 첫 번째 숙소만 봐서, 숙소가 여럿이면 나머지 예약이 빠졌다.
     const firstPropId = properties[0]?.id;
-    const vb = bookings
-      .filter(b => {
-        if (!selectedDashboardPropertyId) return true;
-        const pid = b.propertyId || firstPropId;
-        return !pid || pid === selectedDashboardPropertyId;
-      })
-      .filter(isAnalyticsBooking)
+    // 선택 숙소 · 유효 상태 · 판매 차단 제외 · 테스트 숙소 제외 (analyticsBookings.ts)
+    const vb = selectDashboardBookings(bookings, firstPropId, selectedDashboardPropertyId)
       .map(b => ({
         ...b,
         nat: (b.nationality || '').trim() || 'Unknown',

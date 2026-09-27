@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { isHoliday } from '../utils/holidays';
+import { selectDashboardBookings } from '../utils/analyticsBookings';
 import type {
   Booking, Property, FillCurve, FillCurvePoint, LastMinuteRadarResult,
   RadarAdvice, RadarDowGroup, RadarRow, RadarStripCell, RadarWindow,
@@ -116,7 +117,12 @@ export const computeRadar = (
   const scopeProps: Property[] = opts.selectedPropertyId
     ? properties.filter(p => p.id === opts.selectedPropertyId)
     : (() => {
-        const withBookings = new Set(bookings.map(b => b.propertyId || firstPropId).filter(Boolean));
+        // 실제 영업 중인 숙소만 (테스트 숙소 제외 — 대시보드와 같은 규칙).
+        // 판매 차단 블록은 여기서만 판정용으로 빼고, 아래 밤 계산에서는 '막힌 밤'으로 그대로 둔다.
+        const withBookings = new Set(
+          selectDashboardBookings(bookings, firstPropId ?? undefined, null)
+            .map(b => b.propertyId || firstPropId).filter(Boolean),
+        );
         const list = properties.filter(p => withBookings.has(p.id));
         return list.length ? list : properties.slice(0, 1);
       })();

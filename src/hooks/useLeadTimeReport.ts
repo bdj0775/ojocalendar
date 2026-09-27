@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { isAnalyticsBooking } from '../utils/analyticsBookings';
+import { selectDashboardBookings } from '../utils/analyticsBookings';
 
 export const LEAD_TIME_BUCKET_DEFS = [
   { key: 'lastMinute', label: '초단기 (0~7일)',   labelEn: 'Last-min (0–7d)',    min: 0,  max: 7,        color: 'var(--destructive)' },
@@ -133,15 +133,8 @@ export const useLeadTimeReport = (): LeadTimeReport => {
     const todayMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
     const firstPropId = properties[0]?.id;
-    const validBookings = bookings
-      // 대시보드에서 선택한 숙소 기준 (미선택 시 전체)
-      .filter(b => {
-        if (!selectedDashboardPropertyId) return true;
-        const pid = b.propertyId || firstPropId;
-        return !pid || pid === selectedDashboardPropertyId;
-      })
-      // 유효 상태 + iCal 판매 차단 블록 제외 (useDesktopStats와 동일)
-      .filter(isAnalyticsBooking);
+    // 선택 숙소 · 유효 상태 · 판매 차단 제외 · 테스트 숙소 제외 (analyticsBookings.ts)
+    const validBookings = selectDashboardBookings(bookings, firstPropId, selectedDashboardPropertyId);
 
     /** 리드타임(일). 접수일이 없으면 null — 통계에서 제외한다 */
     const leadOf = (b: { checkIn: string; bookingDate?: string | null }): number | null => {

@@ -34,6 +34,53 @@ export const isCalendarBlock = (b: Pick<Booking, 'guestName' | 'amount' | 'check
 export const isAnalyticsBooking = (b: Booking): boolean =>
   isCountedStatus(b.status) && !isCalendarBlock(b);
 
+/** 한 달에 체크인이 이만큼 있어야 실제 영업 중인 숙소로 본다 (useDesktopStats 오픈월 기준과 동일) */
+export const MIN_OPERATING_CHECKINS = 3;
+
+/**
+ * 대시보드 분석 대상 예약을 고른다. 모든 분석 훅이 이 함수 하나로 범위를 정한다.
+ *
+ * - 특정 숙소를 선택했으면 그 숙소 예약만 (숙소 미지정 예약은 첫 숙소로 간주)
+ * - 유효 상태 + 판매 차단 블록 제외 (isAnalyticsBooking)
+ * - '전체'면 **어느 한 달이라도 체크인이 3건 이상이었던 숙소**의 예약만.
+ *   테스트용으로 만든 숙소에 예약이 몇 건 있으면 그 숙소가 객실 수에 잡혀
+ *   '전체' 점유율이 절반으로 떨어졌다(실사례: 10월 27/62박 = 44%).
+ *   그런 숙소도 드롭다운에서 직접 선택하면 그대로 볼 수 있다.
+ *   조건을 만족하는 숙소가 하나도 없으면(막 시작한 사용자) 거르지 않는다.
+ */
+export const selectDashboardBookings = <T extends Booking>(
+  bookings: T[],
+  firstPropId: string | undefined,
+  selectedPropertyId: string | null,
+): T[] => {
+  const inScope = bookings
+    .filter(b => {
+      if (!selectedPropertyId) return true;
+      const pid = b.propertyId || firstPropId;
+      return !pid || pid === selectedPropertyId;
+    })
+    .filter(isAnalyticsBooking);
+  if (selectedPropertyId) return inScope;
+
+  // 숙소별 · 월별 체크인 건수
+  const counts = new Map<string, Map<number, number>>();
+  inScope.forEach(b => {
+    const pid = b.propertyId || firstPropId || '';
+    const d = new Date(b.checkIn + 'T12:00:00');
+    const k = d.getFullYear() * 12 + d.getMonth();
+    if (!counts.has(pid)) counts.set(pid, new Map());
+    const m = counts.get(pid)!;
+    m.set(k, (m.get(k) || 0) + 1);
+  });
+  const operating = new Set(
+    [...counts.entries()]
+      .filter(([, m]) => [...m.values()].some(c => c >= MIN_OPERATING_CHECKINS))
+      .map(([pid]) => pid),
+  );
+  if (operating.size === 0) return inScope;
+  return inScope.filter(b => operating.has(b.propertyId || firstPropId || ''));
+};
+
 /**
  * 월별 점유율 분모(객실 수)를 돌려주는 함수를 만든다.
  *
